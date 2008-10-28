@@ -37,11 +37,15 @@ DEFINE_INSTANCE(Mouse)
 static s32 open_gpm(Gpm_Connect *conn)
 {
 	s8 buf[64];
-	ttyname_r(STDIN_FILENO, buf, sizeof(buf));
+	s32 ret = ttyname_r(STDIN_FILENO, buf, sizeof(buf));
+
 	u32 index = strlen(buf) - 1;
 	while (buf[index] >= '0' && buf[index] <= '9') index--;
 
-	conn->vc = strtol(buf + index + 1, 0, 10);
+	s8 *tail;
+	conn->vc = strtol(buf + index + 1, &tail, 10);
+	if (*tail) return -1;
+
 	conn->pid = getpid();
 
 	s32 gpm_fd = socket(PF_UNIX, SOCK_STREAM, 0);
@@ -81,29 +85,13 @@ Mouse *Mouse::createInstance()
 	return mouse;
 }
 
-static winsize oldSize;
-
 Mouse::Mouse()
 {
 	x = y = 0;
-	width = Screen::instance()->cols();
-	height = Screen::instance()->rows();
-
-	winsize size;
-	size.ws_xpixel = 0;
-	size.ws_ypixel = 0;
-	size.ws_col = width;
-	size.ws_row = height;
-
-	ioctl(STDIN_FILENO, TIOCGWINSZ, &oldSize);
-	ioctl(STDIN_FILENO, TIOCSWINSZ, &size);
-
-	Screen::instance()->enterLeaveVc(true);
 }
 
 Mouse::~Mouse()
 {
-	ioctl(STDIN_FILENO, TIOCSWINSZ, &oldSize);
 }
 
 void Mouse::readyRead(s8 *buf, u32 len)
@@ -123,18 +111,20 @@ void Mouse::readyRead(s8 *buf, u32 len)
 	if (ev->buttons & GPM_B_RIGHT) buttons |= RightButton;
 
 	if (ev->modifiers & (1 << KG_SHIFT)) buttons |= ShiftButton;
-	if (ev->modifiers & (1 << KG_CTRL)) buttons |= ControlButton ;
+	if (ev->modifiers & (1 << KG_CTRL)) buttons |= ControlButton;
 	if (ev->modifiers & ((1 << KG_ALT) | (1 << KG_ALTGR))) buttons |= AltButton;
 
+	u16 maxx = Screen::instance()->cols(), maxy = Screen::instance()->rows();
 	s16 newx = (s16)x + ev->dx, newy =(s16)y + ev->dy;
+
 	if (newx < 0) newx = 0;
 	if (newy < 0) newy = 0;
-	if (newx >= width) newx = width - 1;
-	if (newy >= height) newy = height - 1;
+	if (newx >= maxx) newx = maxx - 1;
+	if (newy >= maxy) newy = maxy - 1;
 
 	if (newx == x && newy == y && !(buttons & MouseButtonMask)) return;
-
-	FbShell *shell = FbShell::activeShell();
+	
+	FbShell *shell = FbShellManager::instance()->activeShell();
 	if (shell) {
 		shell->mouseInput(newx, newy, type, buttons);
 	}

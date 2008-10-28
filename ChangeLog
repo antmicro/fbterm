@@ -1,3 +1,33 @@
+2008-10-12 version 1.2
+	* lib/term.h lib/term.cpp lib/term_states.cpp lib/term_action.cpp:
+	improved escape and control sequences compability with linux console
+	
+	* fbshell.cpp:
+	added support linux console sequences for changing the color palette and cursor shape
+	moved shell management code to a seperate class FbShellManager
+	
+	* fbconfig.cpp fbshell.cpp:
+	added option to adjust default cursor shape and flash interval
+	added option to modify chars considered as part of a word while auto-selecting text
+	
+	* fbterm.cpp:
+	added handle signal SIGHUP, FbTerm will exit normally while shutdown system directly in it
+	
+	* mouse.cpp:
+	Mouse(): fixed a freeze issue caused by changing console winsize under kernel 2.6.26
+	
+	* screen.cpp:
+	createInstance(): fixed a crash bug while font size is greater than screen size
+	
+	* lib/shell.cpp:
+	cleaned text selection code and fixed a crash bug
+	
+	* fbshell.cpp:
+	fixed not repainting screen when switch back to virtual console which FbTerm running on, but FbTerm not have active window
+	
+	* lib/term_action.cpp:
+	next_param(): fixed a buffer overflow issue which may cause denial of service via application crash
+
 2008-08-23 version 1.1
 	* fbshell.h fbshell.cpp fbterm.cpp input_key.h:
 	added configurable additional text encoding support and switch between them with hot keys

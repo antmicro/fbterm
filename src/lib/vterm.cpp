@@ -30,6 +30,7 @@ const VTerm::CharAttr VTerm::default_char_attr = { -1, -1, 1, 0, 0, 0, 0, VTerm:
 VTerm::CharAttr VTerm::normal_char_attr()
 {
 	CharAttr a(char_attr);
+
 	if (a.underline && default_underline_color != -1) {
 		a.underline = false;
 		a.fcolor = default_underline_color;
@@ -46,6 +47,7 @@ VTerm::CharAttr VTerm::normal_char_attr()
 VTerm::CharAttr VTerm::erase_char_attr()
 {
 	CharAttr a(default_char_attr);
+
 	a.fcolor = char_attr.fcolor;
 	a.bcolor = char_attr.bcolor;
 	a.blink = char_attr.blink;
@@ -72,8 +74,8 @@ void VTerm::init_state()
 	do { \
 		bzero(hash_##a, sizeof(hash_##a)); \
 		for (u32 i = 0; a[i].key != (u16)-1; i++) { \
-			for (u32 j = 0; j <= (a[i].key >> 8); j++) { \
-				hash_##a[(a[i].key & 0xff) + j] = a + i; \
+			for (u32 j = 0; j <= (u32)(a[i].key >> 8); j++) { \
+				hash_##a[(u32)(a[i].key & 0xff) + j] = a + i; \
 			} \
 		} \
 	} while (0)
@@ -124,7 +126,7 @@ VTerm::~VTerm()
 
 void VTerm::reset()
 {
-	utf8 = !strcasecmp(IoPipe::localCodec(), "UTF-8");
+	utf8 = true;
 	utf8_count = 0;
 //	g0_is_active = true;
 	normal_state = true;
@@ -139,6 +141,8 @@ void VTerm::reset()
 	char_attr = s_char_attr = default_char_attr;
 	default_fcolor = default_bcolor = -1;
 	default_underline_color = default_halfbright_color = -1;
+
+	modeChanged(AllModes);
 
 	if (text) {
 		bzero(tab_stops, max_width / 8 + 1);
@@ -246,7 +250,7 @@ void VTerm::resize(u16 w, u16 h)
 	height = h;
 	
 	if (h_changed) {
-		historyChange(visual_start_line, total_history_lines());
+		historyChanged(visual_start_line, total_history_lines());
 	}
 	
 	scroll_bot = height - 1;
@@ -268,7 +272,7 @@ void VTerm::input(const u8 *buf, u32 count)
 
 	if (visual_start_line != total_history_lines()) {
 		historyDisplay(true, total_history_lines());
-		historyChange(visual_start_line, total_history_lines());
+		historyChanged(visual_start_line, total_history_lines());
 	}
 
 	u32 c, tc;
@@ -373,7 +377,7 @@ void VTerm::input(const u8 *buf, u32 count)
 		 * them; to display an arbitrary font position use the
 		 * direct-to-font zone in UTF-8 mode.
 		 */
-		bool ok = tc && (c >= 32 || !(mode_flags.display_ctrl ? (CTRL_ALWAYS >> c) & 1 : utf8 || ((CTRL_ACTION >> c) & 1)))
+		bool ok = tc && (c >= 32 || !(mode_flags.display_ctrl ? ((CTRL_ALWAYS >> c) & 1) : (utf8 || ((CTRL_ACTION >> c) & 1))))
 				  && (c != 127 || mode_flags.display_ctrl)
 				  && (c != 128+27);
 
@@ -748,24 +752,24 @@ void VTerm::move_cursor(u16 x, u16 y)
 	cursor_y = y;
 }
 
-bool VTerm::mode(ModeType type)
+u16 VTerm::mode(ModeType type)
 {
-	bool ret = false;
+	u16 ret = false;
 	switch (type) {
 	case AutoRepeatKey:
 		ret = mode_flags.autorepeat_key;
 		break;
-	case NumericKeypad:
-		ret = mode_flags.numeric_keypad;
+	case ApplicKeypad:
+		ret = mode_flags.applic_keypad;
 		break;
-	case X10MouseReport:
-		ret = mode_flags.x10_mouse_report;
+	case MouseReport:
+		ret = mode_flags.mouse_report;
 		break;
-	case X11MouseReport:
-		ret = mode_flags.x11_mouse_report;
+	case CursorShape:
+		ret = mode_flags.cursor_shape;
 		break;
-	case CursorKeyEsc0:
-		ret = mode_flags.cursorkey_esc0;
+	case CursorKeyEscO:
+		ret = mode_flags.cursorkey_esco;
 		break;
 	case CursorVisible:
 		ret = mode_flags.cursor_visible && (visual_start_line == total_history_lines());
@@ -803,7 +807,7 @@ void VTerm::history_scroll(u16 num)
 	}
 
 	visual_start_line = total_history_lines();
-	historyChange(visual_start_line, total_history_lines());
+	historyChanged(visual_start_line, total_history_lines());
 }
 
 void VTerm::historyDisplay(bool absolute, s32 num)
@@ -822,7 +826,7 @@ void VTerm::historyDisplay(bool absolute, s32 num)
 	if (visual_start_line > total_history_lines()) visual_start_line = total_history_lines();
 	if (visual_start_line == bak_line) return;
 	
-	modeChange(CursorVisible);
+	modeChanged(CursorVisible);
 
 	bool accel_scroll = false;
 

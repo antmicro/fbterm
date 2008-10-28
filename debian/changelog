@@ -1,3 +1,9 @@
+fbterm (1.2-1) unstable; urgency=low
+
+  * New upstream release. (Closes: #503756)
+
+ -- Nobuhiro Iwamatsu <iwamatsu@nigauri.org>  Tue, 28 Oct 2008 12:36:42 +0900
+
 fbterm (1.1-1) unstable; urgency=low
 
   * Initial release (Closes: #497803)

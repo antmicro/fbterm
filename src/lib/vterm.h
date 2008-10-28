@@ -49,12 +49,36 @@ protected:
 		CharType type : 2;
 	};
 
-	typedef enum { CursorVisible, CursorKeyEsc0, X10MouseReport, X11MouseReport, AutoRepeatKey, NumericKeypad } ModeType;
+	typedef enum {
+		MouseNone, MouseX11, MouseX10,
+	} MouseReportType;
+
+	typedef enum {
+		CurDefault, CurNone, CurUnderline, CurLowerThird, CurLowerHalf, CurTwoThirds, CurBlock,
+	} CursorType;
+
+	typedef enum {
+		CursorVisible = 1,
+		CursorShape = 2,
+		MouseReport = 4,
+		CursorKeyEscO = 8,
+		AutoRepeatKey = 16,
+		ApplicKeypad = 32,
+		AllModes = 0xff,
+	} ModeType;
+
+	typedef enum {
+		Bell, BellFrequencySet, BellDurationSet,
+		PaletteSet, PaletteClear,
+		Blank, Unblank,
+		LedSet, LedClear,
+		VcSwitch, VesaPowerIntervalSet,
+	} RequestType;
 
 	VTerm(u16 w = 0, u16 h = 0);
 	virtual ~VTerm();
 
-	bool mode(ModeType type);
+	u16 mode(ModeType type);
 	void resize(u16 w, u16 h);
 	void input(const u8 *buf, u32 count);
 	void expose(u16 x, u16 y, u16 w, u16 h);
@@ -66,10 +90,9 @@ protected:
 	virtual bool moveChars(u16 sx, u16 sy, u16 dx, u16 dy, u16 w, u16 h) { return false; }
 	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c) {};
 	virtual void sendBack(const s8 *data) {}
-	virtual void modeChange(ModeType type) {}
-	virtual void historyChange(u32 cur, u32 total) {}
-	virtual void requestBell() {}
-	virtual void requestSizeChange(u16 w, u16 h) {}
+	virtual void modeChanged(ModeType type) {}
+	virtual void historyChanged(u32 cur, u32 total) {}
+	virtual void request(RequestType type, u32 val = 0) {}
 	virtual void requestUpdate(u16 x, u16 y, u16 w, u16 h);
 
 private:
@@ -139,6 +162,9 @@ private:
 	void set_charset();
 	void set_cursor_type();
 	void linux_specific();
+	void set_palette();
+	void reset_palette();
+	void set_led();
 
 	CharAttr normal_char_attr();
 	CharAttr erase_char_attr();
@@ -179,27 +205,28 @@ private:
 	u16 *dirty_startx, *dirty_endx;
 	u16 width, height, max_width, max_height;
 	u16 scroll_top, scroll_bot;
-	s16 pending_scroll; // >0 means scroll up
+	s32 pending_scroll; // >0 means scroll up
 
 	// terminal state
 	struct ModeFlag {
 		ModeFlag();
 
-		u16 display_ctrl : 1;
 		u16 toggle_meta : 1;
+		u16 inverse_screen : 1;
+
+		u16 display_ctrl : 1;
 		u16 crlf : 1;
 		u16 auto_wrap : 1;
 		u16 insert_mode : 1;
 		u16 cursor_visible : 1;
 		u16 cursor_relative : 1;
-		u16 inverse_screen : 1;
 		u16 col_132 : 1;
 
-		u16 numeric_keypad : 1;
+		u16 applic_keypad : 1;
 		u16 autorepeat_key : 1;
-		u16 x10_mouse_report : 1;
-		u16 x11_mouse_report : 1;
-		u16 cursorkey_esc0 : 1;
+		u16 cursorkey_esco : 1;
+		u16 mouse_report : 2;
+		u16 cursor_shape : 3;
 	} mode_flags;
 
 	u16 cursor_x, cursor_y, s_cursor_x, s_cursor_y;
@@ -209,8 +236,9 @@ private:
 	s8 default_fcolor, default_bcolor, default_underline_color, default_halfbright_color;
 
 	// action parameters
-	u16 npar, param[30];
-	bool q_mode;
+	#define NPAR 16
+	u16 npar, param[NPAR];
+	bool q_mode, palette_mode;
 
 	//history
 	static u16 history_lines;

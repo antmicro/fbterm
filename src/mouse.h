@@ -29,7 +29,6 @@ private:
 	virtual void readyRead(s8 *buf, u32 len);
 
 	u16 x, y;
-	u16 width, height;
 };
 
 #endif

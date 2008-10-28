@@ -105,6 +105,7 @@ FbTerm::FbTerm()
 FbTerm::~FbTerm()
 {
 	IoDispatcher::uninstance();
+	FbShellManager::uninstance();
 	Screen::uninstance();
 	Config::uninstance();
 }
@@ -115,8 +116,6 @@ void FbTerm::init()
 	seteuid(getuid());
 
 	if (!TtyInput::instance() || !Screen::instance()) return;
-
-	Mouse::instance();
 
 	struct vt_mode vtm;
 	vtm.mode = VT_PROCESS;
@@ -138,6 +137,7 @@ void FbTerm::init()
 	sigaddset(&sigmask, SIGUSR2);
 	sigaddset(&sigmask, SIGALRM);
 	sigaddset(&sigmask, SIGTERM);
+	sigaddset(&sigmask, SIGHUP);
 
 	sigprocmask(SIG_BLOCK, &sigmask, &oldSigmask);
 	new SignalIo(sigmask);
@@ -147,9 +147,10 @@ void FbTerm::init()
 	signal(SIGUSR2, sh);
 	signal(SIGALRM, sh);
 	signal(SIGTERM, sh);
+	signal(SIGHUP, sh);
 
-	FbShell *shell = FbShell::createShell();
-//	ioctl(STDIN_FILENO, TIOCCONS, shell->fd()); //should have perm CAP_SYS_ADMIN
+	Mouse::instance();
+	FbShellManager::instance()->createShell();
 
 	mInit = true;
 }
@@ -172,24 +173,25 @@ void FbTerm::processSignal(u32 signo)
 {
 	switch (signo) {
 	case SIGTERM:
+	case SIGHUP:
 		exit();
 		break;
 
 	case SIGALRM:
-		FbShell::drawCursor();
+		FbShellManager::instance()->drawCursor();
 		break;
 
 	case SIGUSR1:
-		FbShell::enterLeaveVc(false);
-		Screen::instance()->enterLeaveVc(false);
-		TtyInput::instance()->enterLeaveVc(false);
+		FbShellManager::instance()->switchVc(false);
+		Screen::instance()->switchVc(false);
+		TtyInput::instance()->switchVc(false);
 		ioctl(STDIN_FILENO, VT_RELDISP, 1);
 		break;
 
 	case SIGUSR2:
-		TtyInput::instance()->enterLeaveVc(true);
-		Screen::instance()->enterLeaveVc(true);
-		FbShell::enterLeaveVc(true);
+		TtyInput::instance()->switchVc(true);
+		Screen::instance()->switchVc(true);
+		FbShellManager::instance()->switchVc(true);
 		break;
 
 	default:
@@ -199,47 +201,43 @@ void FbTerm::processSignal(u32 signo)
 
 void FbTerm::processSysKey(u32 key)
 {
+	FbShellManager *manager = FbShellManager::instance();
+
 	switch (key) {
 	case CTRL_ALT_E:
 		exit();
 		break;
 
 	case SHIFT_PAGEDOWN:
-	case SHIFT_PAGEUP: {
-		FbShell *shell = FbShell::activeShell();
-		if (shell) {
-			shell->historyDisplay(false, (key == SHIFT_PAGEDOWN) ? shell->h() : -shell->h());
-		}
+	case SHIFT_PAGEUP:
+		manager->historyScroll(key == SHIFT_PAGEDOWN);
 		break;
-	}
 
 	case CTRL_ALT_C:
-		FbShell::createShell();
+		manager->createShell();
 		break;
 
 	case CTRL_ALT_D:
-		FbShell::deleteShell();
+		manager->deleteShell();
 		break;
 
 	case CTRL_ALT_1 ... CTRL_ALT_0:
-		FbShell::switchShell(key - CTRL_ALT_1);
+		manager->switchShell(key - CTRL_ALT_1);
 		break;
 
 	case SHIFT_LEFT:
-		FbShell::prevShell();
+		manager->prevShell();
 		break;
 
 	case SHIFT_RIGHT:
-		FbShell::nextShell();
+		manager->nextShell();
 		break;
-
-	case CTRL_ALT_F1 ... CTRL_ALT_F6: {
-		FbShell *shell = FbShell::activeShell();
-		if (shell) {
-			shell->switchCodec(key - CTRL_ALT_F1);
+				
+	case CTRL_ALT_F1 ... CTRL_ALT_F6:
+		if (manager->activeShell()) {
+			manager->activeShell()->switchCodec(key - CTRL_ALT_F1);
 		}
 		break;
-	}
 
 	default:
 		break;

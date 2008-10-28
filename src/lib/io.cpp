@@ -120,15 +120,20 @@ void IoPipe::ready(bool isread)
 	s8 buf[BUF_SIZE];
 
 	s32 len = read(mFd, buf + mBufLenRead, sizeof(buf) - mBufLenRead);
-	if (len <= 0) return;
+	
+	if (len == -1) {
+		if (errno == EBADF) {
+			ioEnd();
+		}
+	} else if (len > 0) {
+		if (mBufLenRead) {
+			memcpy(buf, mBufRead, mBufLenRead);
+			len += mBufLenRead;
+			mBufLenRead = 0;
+		}
 
-	if (mBufLenRead) {
-		memcpy(buf, mBufRead, mBufLenRead);
-		len += mBufLenRead;
-		mBufLenRead = 0;
+		translate(true, buf, len);
 	}
-
-	translate(true, buf, len);
 }
 
 void IoPipe::write(s8 *buf, u32 len)
@@ -156,7 +161,7 @@ void IoPipe::translate(bool isread, s8 *buf, u32 len)
 		if (isread) {
 			readyRead(buf, len);
 		} else {
-			::write(mFd, buf, len);
+			s32 ret = ::write(mFd, buf, len);
 		}
 
 		return;
@@ -177,7 +182,7 @@ void IoPipe::translate(bool isread, s8 *buf, u32 len)
 			if (isread) {
 				readyRead(outbuf, outlen - left);
 			} else {
-				::write(mFd, outbuf, outlen - left);
+				s32 ret = ::write(mFd, outbuf, outlen - left);
 			}
 		}
 
@@ -187,7 +192,7 @@ void IoPipe::translate(bool isread, s8 *buf, u32 len)
 				if (isread) {
 					readyRead(&c, 1);
 				} else {
-					::write(mFd, &c, 1);
+					s32 ret = ::write(mFd, &c, 1);
 				}
 
 				inptr++;
