@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
  *   This program is free software; you can redistribute it and/or
@@ -20,25 +21,24 @@
 
 #include <string.h>
 #include "vterm.h"
-#include "io.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-const VTerm::CharAttr VTerm::default_char_attr = { -1, -1, 1, 0, 0, 0, 0, VTerm::CharAttr::Single };
+VTerm::CharAttr VTerm::default_char_attr = { 0, 0, 1, 0, 0, 0, 0, VTerm::CharAttr::Single };
 
 VTerm::CharAttr VTerm::normal_char_attr()
 {
 	CharAttr a(char_attr);
 
-	if (a.underline && default_underline_color != -1) {
+	if (a.underline && cur_underline_color != -1) {
 		a.underline = false;
-		a.fcolor = default_underline_color;
+		a.fcolor = cur_underline_color;
 	}
 
-	if (a.intensity == 0 && default_halfbright_color != -1) {
+	if (a.intensity == 0 && cur_halfbright_color != -1) {
 		a.intensity = 1;
-		a.fcolor = default_halfbright_color;
+		a.fcolor = cur_halfbright_color;
 	}
 
 	return a;
@@ -92,6 +92,8 @@ VTerm::VTerm(u16 w, u16 h)
 		inited = true;
 		init_state();
 		history_lines = init_history_lines();
+		default_char_attr.fcolor = init_default_color(true);
+		default_char_attr.bcolor = init_default_color(false);
 	}
 
 	text = 0;
@@ -139,15 +141,17 @@ void VTerm::reset()
 
 	mode_flags = ModeFlag();
 	char_attr = s_char_attr = default_char_attr;
-	default_fcolor = default_bcolor = -1;
-	default_underline_color = default_halfbright_color = -1;
-
-	modeChanged(AllModes);
+	cur_fcolor = default_char_attr.fcolor;
+	cur_bcolor = default_char_attr.bcolor;
+	cur_underline_color = -1;
+	cur_halfbright_color = -1;
 
 	if (text) {
 		bzero(tab_stops, max_width / 8 + 1);
 		clear_area(0, 0, width - 1, height - 1);
 	}
+
+	modeChanged(AllModes);
 }
 
 void VTerm::resize(u16 w, u16 h)
@@ -200,7 +204,7 @@ void VTerm::resize(u16 w, u16 h)
 
 		if (text) {
 			u32 start, new_start;
-			u16 history_copy_lines = history_full ? history_lines : history_save_line;
+			u16 history_copy_lines = (history_full ? history_lines : history_save_line);
 			for (u16 i = 0; i < history_copy_lines; i++) {
 				start = i * max_width;
 				new_start = i * new_max_width;
@@ -208,7 +212,7 @@ void VTerm::resize(u16 w, u16 h)
 				memcpy(&new_attrs[new_start], &attrs[start], sizeof(*attrs) * max_width);
 
 				for (u16 j = max_width; j < new_max_width; j++) {
-					new_text[new_start + j] = 0x20;
+					new_text[new_start + j] = ' ';
 					new_attrs[new_start + j] = default_char_attr;
 				}
 			}
@@ -231,6 +235,7 @@ void VTerm::resize(u16 w, u16 h)
 	}
 
 	bool h_changed = false;
+	
 	if (h != height) {
 		h_changed = true;
 
@@ -269,10 +274,14 @@ void VTerm::resize(u16 w, u16 h)
 void VTerm::input(const u8 *buf, u32 count)
 {
 	if (!width) return;
-
+	
 	if (visual_start_line != total_history_lines()) {
 		historyDisplay(true, total_history_lines());
 		historyChanged(visual_start_line, total_history_lines());
+	}
+
+	if (mode(CursorVisible)) {
+		changed_line(cursor_y, cursor_x, cursor_x);
 	}
 
 	u32 c, tc;
@@ -400,6 +409,7 @@ void VTerm::input(const u8 *buf, u32 count)
 	}
 
 	update();
+	draw_cursor();
 }
 
 /* is_double_width() is based on the wcwidth() implementation by
@@ -450,7 +460,7 @@ void VTerm::do_normal_char()
 	if ((!dw && cursor_x >= width) || (dw && (cursor_x >= width - 1))) {
 		if (mode_flags.auto_wrap) {
 			if (dw && cursor_x == width - 1) {
-				text[yp + cursor_x] = 0x20;
+				text[yp + cursor_x] = ' ';
 				attrs[yp + cursor_x] = erase_char_attr();
 			}
 			next_line();
@@ -567,14 +577,12 @@ void VTerm::update()
 			dirty_endx[i] = 0;
 		}
 	}
-
-	draw_cursor();
 }
 
 void VTerm::draw_cursor()
 {
-	if (!mode_flags.cursor_visible) return;
-	
+	if (!mode(CursorVisible)) return;
+
 	u32 yp = linenumbers[cursor_y] * max_width + cursor_x;
 
 	CharAttr attr = attrs[yp];
@@ -614,7 +622,7 @@ void VTerm::expose(u16 x, u16 y, u16 w, u16 h)
 		
 			if (attrs[yp + cur] != attr) {
 				attr.reverse ^= mode_flags.inverse_screen;
-				drawChars(attr, start, y, num, codes, dws);
+				drawChars(attr, start, y, cur - start, num, codes, dws);
 
 				num = 0;
 				start = cur;
@@ -626,7 +634,25 @@ void VTerm::expose(u16 x, u16 y, u16 w, u16 h)
 		}
 
 		attr.reverse ^= mode_flags.inverse_screen;
-		drawChars(attr, start, y, num, codes, dws);
+		drawChars(attr, start, y, cur - start, num, codes, dws);
+	}
+}
+
+void VTerm::inverse(u16 sx, u16 sy, u16 ex, u16 ey)
+{
+	if (sy > ey) return;
+	if (charAttr(sx, sy).type == CharAttr::DoubleRight) sx--;
+	if (charAttr(ex, ey).type == CharAttr::DoubleLeft) ex++;
+	if (sy == ey && sx > ex) return;
+	
+	for (u16 y = sy; y <= ey; y++) {
+		u32 yp = get_line(y) * max_width;
+		u16 start = (y == sy) ? sx : 0;
+		u16 end = (y == ey) ? ex : (w() - 1);
+
+		for (u16 x = start; x <= end; x++) {
+			attrs[yp + x].reverse ^= 1;
+		}
 	}
 }
 
@@ -668,17 +694,18 @@ void VTerm::scroll_region(u16 start_y, u16 end_y, s16 num)
 
 			linenumbers[y] = temp[takey];
 
-			if (!fast_scroll || clr) {
-				dirty_startx[y] = 0;
-				dirty_endx[y] = width-1;
-			} else {
-				dirty_startx[y] = temp_sx[takey];
-				dirty_endx[y] = temp_ex[takey];
-			}
-			if (clr) {
-				clear_area(0, y, width - 1, y);
-			}
-		}
+            if (!fast_scroll || clr) {
+                dirty_startx[y] = 0;
+                dirty_endx[y] = width-1;
+            } else {
+                dirty_startx[y] = temp_sx[takey];
+                dirty_endx[y] = temp_ex[takey];
+            }
+ 
+            if (clr) {
+                clear_area(0, y, width - 1, y);
+            }
+ 		}
 	}
 }
 
@@ -705,7 +732,7 @@ void VTerm::shift_text(u16 y, u16 start_x, u16 end_x, s16 num)
 	u16 x = (num < 0) ? (num + end_x + 1) : start_x;
 	if (num < 0) num = -num;
 	for (; num--; x++) {
-		text[yp + x] = 0x20;
+		text[yp + x] = ' ';
 		attrs[yp + x] = erase_char_attr();
 	}
 
@@ -724,7 +751,7 @@ void VTerm::clear_area(u16 start_x, u16 start_y, u16 end_x, u16 end_y)
 	for (y=start_y; y<=end_y; y++) {
 		yp = linenumbers[y]*max_width;
 		for (x=start_x; x<=end_x; x++) {
-			text[yp+x]= 0x20;
+			text[yp+x]= ' ';
 			attrs[yp+x] = erase_char_attr();
 		}
 		changed_line(y, start_x, end_x);
@@ -744,8 +771,6 @@ void VTerm::changed_line(u16 y, u16 start_x, u16 end_x)
 
 void VTerm::move_cursor(u16 x, u16 y)
 {
-	changed_line(cursor_y, cursor_x, cursor_x);
-	
 	if (x>=width) x = width-1;
 	if (y>=height) y = height-1;
 	cursor_x = x;
@@ -771,6 +796,9 @@ u16 VTerm::mode(ModeType type)
 	case CursorKeyEscO:
 		ret = mode_flags.cursorkey_esco;
 		break;
+	case CRWithLF:
+		ret = mode_flags.crlf;
+		break;
 	case CursorVisible:
 		ret = mode_flags.cursor_visible && (visual_start_line == total_history_lines());
 		break;
@@ -794,7 +822,7 @@ void VTerm::history_scroll(u16 num)
 
 		if (width < max_width) {
 			for (u16 i = width; i < max_width; i++) {
-				text[yp_history + i] = 0x20;
+				text[yp_history + i] = ' ';
 				attrs[yp_history + i] = default_char_attr;
 			}
 		}
@@ -853,6 +881,8 @@ void VTerm::historyDisplay(bool absolute, s32 num)
 	if (!accel_scroll) {
 		requestUpdate(0, 0, width, height);
 	}
+	
+	draw_cursor();
 }
 
 u16 VTerm::get_line(u16 y)

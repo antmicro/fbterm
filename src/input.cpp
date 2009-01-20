@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -25,10 +26,13 @@
 #include <sys/vt.h>
 #include <linux/kd.h>
 #include <linux/input.h>
+#include "config.h"
 #include "input.h"
 #include "input_key.h"
 #include "fbshell.h"
+#include "fbshellman.h"
 #include "fbterm.h"
+#include "improxy.h"
 
 static termios oldTm;
 static long oldKbMode;
@@ -39,12 +43,12 @@ TtyInput *TtyInput::createInstance()
 {
 	s8 buf[64];
 	if (ttyname_r(STDIN_FILENO, buf, sizeof(buf))) {
-		printf("stdin isn't a tty!\n");
+		fprintf(stderr, "stdin isn't a tty!\n");
 		return 0;
 	}
 
 	if (!strstr(buf, "/dev/tty") && !strstr(buf, "/dev/vc")) {
-		printf("stdin isn't a interactive tty!\n");
+		fprintf(stderr, "stdin isn't a interactive tty!\n");
 		return 0;
 	}
 
@@ -53,37 +57,36 @@ TtyInput *TtyInput::createInstance()
 
 TtyInput::TtyInput()
 {
-	ioctl(STDIN_FILENO, KDGKBMODE, &oldKbMode);
-	switchVc(true);
-
 	tcgetattr(STDIN_FILENO, &oldTm);
 
-	termios tm = oldTm;
-	
+	termios tm = oldTm;	
 	cfmakeraw(&tm);
 	tm.c_cc[VMIN] = 1;
 	tm.c_cc[VTIME] = 0;	
-
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &tm);
+
+	ioctl(STDIN_FILENO, KDGKBMODE, &oldKbMode);
+	switchIm(false, false);
 
 	setFd(dup(STDIN_FILENO));
 }
 
 TtyInput::~TtyInput()
 {
+	setupSysKey(true);
+	ioctl(STDIN_FILENO, KDSKBMODE, oldKbMode);
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTm);
-	switchVc(false);
 }
 
 void TtyInput::switchVc(bool enter)
 {
-	ioctl(STDIN_FILENO, KDSKBMODE, enter ? K_UNICODE : oldKbMode);
 	setupSysKey(!enter);
 }
 
 void TtyInput::setupSysKey(bool restore)
 {
 	#define T_SHIFT (1 << KG_SHIFT)
+	#define T_CTRL (1 << KG_CTRL)
 	#define T_CTRL_ALT ((1 << KG_CTRL) + (1 << KG_ALT))
 
 	static bool syskey_saved = false;
@@ -93,33 +96,38 @@ void TtyInput::setupSysKey(bool restore)
 		u16 new_val;
 		u16 old_val;
 	} sysKeyTable[] = {
-		{T_SHIFT, KEY_PAGEUP,	SHIFT_PAGEUP},
-		{T_SHIFT, KEY_PAGEDOWN,	SHIFT_PAGEDOWN},
-		{T_SHIFT, KEY_LEFT,		SHIFT_LEFT},
-		{T_SHIFT, KEY_RIGHT,	SHIFT_RIGHT},
-		{T_CTRL_ALT, KEY_1, CTRL_ALT_1},
-		{T_CTRL_ALT, KEY_2, CTRL_ALT_2},
-		{T_CTRL_ALT, KEY_3, CTRL_ALT_3},
-		{T_CTRL_ALT, KEY_4, CTRL_ALT_4},
-		{T_CTRL_ALT, KEY_5, CTRL_ALT_5},
-		{T_CTRL_ALT, KEY_6, CTRL_ALT_6},
-		{T_CTRL_ALT, KEY_7, CTRL_ALT_7},
-		{T_CTRL_ALT, KEY_8,	CTRL_ALT_8},
-		{T_CTRL_ALT, KEY_9, CTRL_ALT_9},
-		{T_CTRL_ALT, KEY_0, CTRL_ALT_0},
-		{T_CTRL_ALT, KEY_C, CTRL_ALT_C},
-		{T_CTRL_ALT, KEY_D, CTRL_ALT_D},
-		{T_CTRL_ALT, KEY_E, CTRL_ALT_E},
-		{T_CTRL_ALT, KEY_F1, CTRL_ALT_F1},
-		{T_CTRL_ALT, KEY_F2, CTRL_ALT_F2},
-		{T_CTRL_ALT, KEY_F3, CTRL_ALT_F3},
-		{T_CTRL_ALT, KEY_F4, CTRL_ALT_F4},
-		{T_CTRL_ALT, KEY_F5, CTRL_ALT_F5},
-		{T_CTRL_ALT, KEY_F6, CTRL_ALT_F6},
+		{T_SHIFT,    KEY_PAGEUP,   SHIFT_PAGEUP},
+		{T_SHIFT,    KEY_PAGEDOWN, SHIFT_PAGEDOWN},
+		{T_SHIFT,    KEY_LEFT,	   SHIFT_LEFT},
+		{T_SHIFT,    KEY_RIGHT,    SHIFT_RIGHT},
+		{T_CTRL,     KEY_SPACE,    CTRL_SPACE},
+		{T_CTRL_ALT, KEY_1,        CTRL_ALT_1},
+		{T_CTRL_ALT, KEY_2,        CTRL_ALT_2},
+		{T_CTRL_ALT, KEY_3,        CTRL_ALT_3},
+		{T_CTRL_ALT, KEY_4,        CTRL_ALT_4},
+		{T_CTRL_ALT, KEY_5,        CTRL_ALT_5},
+		{T_CTRL_ALT, KEY_6,        CTRL_ALT_6},
+		{T_CTRL_ALT, KEY_7,        CTRL_ALT_7},
+		{T_CTRL_ALT, KEY_8,	       CTRL_ALT_8},
+		{T_CTRL_ALT, KEY_9,        CTRL_ALT_9},
+		{T_CTRL_ALT, KEY_0,        CTRL_ALT_0},
+		{T_CTRL_ALT, KEY_C,        CTRL_ALT_C},
+		{T_CTRL_ALT, KEY_D,        CTRL_ALT_D},
+		{T_CTRL_ALT, KEY_E,        CTRL_ALT_E},
+		{T_CTRL_ALT, KEY_F1,       CTRL_ALT_F1},
+		{T_CTRL_ALT, KEY_F2,       CTRL_ALT_F2},
+		{T_CTRL_ALT, KEY_F3,       CTRL_ALT_F3},
+		{T_CTRL_ALT, KEY_F4,       CTRL_ALT_F4},
+		{T_CTRL_ALT, KEY_F5,       CTRL_ALT_F5},
+		{T_CTRL_ALT, KEY_F6,       CTRL_ALT_F6},
 	};
 
+	if (!syskey_saved && restore) return;
+
+#ifndef HAVE_FS_CAPABILITY
 	extern s32 effective_uid;
 	seteuid(effective_uid);
+#endif
 
 	for (u32 i = 0; i < sizeof(sysKeyTable) / sizeof(KeyEntry); i++) {
 		kbentry entry;
@@ -135,29 +143,124 @@ void TtyInput::setupSysKey(bool restore)
 		ioctl(STDIN_FILENO, KDSKBENT, &entry); //should have perm CAP_SYS_TTY_CONFIG
 	}
 
-	if (!syskey_saved) syskey_saved = true;
+	if (!syskey_saved && !restore) syskey_saved = true;
 
+#ifndef HAVE_FS_CAPABILITY
 	seteuid(getuid());
+#endif
 }
 
 void TtyInput::readyRead(s8 *buf, u32 len)
 {
-	static const u8 sys_utf8_start = 0xc0 | (AC_START >> 6);
-
-	FbShell *shell = FbShellManager::instance()->activeShell();
-	u32 i, start = 0;
-	for (i = 0; i < len; i++) {
-		u32 orig = i;
-		u8 c = buf[i];
-
-		if (c == sys_utf8_start && i < (len - 1)) c = (buf[++i] & 0x3f) | (AC_START & 0xc0);
-		if (c < AC_START || c > AC_END) continue;
-
-		if (orig > start && shell) shell->keyInput(buf + start, orig - start);
-		start = i + 1;
-
-		FbTerm::instance()->processSysKey(c);
+	if (mRawMode) {
+		processRawKeys(buf, len);
+		return;
 	}
 
-	if (i > start && shell) shell->keyInput(buf + start, i - start);
+	#define PUT_KEYS(buf, len) \
+	do { \
+		if (mImEnable) { \
+			ImProxy::instance()->sendKey(buf, len); \
+		} else { \
+			FbShell *shell = FbShellManager::instance()->activeShell(); \
+			if (shell) { \
+				shell->keyInput(buf, len); \
+			} \
+		} \
+	} while (0)
+
+	u32 start = 0;
+	for (u32 i = 0; i < len; i++) {
+		u32 orig = i;
+		u16 c = (u8)buf[i];
+
+		if ((c >> 5) == 0x6 && i < (len - 1) && (((u8)buf[++i]) >> 6) == 0x2) {
+			c = ((c & 0x1f) << 6) | (buf[i] & 0x3f);
+			if (c < AC_START || c > AC_END) continue;
+
+			if (orig > start) PUT_KEYS(buf + start, orig - start);
+			start = i + 1;
+
+			FbTerm::instance()->processSysKey(c);
+		}
+	}
+
+	if (len > start) PUT_KEYS(buf + start, len - start);
+}
+
+typedef enum {
+	ALT_L = 1 << 0, ALT_R = 1 << 1,
+	CTRL_L = 1 << 2, CTRL_R = 1 << 3,
+	SHIFT_L = 1 << 4, SHIFT_R = 1 << 5,
+} ModifierType;
+
+static u16 modState;
+
+void TtyInput::switchIm(bool enter, bool raw)
+{
+	modState = 0;
+	mImEnable = enter;
+	mRawMode = (enter && raw);
+
+	ioctl(STDIN_FILENO, KDSKBMODE, mRawMode ? K_MEDIUMRAW : K_UNICODE);
+	setupSysKey(mRawMode);
+}
+
+void TtyInput::processRawKeys(s8 *buf, u32 len)
+{
+	for (u32 i = 0; i < len; i++) {
+		bool down = !(buf[i] & 0x80);
+		u16 code = buf[i] & 0x7f;
+
+		if (!code) {
+			if (i + 2 >= len) break;
+
+			code = (buf[++i] & 0x7f) << 7;
+			code |= buf[++i] & 0x7f;
+			if (!(buf[i] & 0x80) || !(buf[i - 1] & 0x80)) continue;
+		}
+		
+		u16 mod = 0;
+		switch (code) {
+		case KEY_LEFTALT:
+			mod = ALT_L;
+			break;
+
+		case KEY_RIGHTALT:
+			mod = ALT_R;
+			break;
+
+		case KEY_LEFTCTRL:
+			mod = CTRL_L;
+			break;
+
+		case KEY_RIGHTCTRL:
+			mod = CTRL_R;
+			break;
+
+		case KEY_LEFTSHIFT:
+			mod = SHIFT_L;
+			break;
+
+		case KEY_RIGHTSHIFT:
+			mod = SHIFT_R;
+			break;
+
+		default:
+			break;
+		}
+
+		if (mod) {
+			if (down) modState |= mod;
+			else modState &= ~mod;
+		} else if (down) {
+			u16 ctrl = (CTRL_L | CTRL_R);
+			if ((modState & ctrl) && !(modState & ~ctrl) && code == KEY_SPACE) {
+				FbTerm::instance()->processSysKey(CTRL_SPACE);
+				return;
+			}
+		}
+	}
+
+	ImProxy::instance()->sendKey(buf, len);
 }

@@ -1,13 +1,13 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* draw text mouse pointer */
-#undef DRAW_MOUSE_POINTER
-
 /* Define to 1 if you have the `bzero' function. */
 #undef HAVE_BZERO
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
+
+/* */
+#undef HAVE_FS_CAPABILITY
 
 /* Define to 1 if you have the `getpagesize' function. */
 #undef HAVE_GETPAGESIZE
@@ -23,6 +23,9 @@
 
 /* Define to 1 if you have the <linux/fb.h> header file. */
 #undef HAVE_LINUX_FB_H
+
+/* Define to 1 if you have the <linux/input.h> header file. */
+#undef HAVE_LINUX_INPUT_H
 
 /* Define to 1 if you have the <linux/kd.h> header file. */
 #undef HAVE_LINUX_KD_H
@@ -53,6 +56,9 @@
 
 /* Define to 1 if you have the `setlocale' function. */
 #undef HAVE_SETLOCALE
+
+/* */
+#undef HAVE_SIGNALFD
 
 /* Define to 1 if you have the `socket' function. */
 #undef HAVE_SOCKET

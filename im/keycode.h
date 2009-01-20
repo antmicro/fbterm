@@ -18,25 +18,25 @@
  *
  */
 
-#ifndef INPUT_H
-#define INPUT_H
+#ifndef KEYCODE_H
+#define KEYCODE_H
 
-#include "io.h"
-#include "instance.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-class TtyInput : public IoPipe {
-	DECLARE_INSTANCE(TtyInput)
-public:
-	void switchVc(bool enter);
-	void switchIm(bool enter, bool raw);
+void init_keycode_state();
 
-private:
-	virtual void readyRead(s8 *buf, u32 len);
-	void setupSysKey(bool restore);
-	void processRawKeys(s8* buf, u32 len);
-	
-	bool mRawMode;
-	bool mImEnable;
-};
+void update_term_mode(char crlf, char appkey, char curo);
+
+unsigned short keycode_to_keysym(unsigned short keycode, char down);
+
+unsigned short keypad_keysym_redirect(unsigned short keysym);
+
+char *keysym_to_term_string(unsigned short keysym, char down);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

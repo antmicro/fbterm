@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -22,6 +23,7 @@ DEFINE_INSTANCE(Mouse)
 
 #include "config.h"
 #ifdef HAVE_GPM_H
+
 #include <stddef.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -31,6 +33,7 @@ DEFINE_INSTANCE(Mouse)
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <linux/keyboard.h>
+#include "fbshellman.h"
 #include "fbshell.h"
 #include "screen.h"
 
@@ -56,7 +59,8 @@ static s32 open_gpm(Gpm_Connect *conn)
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, GPM_NODE_CTL, sizeof(addr.sun_path) - 1);
 
-	u32 len = offsetof(sockaddr_un, sun_path) + sizeof(GPM_NODE_CTL) - 1;
+	#define OFFSET(TYPE, MEMBER) ((size_t)(&(((TYPE *)0)->MEMBER)))
+	u32 len = OFFSET(sockaddr_un, sun_path) + sizeof(GPM_NODE_CTL) - 1;
 	if (len > sizeof(addr)) len = sizeof(addr);
 
 	if(connect(gpm_fd, (struct sockaddr *)(&addr), len) < 0 ||
@@ -96,41 +100,45 @@ Mouse::~Mouse()
 
 void Mouse::readyRead(s8 *buf, u32 len)
 {
-	if (len != sizeof(Gpm_Event)) return;
+	if (len % sizeof(Gpm_Event)) return;
 
-	Gpm_Event *ev = (Gpm_Event*)buf;
-	s32 type = -1, buttons = 0;
-
-	if ((ev->type & GPM_MOVE) || (ev->type & GPM_DRAG)) type = Move;
-	else if (ev->type & GPM_DOWN) type = (ev->type & GPM_DOUBLE) ? DblClick : Press;
-	else if (ev->type & GPM_UP) type = Release;
-	if (type == -1) return;
-
-	if (ev->buttons & GPM_B_LEFT) buttons |= LeftButton;
-	if (ev->buttons & GPM_B_MIDDLE) buttons |= MidButton;
-	if (ev->buttons & GPM_B_RIGHT) buttons |= RightButton;
-
-	if (ev->modifiers & (1 << KG_SHIFT)) buttons |= ShiftButton;
-	if (ev->modifiers & (1 << KG_CTRL)) buttons |= ControlButton;
-	if (ev->modifiers & ((1 << KG_ALT) | (1 << KG_ALTGR))) buttons |= AltButton;
+	FbShell *shell = FbShellManager::instance()->activeShell();
+	if (!shell) return;
 
 	u16 maxx = Screen::instance()->cols(), maxy = Screen::instance()->rows();
-	s16 newx = (s16)x + ev->dx, newy =(s16)y + ev->dy;
 
-	if (newx < 0) newx = 0;
-	if (newy < 0) newy = 0;
-	if (newx >= maxx) newx = maxx - 1;
-	if (newy >= maxy) newy = maxy - 1;
-
-	if (newx == x && newy == y && !(buttons & MouseButtonMask)) return;
+	len /= sizeof(Gpm_Event);
+	Gpm_Event *ev = (Gpm_Event *)buf;
 	
-	FbShell *shell = FbShellManager::instance()->activeShell();
-	if (shell) {
-		shell->mouseInput(newx, newy, type, buttons);
-	}
+	for (; len--; ev++) {
+		s32 type = -1, buttons = 0;
 
-	x = newx;
-	y = newy;
+		if (ev->wdy) type = Wheel;
+		else if ((ev->type & GPM_MOVE) || (ev->type & GPM_DRAG)) type = Move;
+		else if (ev->type & GPM_DOWN) type = (ev->type & GPM_DOUBLE) ? DblClick : Press;
+		else if (ev->type & GPM_UP) type = Release;
+		if (type == -1) continue;
+
+		if (ev->buttons & GPM_B_LEFT) buttons |= LeftButton;
+		if (ev->buttons & GPM_B_MIDDLE) buttons |= MidButton;
+		if (ev->buttons & GPM_B_RIGHT) buttons |= RightButton;
+		if (type == Wheel) buttons |= ((ev->wdy < 0) ? WheelDown : WheelUp);
+
+		if (ev->modifiers & (1 << KG_SHIFT)) buttons |= ShiftButton;
+		if (ev->modifiers & (1 << KG_CTRL)) buttons |= ControlButton;
+		if (ev->modifiers & ((1 << KG_ALT) | (1 << KG_ALTGR))) buttons |= AltButton;
+
+		s16 newx = (s16)x + ev->dx, newy =(s16)y + ev->dy;
+		if (newx < 0) newx = 0;
+		if (newy < 0) newy = 0;
+		if (newx >= maxx) newx = maxx - 1;
+		if (newy >= maxy) newy = maxy - 1;
+		if (newx == x && newy == y && !(buttons & MouseButtonMask)) continue;
+	
+		shell->mouseInput(newx, newy, type, buttons);
+		x = newx;
+		y = newy;
+	}
 }
 #else
 

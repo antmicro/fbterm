@@ -1,6 +1,53 @@
+2008-12-20 version 1.3
+	* fbconfig.cpp:
+	added command line arguments to change option values
+
+	* fbterm.cpp fbshellman.cpp fbshell.cpp improxy.cpp improxy.h input.cpp im/*:
+	added client-server based input method framework
+		
+	* screen.cpp screen_clip.cpp:
+	added screen clip support for IM
+	
+	* screen.cpp font.cpp:
+	added screen rotation support
+	
+	* screen.cpp:
+	drawGlyph(): fixed a spelling error of '=' as '-', which even appears in version 1.0
+	move(): fixed a duplicate repaint bug while fast scrolling type is ypan
+	moved paint code to a seperate source file screen_render.cpp
+	
+	* screen_render.cpp:
+	setupSysPalette(): added support visual FB_VISUAL_DIRECTCOLOR
+	
+	* mouse.cpp lib/shell.cpp lib/shell.h:
+	added mouse wheel support
+	
+	* lib/vterm.h lib/vterm.cpp:
+	decreased memory usage of every vterm instance by changing struct CharAttr size from 4 to 2 bytes
+	
+	* font.cpp:
+	replaced hash table based glyph cache with direct array index, removed dependence of hash.h/hash.cpp
+	
+	* input.cpp:
+	readyRead(): fixed a unicode input character processing error
+	
+	* lib/shell.cpp lib/vterm.cpp:
+	fixed a bug of not inverse color for selected text when switch back to the shell
+	moved mouse pointer drawing code to class FbShell
+	
+	* fbshell.cpp:
+	fixed a bug of maybe not restore original console state after FbTerm exited
+	moved class FbShellManager to seperate source files fbshellman.h and fbshellman.cpp
+	
+	* fbshellman.cpp:
+	switchShell(): fixed a duplicate repaint bug while switch to same window
+	
+	* configure src/Makefile.in fbterm.cpp fbshell.cpp input.cpp:
+	added using filesystem capability attributes offered by kernel 2.6.27, instead of setting set-user-ID bit on FbTerm
+
 2008-10-12 version 1.2
 	* lib/term.h lib/term.cpp lib/term_states.cpp lib/term_action.cpp:
-	improved escape and control sequences compability with linux console
+	improved escape and control sequences compatibility with linux console
 	
 	* fbshell.cpp:
 	added support linux console sequences for changing the color palette and cursor shape

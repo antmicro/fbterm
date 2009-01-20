@@ -1,8 +1,8 @@
-.TH "FbTerm" "1" "October 2008" "FbTerm @VERSION@" "FbTerm User Manual"
+.TH "FbTerm" "1" "December 2008" "FbTerm @VERSION@" "FbTerm User Manual"
 .SH "NAME"
 FbTerm - a fast FrameBuffer based TERMinal emulator for linux
 .SH "SYNOPSIS"
-fbterm
+\fBfbterm\fR [\fIOPTION\fR]
 .SH "DESCRIPTION"
 FbTerm is a fast terminal emulator for linux with frame buffer device. Features include:
   
@@ -11,12 +11,48 @@ FbTerm is a fast terminal emulator for linux with frame buffer device. Features 
   * dynamicly create/destroy up to 10 windows initially running default shell
   * record scrollback history for every window
   * auto-detect current locale and convert text encoding, support double width scripts like Chinese, Japanese etc
-  * switch between configurable additional text encoding with hot keys on the fly
+  * switch between configurable additional text encodings with hot keys on the fly
   * copy/past selected text between windows with mouse when gpm server is running
-.SH "CONFIGURE FILE"
-On startup, FbTerm try to load configuration from $HOME/.fbtermrc. If that file dosn't exist, FbTerm will create it with
-default options. Through the configure file, you can control font family/size, text background/foreground color, additional
-text encodings etc. See comments in that file for details.
+  * change the orientation of screen display, a.k.a. screen rotation
+  * lightweight input method framework with client-server architecture
+.SH "OPTIONS"
+FbTerm first uses option value specified in command line arguments, then in the configure file $HOME/.fbtermrc.
+If that file dosn't exist, FbTerm will create it with default options on startup.
+.TP
+\fB-V, --version\fR
+display FbTerm version and exit.
+.TP
+\fB-h, --help\fR
+display the help and exit.
+.TP
+\fB-n, --font-names=\fR\fItext\fR
+specify font family names
+.TP
+\fB-s, -font-size=\fR\fInum\fR
+specify font pixel size
+.TP
+\fB-f, --color-foreground=\fR\fInum\fR
+speicfy foreground color
+.TP
+\fB-b, --color-background=\fR\fInum\fR
+specify background color
+.TP
+\fB-e, --text-encodings=\fR\fItext\fR
+specify additional text encodings
+.TP
+\fB-r, --screen-rotate=\fR\fInum\fR
+specify the orientation of screen display
+.TP
+\fB-i, --input-method=\fR\fItext\fR
+sepcify input method program
+.TP
+\fB--cursor-shape=\fR\fInum\fR
+specify default cursor shape
+.TP
+\fB--cursor-interval=\fR\fInum\fR
+specify cursor flash interval
+.TP
+see comments in $HOME/.fbtermrc for details of these options.
 .SH "SHORTCUT SUMMAY"
 keyboard:
   CTRL_ALT_E:    exit from FbTerm
@@ -38,6 +74,7 @@ keyboard:
   SHIFT_PAGEDOWN:  history scroll down
   CTRL_ALT_F1:                 switch to encoding of current locale
   CTRL_ALT_F2 to CTRL_ALT_F6:  switch to additional encodings
+  CTRL_SPACE:    toggle input method
 
 mouse:
   move when left button down:      select text
@@ -50,12 +87,12 @@ According test result, FbTerm spends more than 95% time on painting screen. Spee
 increase performance. Here are some suggestions:
 
   * Enable fast scrolling on frame buffer device. The visible screen will be just a window of the video memory,
-    when scrolling, FbTerm only change the start of window, no need to repaint the whole screen.
+when scrolling, FbTerm only change the start of window, no need to repaint the whole screen.
     
-  * On Intel P6 family processors the Memory Type Range Registers (MTRRs) may be used to control processor access to 
-    memory ranges. If you have video card on a PCI or AGP bus, enabling write-combining allows bus write transfers 
-    to be combined into a larger transfer before bursting over the PCI/AGP bus. This can increase performance of 
-    FbTerm's paint operations.
+  * On Intel P6 family processors the Memory Type Range Registers (MTRRs) may be used to control processor access to
+memory ranges. If you have video card on a PCI or AGP bus, enabling write-combining allows bus write transfers
+to be combined into a larger transfer before bursting over the PCI/AGP bus. This can increase performance of
+FbTerm's paint operations.
 
 Maybe you need to enable them manually for your video card. For example, defaultly fast scrolling and write-combining
 are all disabled on general VESA frame buffer device, GRUB/LILO configure file should be modified to enable them.

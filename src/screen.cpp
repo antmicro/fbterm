@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -17,43 +18,38 @@
  *
  */
 
+#include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <linux/kd.h>
 #include <linux/fb.h>
-#include <ft2build.h>
-#include FT_GLYPH_H
-#include "fbshell.h"
+#include "fbshellman.h"
 #include "font.h"
 #include "screen.h"
-
-#define fb_readb(addr) (*(volatile u8 *) (addr))
-#define fb_readw(addr) (*(volatile u16 *) (addr))
-#define fb_readl(addr) (*(volatile u32 *) (addr))
-#define fb_writeb(addr,val) (*(volatile u8 *) (addr) = (val))
-#define fb_writew(addr,val) (*(volatile u16 *) (addr) = (val))
-#define fb_writel(addr,val) (*(volatile u32 *) (addr) = (val))
-
-#define font (Font::instance())
-#define W(x) ((x) * font->width())
-#define H(y) ((y) * font->height())
+#include "fbconfig.h"
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define redraw(args...) (FbShellManager::instance()->redraw(args))
 
-static const s8 show_cursor[] = "\033[?25h";
-static const s8 hide_cursor[] = "\033[?25l";
-static const s8 disable_blank[] = "\033[9;0]";
-static const s8 enable_blank[] = "\033[9;10]";
-static const s8 clear_screen[] = "\033[2J\033[H";
+static const s8 show_cursor[] = "\e[?25h";
+static const s8 hide_cursor[] = "\e[?25l";
+static const s8 disable_blank[] = "\e[9;0]";
+static const s8 enable_blank[] = "\e[9;10]";
+static const s8 clear_screen[] = "\e[2J\e[H";
 
 static fb_fix_screeninfo finfo;
 static fb_var_screeninfo vinfo;
+static u32 bytes_per_pixel;
 
-static Color palette[NR_COLORS];
-static u32 colors[NR_COLORS];
+RotateType Screen::mRotate;
+u32 Screen::mScreenw;
+u32 Screen::mScreenh;
+
+#include "screen_clip.cpp"
+#include "screen_render.cpp"
 
 DEFINE_INSTANCE(Screen)
 
@@ -68,7 +64,7 @@ Screen *Screen::createInstance()
 	}
 
 	if (devFd < 0) {
-		printf("can't open framebuffer device!\n");
+		fprintf(stderr, "can't open framebuffer device!\n");
 		return 0;
 	}
 
@@ -77,47 +73,82 @@ Screen *Screen::createInstance()
 	ioctl(devFd, FBIOGET_VSCREENINFO, &vinfo);
 
 	if (finfo.type != FB_TYPE_PACKED_PIXELS) {
-		printf("unsupported framebuffer device!\n");
+		fprintf(stderr, "unsupported framebuffer device!\n");
 		return 0;
 	}
 
-	if (vinfo.bits_per_pixel == 15) vinfo.bits_per_pixel = 16;
+	switch (vinfo.bits_per_pixel) {
+	case 8:
+		if (finfo.visual != FB_VISUAL_PSEUDOCOLOR) {
+			fprintf(stderr, "only support pseudocolor visual with 8bpp depth!\n");
+			return 0;
+		}
+		break;
 
-	if (vinfo.bits_per_pixel != 8 && vinfo.bits_per_pixel != 16 && vinfo.bits_per_pixel != 32) {
-		printf("only support framebuffer device with 8/15/16/32 color depth!\n");
+	case 15:
+	case 16:
+	case 32:
+		if (finfo.visual != FB_VISUAL_TRUECOLOR && finfo.visual != FB_VISUAL_DIRECTCOLOR) {
+			fprintf(stderr, "only support truecolor/directcolor visual with 15/16/32bpp depth!\n");
+			return 0;
+		}
+		break;
+
+	default:
+		fprintf(stderr, "only support framebuffer device with 8/15/16/32 color depth!\n");
 		return 0;
 	}
 
-	if (!font) return 0;
+	u32 rtype = 0;
+	Config::instance()->getOption("screen-rotate", rtype);
+	if (rtype > 3) rtype = 0;
+	mRotate = (RotateType)rtype;
+
+	if (mRotate == Rotate0 || mRotate == Rotate180) {
+		mScreenw = vinfo.xres;
+		mScreenh = vinfo.yres;
+	} else {
+		mScreenw = vinfo.yres;
+		mScreenh = vinfo.xres;
+	}
 	
-	if (vinfo.xres / W(1) == 0 || vinfo.yres / H(1) == 0) {
-		printf("font size is too huge!\n");
+	if (!Font::instance()) return 0;
+
+	if (mScreenw / W(1) == 0 || mScreenh / H(1) == 0) {
+		fprintf(stderr, "font size is too huge!\n");
 		return 0;
 	}
+	
+	if (vinfo.bits_per_pixel == 15) bytes_per_pixel = 2;
+	else bytes_per_pixel = (vinfo.bits_per_pixel >> 3);
 
+	initFillDraw();	
 	return new Screen(devFd);
 }
 
 Screen::Screen(s32 fd)
 {
 	mFd = fd;
-	mpMemStart = (s8 *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, mFd, 0);
+	mpMemStart = (u8 *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, mFd, 0);
 
-	mCols = vinfo.xres / W(1);
-	mRows = vinfo.yres / H(1);
+	mCols = mScreenw / W(1);
+	mRows = mScreenh / H(1);
+	mScrollAccel = 0;
 
-	bool ypan = (vinfo.yres_virtual > vinfo.yres && finfo.ypanstep && !(H(1) % finfo.ypanstep));
-	bool ywrap = (finfo.ywrapstep && !(H(1) % finfo.ywrapstep));
-	if (ywrap && !(vinfo.vmode & FB_VMODE_YWRAP)) {
-		vinfo.vmode |= FB_VMODE_YWRAP;
-		ioctl(mFd, FBIOPUT_VSCREENINFO, &vinfo);
-		ywrap = (vinfo.vmode & FB_VMODE_YWRAP);
+	if (mRotate == Rotate0 || mRotate == Rotate180) {
+		bool ypan = (vinfo.yres_virtual > vinfo.yres && finfo.ypanstep && !(H(1) % finfo.ypanstep));
+		bool ywrap = (finfo.ywrapstep && !(H(1) % finfo.ywrapstep));
+		if (ywrap && !(vinfo.vmode & FB_VMODE_YWRAP)) {
+			vinfo.vmode |= FB_VMODE_YWRAP;
+			ioctl(mFd, FBIOPUT_VSCREENINFO, &vinfo);
+			ywrap = (vinfo.vmode & FB_VMODE_YWRAP);
+		}
+
+		if ((ypan || ywrap) && !ioctl(mFd, FBIOPAN_DISPLAY, &vinfo)) mScrollAccel = (ywrap ? 2 : 1);
 	}
 
-	mScrollAccel = ((ypan || ywrap) && !ioctl(mFd, FBIOPAN_DISPLAY, &vinfo)) ? (ywrap ? 2 : 1) : 0;
-
 	s32 ret = write(STDIN_FILENO, hide_cursor, sizeof(hide_cursor) - 1);
-	ret = write(STDIN_FILENO, disable_blank, sizeof(disable_blank) - 1);	
+	ret = write(STDIN_FILENO, disable_blank, sizeof(disable_blank) - 1);
 }
 
 Screen::~Screen()
@@ -138,37 +169,6 @@ Screen::~Screen()
 	Font::uninstance();
 }
 
-void Screen::setPalette(const Color *_palette)
-{
-	memcpy(palette, _palette, sizeof(palette));
-
-	switch (vinfo.bits_per_pixel) {
-	case 8:
-		for (u32 i = 0; i < NR_COLORS; i++) {
-			colors[i] = (i << 24) | (i << 16) | (i << 8) | i;
-		}
-		break;
-		
-	case 16:
-	case 32:
-		for (u32 i = 0; i < NR_COLORS; i++) {
-			colors[i] = (palette[i].red >> (8 - vinfo.red.length) << vinfo.red.offset)
-						| ((palette[i].green >> (8 - vinfo.green.length)) << vinfo.green.offset)
-						| ((palette[i].blue >> (8 - vinfo.blue.length)) << vinfo.blue.offset);
-			if (vinfo.bits_per_pixel == 16) {
-				colors[i] |= colors[i] << 16;
-			}
-		}
-		break;
-	
-	default:
-		break;
-	}
-
-	setupSysPalette(false);
-	eraseMargin(true, mRows);
-}
-
 void Screen::switchVc(bool enter)
 {
 	if (enter) {
@@ -182,64 +182,9 @@ void Screen::switchVc(bool enter)
 	}
 }
 
-void Screen::setupSysPalette(bool restore)
-{
-	if (vinfo.bits_per_pixel != 8) return;
-
-	static bool palette_saved = false;
-	static u16 saved_red[NR_COLORS], saved_green[NR_COLORS], saved_blue[NR_COLORS];
-	fb_cmap cmap;
-
-	#define INIT_CMAP(_red, _green, _blue) \
-	do { \
-		cmap.start = 0; \
-		cmap.len = NR_COLORS; \
-		cmap.red = _red; \
-		cmap.green = _green; \
-		cmap.blue = _blue; \
-		cmap.transp = 0; \
-	} while (0)
-
-	if (restore) {
-		if (!palette_saved) return;
-
-		INIT_CMAP(saved_red, saved_green, saved_blue);
-		ioctl(mFd, FBIOPUTCMAP, &cmap);
-	} else {
-		if (!palette_saved) {
-			palette_saved = true;
-
-			INIT_CMAP(saved_red, saved_green, saved_blue);
-			ioctl(mFd, FBIOGETCMAP, &cmap);
-		}
-
-		u16 red[NR_COLORS], green[NR_COLORS], blue[NR_COLORS];
-
-		for (u32 i = 0; i < NR_COLORS; i++) {
-			red[i] = palette[i].red << 8 | palette[i].red;
-			green[i] = palette[i].green << 8 | palette[i].green;
-			blue[i] = palette[i].blue << 8 | palette[i].blue;
-		}
-
-		INIT_CMAP(red, green, blue);
-		ioctl(mFd, FBIOPUTCMAP, &cmap);
-	}
-}
-
-void Screen::eraseMargin(bool top, u16 h)
-{
-	if (vinfo.xres % W(1)) {
-		fillRect(W(mCols), top ? 0 : H(mRows - h), vinfo.xres % W(1), H(h), 0);
-	}
-
-	if (vinfo.yres % H(1)) {
-		fillRect(0, H(mRows), vinfo.xres, vinfo.yres % H(1), 0);
-	}
-}
-
 bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 {
-	if (mScrollAccel == 0 || scol != dcol) return false;
+	if (clipEnable || mScrollAccel == 0 || scol != dcol) return false;
 
 	u16 top = MIN(srow, drow), bot = MAX(srow, drow) + h;
 	u16 left = scol, right = scol + w;
@@ -250,7 +195,9 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 	if (noaccel_redraw_area <= accel_redraw_area) return false;
 
 	s32 yoffset = vinfo.yoffset;
-	yoffset += H((s32)srow - drow);
+
+	if (mRotate == Rotate0) yoffset += H((s32)srow - drow);
+	else yoffset -= H((s32)srow - drow);
 	
 	bool redraw_all = false;
 	if (mScrollAccel == 1) {
@@ -267,21 +214,30 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 
 	vinfo.yoffset = yoffset;
 	ioctl(mFd, FBIOPAN_DISPLAY, &vinfo);
-
-	#define redraw(args...) (FbShellManager::instance()->redraw(args))
+	
+	if (top) redraw(0, 0, mCols, top);
+	if (bot < mRows) redraw(0, bot, mCols, mRows - bot);
+	if (left > 0) redraw(0, top, left, bot - top - 1);
+	if (right < mCols) redraw(right, top, mCols - right, bot - top - 1);
 
 	if (redraw_all) {
-		redraw(0, 0, mCols, mRows);
 		eraseMargin(true, mRows);
 	} else {
-		if (top) redraw(0, 0, mCols, top);
-		if (bot < mRows) redraw(0, bot, mCols, mRows - bot);
-		if (left > 0) redraw(0, top, left, bot - top - 1);
-		if (right < mCols) redraw(right, top, mCols - right, bot - top - 1);
 		eraseMargin(drow > srow, drow > srow ? (drow - srow) : (srow - drow));
 	}
 
-	return true;
+	return !redraw_all;
+}
+
+void Screen::eraseMargin(bool top, u16 h)
+{
+	if (mScreenw % W(1)) {
+		fillRect(W(mCols), top ? 0 : H(mRows - h), mScreenw % W(1), H(h), 0);
+	}
+
+	if (mScreenh % H(1)) {
+		fillRect(0, H(mRows), mScreenw, mScreenh % H(1), 0);
+	}
 }
 
 void Screen::drawUnderline(u16 col, u16 row, u8 color)
@@ -294,47 +250,32 @@ void Screen::clear(u16 col, u16 row, u16 w, u16 h, u8 color)
 	fillRect(W(col), H(row), W(w), H(h), color);
 }
 
-void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color)
+void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
 {
-	if (x >= vinfo.xres || y >= vinfo.yres) return;
-	if (x + w > vinfo.xres) w = vinfo.xres - x;
-	if (y + h > vinfo.yres) h = vinfo.yres - y;
+	u32 startx, x = W(col), y = H(row), fw = W(1);
 
-	u32 fg = colors[color];
-	s8 *dst8 = mpMemStart + x * vinfo.bits_per_pixel / 8;
+	Rectangle rect = { x, y, x + W(w), y + H(1) };
+	u32 state = intersectWithClipRects(rect);
 
-	u32 ppl = 32 / vinfo.bits_per_pixel, ppw = ppl >> 1, ppb = ppl >> 2;
+	if (state == InSide) return;
+	bool clip = (state == Intersect);
 
-	for(; h--; y++)
-	{
-		u32 *dst32 = (u32 *)(dst8 + ((vinfo.yoffset + y) % vinfo.yres_virtual) * finfo.line_length);
-
-		for (u32 i = w / ppl; i--;) {
-			fb_writel(dst32++, fg);
-		}
-
-		if (ppw && (w & ppw)) {
-			fb_writew(dst32, fg);
-			dst32 = (u32*)((u8*)dst32 + 2);
-		}
-
-		if (ppb && (w & ppb)) {
-			fb_writeb(dst32, fg);
-		}
-	}
-}
-
-void Screen::drawText(u16 col, u16 row, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
-{
-	u32 startx, x = W(col), y = H(row), w = W(1);
 	u16 startnum, *starttext;
 	bool *startdw, draw_space = false, draw_text = false;
 
-	for (; num; num--, text++, dw++, x += w) {
+	for (; num; num--, text++, dw++, x += fw) {
 		if (*text == 0x20) {
 			if (draw_text) {
 				draw_text = false;
-				drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw);
+			
+				if (clip) {
+					Rectangle rect = { startx, y, x, y + H(1) };
+					state = intersectWithClipRects(rect);
+				}
+
+				if (state != InSide) {
+					drawGlyphs(startx, y, x - startx, fc, bc, startnum - num, starttext, startdw, state == Intersect);
+				}
 			}
 
 			if (!draw_space) {
@@ -344,7 +285,7 @@ void Screen::drawText(u16 col, u16 row, u8 fc, u8 bc, u16 num, u16 *text, bool *
 		} else {
 			if (draw_space) {
 				draw_space = false;
-				fillRect(startx, y, x - startx, H(1), bc);
+				fillRect(startx, y, x - startx, H(1), bc, clip);
 			}
 
 			if (!draw_text) {
@@ -355,125 +296,236 @@ void Screen::drawText(u16 col, u16 row, u8 fc, u8 bc, u16 num, u16 *text, bool *
 				startx = x;
 			}
 
-			if (*dw) x += w;
+			if (*dw) x += fw;
 		}
 	}
 
 	if (draw_text) {
-		drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw);
+		if (clip) {
+			Rectangle rect = { startx, y, x, y + H(1) };
+			state = intersectWithClipRects(rect);
+		}
+
+		if (state != InSide) {
+			drawGlyphs(startx, y, x - startx, fc, bc, startnum - num, starttext, startdw, state == Intersect);
+		}
 	} else if (draw_space) {
-		fillRect(startx, y, x - startx, H(1), bc);
+		fillRect(startx, y, x - startx, H(1), bc, clip);
 	}
 }
 
-void Screen::drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
+void Screen::drawGlyphs(u32 x, u32 y, u32 w, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool clip)
 {
-	if (font->isMonospace()) {
-		for (; num; num--, text++, dw++) {
-			drawGlyph(x, y, fc, bc, *text, *dw, true);
-			x += *dw ? W(2) : W(1);
+	if (Font::instance()->isMonospace()) {
+		if (clip) {
+			Rectangle rect = { x, y, x, y + H(1) };
+
+			for (; num--; text++, dw++) {
+				rect.sx = rect.ex;
+				rect.ex += *dw ? W(2) : W(1);
+				
+				u32 state = intersectWithClipRects(rect);
+				if (state != InSide) {
+					drawGlyph(rect.sx, y, fc, bc, *text, *dw, true, state == Intersect);
+				}
+			}
+		} else {
+			for (; num--; text++, dw++) {
+				drawGlyph(x, y, fc, bc, *text, *dw, true, clip);
+				x += *dw ? W(2) : W(1);
+			}
 		}
 	} else {
-		int w = num;
-		for (u16 i = 0; i < num; i++) {
-			if (dw[i]) w++;
-		}
-		fillRect(x, y, W(w), H(1), bc);
+		fillRect(x, y, w, H(1), bc, clip);
 
-		for (; num; num--, text++, dw++) {
-			x += drawGlyph(x, y, fc, bc, *text, *dw, false);
+		for (; num--; text++, dw++) {
+			x += drawGlyph(x, y, fc, bc, *text, *dw, false, clip);
 		}
 	}
 }
 
-u32 Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool fillbg)
+void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 {
-	if (x >= vinfo.xres || y >= vinfo.yres) return 0;
+	u32 tmp;
+	switch (mRotate) {
+	case Rotate0:
+		break;
+
+	case Rotate90:
+		tmp = x;
+		x = mScreenh - y - h;
+		y = tmp;
+
+		tmp = w;
+		w = h;
+		h = tmp;
+		break;
+
+	case Rotate180:
+		x = mScreenw - x - w;
+		y = mScreenh - y - h;
+		break;
+
+	case Rotate270:
+		tmp = y;
+		y = mScreenw - x - w;
+		x = tmp;
+
+		tmp = w;
+		w = h;
+		h = tmp;
+		break;
+	}
+}
+
+void Screen::rotatePoint(u32 W, u32 H, u32 &x, u32 &y)
+{
+	u32 tmp;
+	switch (mRotate) {
+	case Rotate0:
+		break;
+
+	case Rotate90:
+		tmp = x;
+		x = H - y - 1;
+		y = tmp;
+		break;
+
+	case Rotate180:
+		x = W - x - 1;
+		y = H - y - 1;
+		break;
+
+	case Rotate270:
+		tmp = y;
+		y = W - x - 1;
+		x = tmp;
+		break;
+	}
+}
+
+static inline u32 offsetY(u32 y)
+{
+	y += vinfo.yoffset;
+	if (y >= vinfo.yres_virtual) y -= vinfo.yres_virtual;
+	return y;
+}
+
+void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color, bool clip)
+{
+	if (x >= mScreenw || y >= mScreenh || !w || !h) return;
+	if (x + w > mScreenw) w = mScreenw - x;
+	if (y + h > mScreenh) h = mScreenh - y;
+
+	rotateRect(x, y, w, h);
+
+	Rectangle rect = { x, y, x + w, y + h }, *rects = &rect;
+	u32 num = 1;
+	bool isalloc = false;
+
+	if (clip) {
+		isalloc = subtractWithRotatedClipRects(rect, rects, num);
+	}
+	
+	for (; num--;) {
+		u32 h = rects[num].ey - rects[num].sy;
+		u32 w = rects[num].ex - rects[num].sx;
+		if (!h || !w) continue;
+		
+		u8 *dst8 = mpMemStart + rects[num].sx * bytes_per_pixel;
+		for(; h--;)
+		{
+			u8 *dst = dst8 + offsetY(rects[num].sy++) * finfo.line_length;
+			fill(dst, w, color);
+		}
+	}
+
+	if (isalloc) delete[] rects;
+}
+
+s16 Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool fillbg, bool clip)
+{
+	if (x >= mScreenw || y >= mScreenh) return 0;
 
 	s32 w = (dw ? W(2) : W(1)), h = H(1);
-	if (x + w > vinfo.xres) w = vinfo.xres - x;
-	if (y + h > vinfo.yres) h = vinfo.yres = y;
+	if (x + w > mScreenw) w = mScreenw - x;
+	if (y + h > mScreenh) h = mScreenh - y;
 
-	Font::Glyph *fglyph = (Font::Glyph *)font->getGlyph(code);
-	if (!fglyph) {
-		if (fillbg) fillRect(x, y, w, h, bc);
+	Font::Glyph *glyph = (Font::Glyph *)Font::instance()->getGlyph(code);
+	if (!glyph) {
+		if (fillbg) fillRect(x, y, w, h, bc, clip);
 		return w;
 	}
-		
-	FT_BitmapGlyph glyph = (FT_BitmapGlyph)fglyph->glyph;
 
-	s32 top = fglyph->baseline - glyph->top;
+	s32 top = glyph->top;
 	if (top < 0) top = 0;
 
 	s32 left = glyph->left;
 	if ((s32)x + left < 0) left = -x;
 	
-	s8 *dst, *dst_line = mpMemStart + ((s32)x + left) * vinfo.bits_per_pixel / 8;
-	u8 red, green, blue,  *pixmap = glyph->bitmap.buffer;
-	u32 color;
-	s32 width = glyph->bitmap.width;
+	s32 width = glyph->width;
+	if (width > w - left) width = w - left;
+	if ((s32)x + left + width > (s32)mScreenw) width = mScreenw - ((s32)x + left);
+	if (width < 0) width = 0;
 
+	s32 height = glyph->height;
+	if (height > h - top) height = h - top;
+	if (y + top + height > mScreenh) height = mScreenh - (y + top);
+	if (height < 0) height = 0;
+	
 	if (fillbg) {
-		if (width > w - left) width = w - left;
-
-		if (top) fillRect(x, y, w, top, bc);
-		if (left > 0) fillRect(x, y + top, left, glyph->bitmap.rows, bc);
+		if (top) fillRect(x, y, w, top, bc, clip);
+		if (left > 0) fillRect(x, y + top, left, height, bc, clip);
 	
 		s32 right = width + left;
-		if (w > right) fillRect((s32)x + right, y + top, w - right, glyph->bitmap.rows, bc);
+		if (w > right) fillRect((s32)x + right, y + top, w - right, height, bc, clip);
 	
-		s32 bot = top + glyph->bitmap.rows;
-		if (h > bot) fillRect(x, y + bot, w, h - bot, bc);
+		s32 bot = top + height;
+		if (h > bot) fillRect(x, y + bot, w, h - bot, bc, clip);
 	}
 
-	if ((s32)x + left >= (s32)vinfo.xres || (s32)y + top >= (s32)vinfo.yres) return 0;
+	x += left;
+	y += top;
+	if (x >= mScreenw || y >= mScreenh || !width || !height) return glyph->advance;
 
-	if ((s32)x + left + width > (s32)vinfo.xres) width = vinfo.xres - ((s32)x + left);
+	u32 nwidth = width, nheight = height;
+	rotateRect(x, y, nwidth, nheight);
 
-	s32 height = glyph->bitmap.rows;
-	if (y + top + height > vinfo.yres) height = vinfo.yres - (y + top);
+	u8 *pixmap = glyph->pixmap;
+	u32 wdiff = glyph->width - width, hdiff = glyph->height - height;
+	
+	if (wdiff) {
+		if (mRotate == Rotate180) pixmap += wdiff;
+		else if (mRotate == Rotate270) pixmap += wdiff * glyph->pitch;
+	}
+	
+	if (hdiff) {
+		if (mRotate == Rotate90) pixmap += hdiff;
+		else if (mRotate == Rotate180) pixmap += hdiff * glyph->pitch;
+	}
+	
+	Rectangle rect = { x, y, x + nwidth, y + nheight }, *rects = &rect;
+	u32 num = 1;
+	bool isalloc = false;
 
-	bool isfg;	
-	for (s32 i = 0; i < height; i++, y++, pixmap += glyph->bitmap.pitch) {
-		dst = dst_line + ((vinfo.yoffset + y + top) % vinfo.yres_virtual) * finfo.line_length;
+	if (clip) {
+		isalloc = subtractWithRotatedClipRects(rect, rects, num);
+	}
 
-		for (s32 j = 0; j < width; j++) {
-			if (glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO) {
-				isfg = (pixmap[j >> 3] & (0x80 >> (j & 7)));
-				color = colors[isfg ? fc : bc];
-			} else {
-				if (vinfo.bits_per_pixel == 8) {
-					isfg = (pixmap[j] & 0x80);
-					color = colors[isfg ? fc : bc];
-				} else {
-					isfg = pixmap[j];
-					red = palette[bc].red + ((palette[fc].red - palette[bc].red) * pixmap[j]) / 255;
-					green = palette[bc].green + ((palette[fc].green - palette[bc].green) * pixmap[j]) / 255;
-					blue = palette[bc].blue + ((palette[fc].blue - palette[bc].blue) * pixmap[j]) / 255;
+	for (; num--;) {
+		u32 w = rects[num].ex - rects[num].sx;
+		u32 h = rects[num].ey - rects[num].sy;
+		if (!w || !h) continue;
 
-					color = (red >> (8 - vinfo.red.length) << vinfo.red.offset)
-							| (green >> (8 - vinfo.green.length) << vinfo.green.offset)
-							| (blue >> (8 - vinfo.blue.length) << vinfo.blue.offset);
-				}
-			}
+		u8 *pm = pixmap + (rects[num].sy - y) * glyph->pitch + (rects[num].sx - x);
+		u8 *dst, *dst_line = mpMemStart + rects[num].sx * bytes_per_pixel;
 
-			switch(vinfo.bits_per_pixel)
-			{
-			case 8:
-				if (fillbg || isfg) fb_writeb(dst, color);
-				dst++;
-				break;
-			case 16:
-				if (fillbg || isfg) fb_writew(dst, color);
-				dst += 2;
-				break;
-			case 32:
-				if (fillbg || isfg) fb_writel(dst, color);
-				dst += 4;
-				break;
-			}
+		for (; h--; pm += glyph->pitch) {
+			dst = dst_line + offsetY(rects[num].sy++) * finfo.line_length;
+			draw(dst, pm, w, fillbg, fc, bc);
 		}
 	}
-
-	return glyph->root.advance.x >> 16;
+	
+	if (isalloc) delete[] rects;
+	return glyph->advance;
 }

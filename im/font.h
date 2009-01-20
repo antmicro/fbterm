@@ -18,25 +18,52 @@
  *
  */
 
-#ifndef INPUT_H
-#define INPUT_H
+#ifndef FONT_H
+#define FONT_H
 
-#include "io.h"
 #include "instance.h"
 
-class TtyInput : public IoPipe {
-	DECLARE_INSTANCE(TtyInput)
+#define W(col) (Font::instance()->width() * (col))
+#define H(row) (Font::instance()->height() * (row))
+
+class Font {
+	DECLARE_INSTANCE(Font)
 public:
-	void switchVc(bool enter);
-	void switchIm(bool enter, bool raw);
+	struct Glyph {
+		short pitch, width, height;
+		short left, top, advance;
+		bool isbitmap;
+		char pixmap[0];
+	};
+
+	Glyph *getGlyph(unsigned unicode);
+	unsigned width() {
+		return mWidth;
+	}
+	unsigned height() {
+		return mHeight;
+	}
+	bool isMonospace() {
+		return mMonospace;
+	}
+	static void setFontInfo(char *name, unsigned short pixelsize);
 
 private:
-	virtual void readyRead(s8 *buf, u32 len);
-	void setupSysKey(bool restore);
-	void processRawKeys(s8* buf, u32 len);
-	
-	bool mRawMode;
-	bool mImEnable;
+	struct FontRec {
+		void *pattern;
+		void *face;
+		int load_flags;
+	};
+
+	Font(FontRec *fonts, unsigned num, void *unicover);
+	void openFont(unsigned index);
+	int fontIndex(unsigned unicode);
+
+	void *mpUniCover;
+	FontRec *mpFontList;
+	unsigned mFontNum;
+	unsigned mWidth, mHeight;
+	bool mMonospace;
 };
 
 #endif

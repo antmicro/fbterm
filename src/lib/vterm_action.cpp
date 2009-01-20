@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
  *   This program is free software; you can redistribute it and/or
@@ -343,14 +344,11 @@ void VTerm::erase_display()
 
 void VTerm::screen_align()
 {
-	u16 x, y;
-	u32 yp;
-
-	for (y = 0; y < height; y++) {
-		yp = linenumbers[y] * max_width;
+	for (u16 y = 0; y < height; y++) {
+		u32 yp = linenumbers[y] * max_width;
 		changed_line(y, 0, width - 1);
 
-		for (x = 0; x < width; x++) {
+		for (u16 x = 0; x < width; x++) {
 			text[yp + x] = 'E';
 			attrs[yp + x] = normal_char_attr();
 		}
@@ -377,16 +375,16 @@ void VTerm::set_margins()
 
 void VTerm::respond_id()
 {
-	sendBack("\033[?6c"); // response 'I'm a VT102'
+	sendBack("\e[?6c"); // response 'I'm a VT102'
 }
 
 void VTerm::status_report()
 {
 	if (param[0] == 5) { // device status report
-		sendBack("\033[0n"); // response 'Terminal OK'
+		sendBack("\e[0n"); // response 'Terminal OK'
 	} else if (param[0] == 6) { // cursor position report
 		s8 str[32];
-		snprintf(str, sizeof(str), "\033[%d;%dR", cursor_y + 1, cursor_x + 1);
+		snprintf(str, sizeof(str), "\e[%d;%dR", cursor_y + 1, cursor_x + 1);
 		sendBack(str);
 	}
 }
@@ -414,6 +412,7 @@ void VTerm::enable_mode(bool enable)
 		break;
 	case 20: // auto echo cr with lf
 		mode_flags.crlf = enable;
+		modeChanged(CRWithLF);
 		break;
 	case 1001 :
 		mode_flags.cursorkey_esco = enable;
@@ -445,7 +444,6 @@ void VTerm::enable_mode(bool enable)
 	case 1025 :
 		mode_flags.cursor_visible = enable;
 		modeChanged(CursorVisible);
-		move_cursor(cursor_x, cursor_y);
 		break;
 	case 2000 :
 		mode_flags.mouse_report = (enable ? MouseX11 : MouseNone);
@@ -523,18 +521,18 @@ void VTerm::set_display_attr()
 			char_attr.fcolor = param[n] % 10;
 			break;
 		case 38:
-			char_attr.fcolor = default_fcolor;
+			char_attr.fcolor = cur_fcolor;
 			char_attr.underline = true;
 			break;
 		case 39:
-			char_attr.fcolor = default_fcolor;
+			char_attr.fcolor = cur_fcolor;
 			char_attr.underline = false;
 			break;
 		case 40 ... 47:
 			char_attr.bcolor = param[n] % 10;
 			break;
 		case 49:
-			char_attr.bcolor = default_bcolor;
+			char_attr.bcolor = cur_bcolor;
 			break;
 		default :
 			break;
@@ -552,7 +550,6 @@ void VTerm::set_cursor_type()
 	if (q_mode) {
 		mode_flags.cursor_shape = param[0];
 		modeChanged(CursorShape);
-		move_cursor(cursor_x, cursor_y);
 	} else if (!param[0]) { 
 		respond_id();
 	}
@@ -610,14 +607,14 @@ void VTerm::linux_specific()
 {
 	switch (param[0]) {
 	case 1:
-		default_underline_color = param[1];
+		cur_underline_color = param[1];
 		break;
 	case 2:
-		default_halfbright_color = param[1];
+		cur_halfbright_color = param[1];
 		break;
 	case 8:
-		default_fcolor = char_attr.fcolor;
-		default_bcolor = char_attr.bcolor;
+		cur_fcolor = char_attr.fcolor;
+		cur_bcolor = char_attr.bcolor;
 		break;
 	case 9:
 		request(Blank, param[1]);

@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -24,6 +25,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <time.h>
 #include "io.h"
 
 DEFINE_INSTANCE(IoDispatcher)
@@ -86,12 +88,16 @@ void IoPipe::setFd(s32 fd)
 
 	if (mFd != -1) {
 		fcntl(mFd, F_SETFD, fcntl(mFd, F_GETFD) | FD_CLOEXEC);
+		fcntl(mFd, F_SETFL, fcntl(mFd, F_GETFL) | O_NONBLOCK);
+
 		IoDispatcher::instance()->addIoSource(this, true);
 	}
 }
 
 void IoPipe::setCodec(const s8 *up, const s8 *down)
 {
+	if (!up || !down) return;
+
 	if (mCodecRead) {
 		iconv_close((iconv_t)mCodecRead);
 		mCodecRead = 0;
@@ -143,6 +149,8 @@ void IoPipe::write(s8 *buf, u32 len)
 
 void IoPipe::translate(bool isread, s8 *buf, u32 len)
 {
+	if (!buf || !len) return;
+
 	s8 *bufleft;
 	u32 *buflen;
 	iconv_t codec;
@@ -161,7 +169,7 @@ void IoPipe::translate(bool isread, s8 *buf, u32 len)
 		if (isread) {
 			readyRead(buf, len);
 		} else {
-			s32 ret = ::write(mFd, buf, len);
+			writeIo(buf, len);
 		}
 
 		return;
@@ -182,17 +190,17 @@ void IoPipe::translate(bool isread, s8 *buf, u32 len)
 			if (isread) {
 				readyRead(outbuf, outlen - left);
 			} else {
-				s32 ret = ::write(mFd, outbuf, outlen - left);
+				writeIo(outbuf, outlen - left);
 			}
 		}
 
-		if ((s32)nconv == -1) {
+		if ((ssize_t)nconv == -1) {
 			if (errno == EILSEQ) {
 				s8 c = '?';
 				if (isread) {
 					readyRead(&c, 1);
 				} else {
-					s32 ret = ::write(mFd, &c, 1);
+					writeIo(&c, 1);
 				}
 
 				inptr++;
@@ -202,6 +210,32 @@ void IoPipe::translate(bool isread, s8 *buf, u32 len)
 				*buflen = total;
 				total = 0;
 			}
+		}
+	}
+}
+
+void IoPipe::writeIo(s8 *buf, u32 len)
+{
+	u32 num = 5;
+
+	while (len) {
+		s32 ret = ::write(mFd, buf, len);
+		if (ret == -1) {
+			if (errno == EAGAIN) {
+				if (num--) {
+					timespec tm = { 0, 200 * 1000000UL };
+					nanosleep(&tm, 0);
+				} else 
+					break;
+			} else if (errno != EINTR) {
+				if (errno == EBADF || errno == EPIPE) {
+					ioEnd();
+				}
+				break;
+			}
+		} else if (ret > 0) {
+			buf += ret;
+			len -= ret;
 		}
 	}
 }

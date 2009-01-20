@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -28,10 +29,8 @@ public:
 	IoPipe();
 	virtual ~IoPipe();
 
+	s32 fd() { return mFd; }
 	void ready(bool isread);
-	s32 fd() {
-		return mFd;
-	}
 
 	static const s8 *localCodec();
 
@@ -45,6 +44,7 @@ protected:
 
 private:
 	void translate(bool isread, s8 *buf, u32 len);
+	void writeIo(s8 *buf, u32 len);
 
 	s32 mFd;
 	void *mCodecRead, *mCodecWrite;

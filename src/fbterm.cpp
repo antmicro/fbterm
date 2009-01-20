@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -21,21 +22,22 @@
 #include <stdio.h>
 #include <signal.h>
 #include <sys/ioctl.h>
-#include <sys/syscall.h>
 #include <linux/vt.h>
-#include <linux/version.h>
+#include "config.h"
 #include "fbterm.h"
 #include "fbshell.h"
+#include "fbshellman.h"
 #include "fbconfig.h"
 #include "fbio.h"
 #include "screen.h"
 #include "input.h"
 #include "input_key.h"
 #include "mouse.h"
+#include "improxy.h"
 
-#ifdef SYS_signalfd
-#include <asm/types.h>
-#include <linux/signalfd.h>
+#ifdef HAVE_SIGNALFD
+// <sys/signalfd.h> offered by some systems has bug with g++
+#include "signalfd.h"
 
 sigset_t oldSigmask;
 
@@ -49,7 +51,7 @@ private:
 
 SignalIo::SignalIo(sigset_t &sigmask)
 {
-	int fd = syscall(SYS_signalfd, -1, &sigmask, 8);
+	int fd = signalfd(-1, &sigmask, 0);
 	setFd(fd);
 }
 
@@ -57,16 +59,12 @@ void SignalIo::readyRead(s8 *buf, u32 len)
 {
 	signalfd_siginfo *si = (signalfd_siginfo*)buf;
 	for (len /= sizeof(*si); len--; si++) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24)
-		FbTerm::instance()->processSignal(si->signo);
-#else
 		FbTerm::instance()->processSignal(si->ssi_signo);
-#endif
 	}
 }
 #else
 
-static sig_atomic_t pendsigs = 0;
+static volatile sig_atomic_t pendsigs = 0;
 
 static void signalHandler(s32 signo)
 {
@@ -94,7 +92,6 @@ static void pollSignal()
 #endif
 
 DEFINE_INSTANCE_DEFAULT(FbTerm)
-u32 effective_uid;
 
 FbTerm::FbTerm()
 {
@@ -106,15 +103,12 @@ FbTerm::~FbTerm()
 {
 	IoDispatcher::uninstance();
 	FbShellManager::uninstance();
+	ImProxy::uninstance();
 	Screen::uninstance();
-	Config::uninstance();
 }
 
 void FbTerm::init()
 {
-	effective_uid = geteuid();
-	seteuid(getuid());
-
 	if (!TtyInput::instance() || !Screen::instance()) return;
 
 	struct vt_mode vtm;
@@ -125,12 +119,7 @@ void FbTerm::init()
 	vtm.frsig = 0;
 	ioctl(STDIN_FILENO, VT_SETMODE, &vtm);
 
-	sighandler_t sh;
-#ifndef SYS_signalfd
-	sh = signalHandler;
-#else
-	sh = SIG_IGN;
-
+#ifdef HAVE_SIGNALFD
 	sigset_t sigmask;
 	sigemptyset(&sigmask);
 	sigaddset(&sigmask, SIGUSR1);
@@ -141,29 +130,31 @@ void FbTerm::init()
 
 	sigprocmask(SIG_BLOCK, &sigmask, &oldSigmask);
 	new SignalIo(sigmask);
-#endif
+#else
+	sighandler_t sh = signalHandler;
 
 	signal(SIGUSR1, sh);
 	signal(SIGUSR2, sh);
 	signal(SIGALRM, sh);
 	signal(SIGTERM, sh);
 	signal(SIGHUP, sh);
+#endif
+	signal(SIGPIPE, SIG_IGN);
 
 	Mouse::instance();
-	FbShellManager::instance()->createShell();
-
 	mInit = true;
 }
 
 void FbTerm::run()
 {
 	if (!mInit) return;
+	FbShellManager::instance()->createShell();
 
 	mRun = true;
 	FbIoDispatcher *io = (FbIoDispatcher*)IoDispatcher::instance();
 	while (mRun) {
 		io->poll();
-#ifndef SYS_signalfd
+#ifndef HAVE_SIGNALFD
 		pollSignal();
 #endif
 	}
@@ -232,11 +223,15 @@ void FbTerm::processSysKey(u32 key)
 	case SHIFT_RIGHT:
 		manager->nextShell();
 		break;
-				
+
 	case CTRL_ALT_F1 ... CTRL_ALT_F6:
 		if (manager->activeShell()) {
 			manager->activeShell()->switchCodec(key - CTRL_ALT_F1);
 		}
+		break;
+
+	case CTRL_SPACE:
+		manager->toggleIm();
 		break;
 
 	default:
@@ -244,9 +239,35 @@ void FbTerm::processSysKey(u32 key)
 	}
 }
 
-int main()
+void FbTerm::initChildProcess()
 {
-	FbTerm::instance()->run();
-	FbTerm::uninstance();
+#ifndef HAVE_FS_CAPABILITY
+    setuid(getuid());
+#endif
+
+#ifdef HAVE_SIGNALFD
+	sigprocmask(SIG_SETMASK, &oldSigmask, 0);
+#endif
+
+	signal(SIGPIPE, SIG_DFL);
+}
+
+#ifndef HAVE_FS_CAPABILITY
+u32 effective_uid;
+#endif
+
+int main(int argc, char **argv)
+{
+#ifndef HAVE_FS_CAPABILITY
+	effective_uid = geteuid();
+	seteuid(getuid());
+#endif
+
+	if (Config::instance()->parseArgs(argc, argv)) {
+		FbTerm::instance()->run();
+		FbTerm::uninstance();
+	}
+	
+	Config::uninstance();
 	return 0;
 }
