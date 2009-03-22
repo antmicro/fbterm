@@ -166,6 +166,10 @@ void Config::checkConfigFile(const s8 *name)
 		"font-names=mono\n"
 		"font-size=12\n"
 		"\n"
+		"# force font width, usually for non-fixed width fonts\n"
+		"# legal value format: n (fw_new = n), +n (fw_new = fw_old + n), -n (fw_new = fw_old - n)\n"
+		"#font-width=\n"
+		"\n"
 		"# default color of foreground/background text\n"
 		"# available colors: 0 = black, 1 = red, 2 = green, 3 = brown, 4 = blue, 5 = magenta, 6 = cyan, 7 = white\n"
 		"color-foreground=7\n"
@@ -218,6 +222,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "input-method", required_argument, 0, 'i' },
 		{ "cursor-shape", required_argument, 0, 0 },
 		{ "cursor-interval", required_argument, 0, 1 },
+		{ "font-width", required_argument, 0, 2 },
 		{ 0, 0, 0, 0 }
 	};
 
@@ -238,6 +243,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"  -h, --help                      display this help and exit\n"
 				"  -n, --font-names=TEXT           specify font family names\n"
 				"  -s, --font-size=NUM             specify font pixel size\n"
+				"      --font-width=NUM            force font width\n"
 				"  -f, --color-foreground=NUM      specify foreground color\n"
 				"  -b, --color-background=NUM      specify background color\n"
 				"  -e, --text-encodings=TEXT       specify additional text endcodings\n"
@@ -249,7 +255,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"See comments in ~/.fbtermrc for details of these options.\n"
 			);
 			return false;
-			
+
 		default:
 			for (const option *opt = options; opt->name; opt++) {
 				if (opt->val != index) continue;

@@ -5,7 +5,7 @@ Dm-Upload-Allowed: yes
 Maintainer: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 Build-Depends: cdbs, debhelper (>= 7), autotools-dev, libfreetype6-dev,\
 		libfontconfig1-dev, libgpm-dev, pkg-config
-Standards-Version: 3.8.0
+Standards-Version: 3.8.1
 Homepage: http://code.google.com/p/fbterm/
 
 Package: fbterm

@@ -72,7 +72,7 @@ void VTerm::set_tab()
 void VTerm::clear_tab()
 {
 	if (param[0] == 3) {
-		bzero(tab_stops, max_width / 8 + 1);
+		memset(tab_stops, 0, max_width / 8 + 1);
 	} else if (param[0] == 0) {
 		tab_stops[cursor_x / 8] &= ~(1 << (cursor_x % 8));
 	}
@@ -80,20 +80,7 @@ void VTerm::clear_tab()
 
 void VTerm::param_digit()
 {
-	if (palette_mode) {
-		param[npar++] = cur_char >= 'a' ? (cur_char - 'a' + 10) : (cur_char >= 'A' ? (cur_char - 'A' + 10) : (cur_char - '0'));
-
-		if (npar == 7) {
-			u32 val = 0;
-			for (u32 i = 0; i < 7; i++) {
-				val <<= 4;
-				val |= param[i];
-			}
-			request(PaletteSet, val);
-			normal_state = true; 
-		}
-	} else
-		param[npar] = param[npar] * 10 + cur_char - '0';
+	param[npar] = param[npar] * 10 + cur_char - '0';
 }
 
 void VTerm::next_param()
@@ -103,10 +90,10 @@ void VTerm::next_param()
 
 void VTerm::clear_param()
 {
-	npar = 0;
-	bzero(param, sizeof(param));
 	q_mode = 0;
-	palette_mode = false;
+	palette_mode = 0;
+	npar = 0;
+	memset(param, 0, sizeof(param));
 }
 
 void VTerm::save_cursor()
@@ -364,7 +351,7 @@ void VTerm::set_margins()
 
 	b = param[1];
 	if (b < 1 || b > height) b = height;
-	
+
 	if (pending_scroll) update();
 
 	scroll_top = t - 1;
@@ -466,7 +453,7 @@ void VTerm::clear_mode()
 
 void VTerm::set_display_attr()
 {
-	for (s32 n = 0; n <= npar; n++) {
+	for (u16 n = 0; n <= npar; n++) {
 		switch (param[n]) {
 		case 0:
 			char_attr = default_char_attr;
@@ -550,7 +537,7 @@ void VTerm::set_cursor_type()
 	if (q_mode) {
 		mode_flags.cursor_shape = param[0];
 		modeChanged(CursorShape);
-	} else if (!param[0]) { 
+	} else if (!param[0]) {
 		respond_id();
 	}
 }
@@ -607,10 +594,10 @@ void VTerm::linux_specific()
 {
 	switch (param[0]) {
 	case 1:
-		cur_underline_color = param[1];
+		if (param[1] < 8) cur_underline_color = param[1];
 		break;
 	case 2:
-		cur_halfbright_color = param[1];
+		if (param[1] < 8) cur_halfbright_color = param[1];
 		break;
 	case 8:
 		cur_fcolor = char_attr.fcolor;
@@ -639,9 +626,29 @@ void VTerm::linux_specific()
 	}
 }
 
+void VTerm::begin_set_palette()
+{
+	if (palette_mode || npar) normal_state = true;
+	else palette_mode = true;
+}
+
 void VTerm::set_palette()
 {
-	palette_mode = true;
+	if (palette_mode) {
+		param[npar++] = (cur_char >= 'a' ? (cur_char - 'a' + 10) : (cur_char >= 'A' ? (cur_char - 'A' + 10) : (cur_char - '0')));
+
+		if (npar != 7) return;
+
+		u32 val = 0;
+		for (u32 i = 0; i < 7; i++) {
+			val <<= 4;
+			val |= param[i];
+		}
+
+		request(PaletteSet, val);
+	}
+
+	normal_state = true;
 }
 
 void VTerm::reset_palette()
@@ -652,4 +659,24 @@ void VTerm::reset_palette()
 void VTerm::set_led()
 {
 	request(param[0] ? LedSet : LedClear,  param[0]);
+}
+
+void VTerm::fbterm_specific()
+{
+	switch (param[0]) {
+	case 1:
+		if (npar == 1) char_attr.fcolor = param[1];
+		break;
+
+	case 2:
+		if (npar == 1) char_attr.bcolor = param[1];
+		break;
+
+	case 3:
+		if (npar == 4) request(PaletteSet, ((param[1] & 0xff) << 24) | ((param[2] & 0xff) << 16) | ((param[3] & 0xff) << 8) | (param[4] & 0xff));
+		break;
+
+	default:
+		break;
+	}
 }

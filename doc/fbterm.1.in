@@ -1,4 +1,4 @@
-.TH "FbTerm" "1" "December 2008" "FbTerm @VERSION@" "FbTerm User Manual"
+.TH "FbTerm" "1" "March 2009" "FbTerm @VERSION@" "FbTerm User Manual"
 .SH "NAME"
 FbTerm - a fast FrameBuffer based TERMinal emulator for linux
 .SH "SYNOPSIS"
@@ -30,6 +30,9 @@ specify font family names
 .TP
 \fB-s, -font-size=\fR\fInum\fR
 specify font pixel size
+.TP
+\fB--font-width=\fR\fInum\fR
+force font width
 .TP
 \fB-f, --color-foreground=\fR\fInum\fR
 speicfy foreground color

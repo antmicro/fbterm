@@ -23,16 +23,15 @@
 
 #include "instance.h"
 
-#define W(col) (Font::instance()->width() * (col))
-#define H(row) (Font::instance()->height() * (row))
+#define FW(cols) (Font::instance()->width() * (cols))
+#define FH(rows) (Font::instance()->height() * (rows))
 
 class Font {
 	DECLARE_INSTANCE(Font)
 public:
 	struct Glyph {
 		short pitch, width, height;
-		short left, top, advance;
-		bool isbitmap;
+		short left, top;
 		char pixmap[0];
 	};
 
@@ -43,10 +42,7 @@ public:
 	unsigned height() {
 		return mHeight;
 	}
-	bool isMonospace() {
-		return mMonospace;
-	}
-	static void setFontInfo(char *name, unsigned short pixelsize);
+	static void setFontInfo(char *name, unsigned short pixelsize, unsigned short height, unsigned short width);
 
 private:
 	struct FontRec {
@@ -63,7 +59,6 @@ private:
 	FontRec *mpFontList;
 	unsigned mFontNum;
 	unsigned mWidth, mHeight;
-	bool mMonospace;
 };
 
 #endif

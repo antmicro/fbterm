@@ -37,8 +37,8 @@ void init_keycode_state()
 {
 	npadch = -1;
 	shift_state = 0;
-	bzero(key_down, sizeof(char) * NR_KEYS);
-	bzero(shift_down, sizeof(char) * NR_SHIFT);
+	memset(key_down, 0, sizeof(char) * NR_KEYS);
+	memset(shift_down, 0, sizeof(char) * NR_SHIFT);
 	ioctl(STDIN_FILENO, KDGKBLED, &lock_state);
 }
 
@@ -72,10 +72,6 @@ unsigned short keycode_to_keysym(unsigned short keycode, char down)
 	unsigned value = KVAL(ke.kb_value);
 
 	switch (KTYP(ke.kb_value)) {
-	case KT_LETTER:
-		ke.kb_value = K(KT_LATIN, value);
-		break;
-
 	case KT_SPEC:
 		switch (ke.kb_value) {
 		case K_NUM:
@@ -117,21 +113,25 @@ unsigned short keycode_to_keysym(unsigned short keycode, char down)
 
 		break;
 
-	case KT_DEAD:
-	case KT_LOCK:
-	case KT_SLOCK:
-	case KT_BRL:
-		printf("not support!\n");
+	case KT_LATIN:
+	case KT_LETTER:
+	case KT_FN:
+	case KT_PAD:
+	case KT_CONS:
+	case KT_CUR:
+	case KT_META:
+	case KT_ASCII:	
 		break;
 
 	default:
+		printf("not support!\n");
 		break;
 	}
 
 	return ke.kb_value;
 }
 
-unsigned short keypad_keysym_redirect(unsigned keysym)
+unsigned short keypad_keysym_redirect(unsigned short keysym)
 {
 	if (applic_keypad || KTYP(keysym) != KT_PAD || KVAL(keysym) >= NR_PAD) return keysym;
 	
@@ -202,6 +202,7 @@ char *keysym_to_term_string(unsigned short keysym, char down)
 
 	switch (KTYP(keysym)) {
 	case KT_LATIN:
+	case KT_LETTER:
 		index = to_utf8(value, buf);
 		break;
 

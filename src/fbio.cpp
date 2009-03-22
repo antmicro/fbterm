@@ -19,16 +19,19 @@
  */
 
 #include <unistd.h>
-#include <signal.h>
 #include <fcntl.h>
-#include <string.h>
-#include <locale.h>
-#include <langinfo.h>
-#include <sys/epoll.h>
+#include "config.h"
 #include "fbio.h"
 
-#define NR_EPOLL_FDS 10
 #define NR_FDS 32
+
+#ifdef HAVE_EPOLL
+#include <sys/epoll.h>
+#define NR_EPOLL_FDS 10
+#else
+static fd_set fds;
+static u32 maxfd = 0;
+#endif
 
 static IoPipe *ioPipeMap[NR_FDS];
 
@@ -39,8 +42,12 @@ IoDispatcher *IoDispatcher::createInstance()
 
 FbIoDispatcher::FbIoDispatcher()
 {
+#ifdef HAVE_EPOLL
 	mEpollFd = epoll_create(NR_EPOLL_FDS);
 	fcntl(mEpollFd, F_SETFD, fcntl(mEpollFd, F_GETFD) | FD_CLOEXEC);
+#else
+	FD_ZERO(&fds);
+#endif
 }
 
 FbIoDispatcher::~FbIoDispatcher()
@@ -49,7 +56,9 @@ FbIoDispatcher::~FbIoDispatcher()
 		if (ioPipeMap[i]) delete ioPipeMap[i];
 	}
 
+#ifdef HAVE_EPOLL
 	close(mEpollFd);
+#endif
 }
 
 void FbIoDispatcher::addIoSource(IoPipe *src, bool isread)
@@ -57,10 +66,15 @@ void FbIoDispatcher::addIoSource(IoPipe *src, bool isread)
 	if (src->fd() >= NR_FDS) return;
 	ioPipeMap[src->fd()] = src;
 
+#ifdef HAVE_EPOLL
 	epoll_event ev;
 	ev.data.fd = src->fd();
 	ev.events = (isread ? EPOLLIN : EPOLLOUT);
 	epoll_ctl(mEpollFd, EPOLL_CTL_ADD, src->fd(), &ev);
+#else
+	FD_SET(src->fd(), &fds);
+	if (src->fd() > maxfd) maxfd = src->fd();
+#endif
 }
 
 void FbIoDispatcher::removeIoSource(IoPipe *src, bool isread)
@@ -68,15 +82,19 @@ void FbIoDispatcher::removeIoSource(IoPipe *src, bool isread)
 	if (src->fd() >= NR_FDS) return;
 	ioPipeMap[src->fd()] = 0;
 
+#ifdef HAVE_EPOLL
 	epoll_event ev;
 	ev.data.fd = src->fd();
 	ev.events = (isread ? EPOLLIN : EPOLLOUT);
 	epoll_ctl(mEpollFd, EPOLL_CTL_DEL, src->fd(), &ev);
-
+#else
+	FD_CLR(src->fd(), &fds);
+#endif
 }
 
 void FbIoDispatcher::poll()
 {
+#ifdef HAVE_EPOLL
 	epoll_event evs[NR_EPOLL_FDS];
 	s32 nfds = epoll_wait(mEpollFd, evs, NR_EPOLL_FDS, -1);
 
@@ -96,4 +114,18 @@ void FbIoDispatcher::poll()
 			delete src;
 		}
 	}
+#else
+	fd_set rfds = fds;
+	s32 num = select(maxfd + 1, &rfds, 0, 0, 0);
+	if (num <= 0) return;
+
+	for (u32 i = 0; i <= maxfd; i++) {
+		if (FD_ISSET(i, &rfds)) {
+			if (ioPipeMap[i]) {
+				ioPipeMap[i]->ready(true);
+			}
+			if (!--num) break;
+		}
+	}
+#endif
 }

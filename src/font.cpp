@@ -26,6 +26,8 @@
 #include "fbconfig.h"
 
 #define OFFSET(TYPE, MEMBER) ((size_t)(&(((TYPE *)0)->MEMBER)))
+#define SUBS(a, b) ((a) > (b) ? (a) - (b) : (b) - (a))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 DEFINE_INSTANCE(Font)
 
@@ -33,14 +35,14 @@ Font *Font::createInstance()
 {
 	FcInit();
 
-    s8 buf[64];
-    Config::instance()->getOption("font-names", buf, sizeof(buf));
+	s8 buf[64];
+	Config::instance()->getOption("font-names", buf, sizeof(buf));
 
-    FcPattern *pat = FcNameParse((FcChar8 *)(*buf ? buf : "mono"));
+	FcPattern *pat = FcNameParse((FcChar8 *)(*buf ? buf : "mono"));
 
-    u32 pixel_size = 12;
-    Config::instance()->getOption("font-size", pixel_size);
-    FcPatternAddDouble(pat, FC_PIXEL_SIZE, (double)pixel_size);
+	u32 pixel_size = 12;
+	Config::instance()->getOption("font-size", pixel_size);
+	FcPatternAddDouble(pat, FC_PIXEL_SIZE, (double)pixel_size);
 
 	FcPatternAddString(pat, FC_LANG, (FcChar8 *)"en");
 
@@ -55,7 +57,7 @@ Font *Font::createInstance()
 	u32 index = 0;
 	if (fs) {
 		fonts = new FontRec[fs->nfont];
-	
+
 		for (s32 i = 0; i < fs->nfont; i++) {
 			FcPattern *font = FcFontRenderPrepare(NULL, pat, fs->fonts[i]);
 			if (font) {
@@ -90,24 +92,49 @@ Font::Font(FontRec *fonts, u32 num, void *unicover)
 	mpFontList = fonts;
 	mFontNum = num;
 	mpUniCover = unicover;
-	mMonospace = false;
+	mHeight = mWidth = 0;
 	glyphCache = new Glyph *[256 * 256];
 	glyphCacheInited = new bool[256];
-	bzero(glyphCacheInited, sizeof(bool) * 256);
-
-	int spacing;
-	if (FcPatternGetInteger((FcPattern*)mpFontList[0].pattern, FC_SPACING, 0, &spacing) == FcResultMatch)
-		mMonospace = (spacing != FC_PROPORTIONAL);
+	memset(glyphCacheInited, 0, sizeof(bool) * 256);
 
 	FT_Init_FreeType(&ftlib);
-
 	openFont(0);
-	mHeight = ((FT_Face)mpFontList[0].face)->size->metrics.height >> 6;
-	mWidth = ((FT_Face)mpFontList[0].face)->size->metrics.max_advance >> 6;
 
-	if (!mMonospace) {
-		Glyph *glyph = getGlyph('a');
-		if (mWidth > glyph->advance * 2) mWidth /= 2;
+	FT_Face face = (FT_Face)mpFontList[0].face;
+	if (face == (FT_Face)-1) return;
+
+	if (face->face_flags & FT_FACE_FLAG_SCALABLE) {
+		mHeight = face->size->metrics.height >> 6;
+		mWidth = face->size->metrics.max_advance >> 6;
+	} else if (face->num_fixed_sizes) {
+		double dsize;
+		FcPatternGetDouble((FcPattern *)mpFontList[0].pattern, FC_PIXEL_SIZE, 0, &dsize);
+
+		FT_Bitmap_Size *sizes = face->available_sizes;
+		u32 index = 0, diffmin = (u32)-1;
+		for (u32 i = 0; i < face->num_fixed_sizes; i++) {
+			u32 diff = SUBS(sizes[i].size >> 6, (u32)dsize);
+			if (diff < diffmin ) {
+				index = i;
+				diffmin = diff;
+			}
+		}
+
+		mHeight = sizes[index].height;
+		mWidth = sizes[index].width;
+	}
+
+	if (!(face->face_flags & FT_FACE_FLAG_FIXED_WIDTH)) mWidth = MIN(mWidth, (mHeight + 1) / 2);
+
+	u32 width = 0;
+	Config::instance()->getOption("font-width", width);
+
+	if (width) {
+		s8 buf[64];
+		Config::instance()->getOption("font-width", buf, sizeof(buf));
+
+		if (buf[0] == '+' || buf[0] == '-') mWidth += (s32)width;
+		else mWidth = width;
 	}
 }
 
@@ -115,7 +142,7 @@ Font::~Font()
 {
 	FcCharSetDestroy((FcCharSet*)mpUniCover);
 
-	for (u32 i = 0; i < mFontNum; i++) {	
+	for (u32 i = 0; i < mFontNum; i++) {
 		FcPatternDestroy((FcPattern*)mpFontList[i].pattern);
 
 		FT_Face face = (FT_Face)mpFontList[i].face;
@@ -127,7 +154,7 @@ Font::~Font()
 	FT_Done_FreeType(ftlib);
 	FcFini();
 
-	delete[] mpFontList;	
+	delete[] mpFontList;
 
 	for (u32 i = 0; i < 256; i++) {
 		if (!glyphCacheInited[i]) continue;
@@ -138,7 +165,7 @@ Font::~Font()
 			}
 		}
 	}
-	
+
 	delete[] glyphCache;
 	delete[] glyphCacheInited;
 }
@@ -147,7 +174,7 @@ void Font::openFont(u32 index)
 {
 	if (index >= mFontNum) return;
 
-	FcPattern *pattern = (FcPattern*)mpFontList[index].pattern;
+	FcPattern *pattern = (FcPattern *)mpFontList[index].pattern;
 
 	FcChar8 *name = (FcChar8 *)"";
 	FcPatternGetString(pattern, FC_FILE, 0, &name);
@@ -181,7 +208,7 @@ void Font::openFont(u32 index)
 
 		if (!hinting || hint_style == FC_HINT_NONE) {
 			load_flags |= FT_LOAD_NO_HINTING;
-		} else { 
+		} else {
 			load_flags |= FT_LOAD_TARGET_LIGHT;
 		}
 	} else {
@@ -208,10 +235,10 @@ int Font::fontIndex(u32 unicode)
 Font::Glyph *Font::getGlyph(u32 unicode)
 {
 	if (unicode >= 256 * 256) return 0;
-	
+
 	if (!glyphCacheInited[unicode >> 8]) {
 		glyphCacheInited[unicode >> 8] = true;
-		bzero(&glyphCache[unicode & 0xff00], sizeof(Glyph *) * 256);
+		memset(&glyphCache[unicode & 0xff00], 0, sizeof(Glyph *) * 256);
 	}
 
 	if (glyphCache[unicode]) return glyphCache[unicode];
@@ -228,33 +255,31 @@ Font::Glyph *Font::getGlyph(u32 unicode)
 
 	FT_Load_Glyph(face, index, FT_LOAD_RENDER | mpFontList[i].load_flags);
 	FT_Bitmap &bitmap = face->glyph->bitmap;
-	
+
 	u32 x, y, w, h, nx, ny, nw, nh;
 	x = y = 0;
 	w = nw = bitmap.width;
 	h = nh = bitmap.rows;
-	Screen::rotateRect(x, y, nw, nh);
+	Screen::instance()->rotateRect(x, y, nw, nh);
 
 	Glyph *glyph = (Glyph *)new u8[OFFSET(Glyph, pixmap) + nw * nh];
 	glyph->left = face->glyph->metrics.horiBearingX >> 6;
 	glyph->top = mHeight - 1 + (face->size->metrics.descender >> 6) - (face->glyph->metrics.horiBearingY >> 6);
-	glyph->advance = face->glyph->metrics.horiAdvance >> 6;
 	glyph->width = face->glyph->metrics.width >> 6;
 	glyph->height = face->glyph->metrics.height >> 6;
 	glyph->pitch = nw;
-	glyph->isbitmap = false;
 
 	u8 *buf = bitmap.buffer;
 	for (y = 0; y < h; y++, buf += bitmap.pitch) {
 		for (x = 0; x < w; x++) {
 			nx = x, ny = y;
-			Screen::rotatePoint(w, h, nx, ny);
+			Screen::instance()->rotatePoint(w, h, nx, ny);
 
-			glyph->pixmap[ny * nw + nx] = 
+			glyph->pixmap[ny * nw + nx] =
 				(bitmap.pixel_mode == FT_PIXEL_MODE_MONO) ? ((buf[(x >> 3)] & (0x80 >> (x & 7))) ? 0xff : 0) : buf[x];
 		}
 	}
-	
-	glyphCache[unicode]	= glyph;
+
+	glyphCache[unicode] = glyph;
 	return glyph;
 }

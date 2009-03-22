@@ -1,3 +1,25 @@
+2009-03-14 version 1.4
+	* screen_render.cpp:
+	improved text rendering performence
+	
+	* lib/vterm_state.cpp lib/vterm_action.cpp fbshell.cpp:
+	added private escape sequences for 256 color support 
+	
+	* font.cpp fbconfig.cpp:
+	added a option to adjust font width
+	
+	* fbterm.cpp fbio.cpp:
+	added using select() for old 2.2/2.4 kernel
+	
+	* font.cpp:
+	fixed a crash bug where font's width/height returns zero for bitmap fonts
+	
+	* font.cpp screen.cpp:
+	removed codes for non fixed width font
+	
+	* configure:
+	fixed a failure with cross-compiling environment
+
 2008-12-20 version 1.3
 	* fbconfig.cpp:
 	added command line arguments to change option values

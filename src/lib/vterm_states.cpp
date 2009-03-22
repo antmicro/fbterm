@@ -26,7 +26,7 @@
 #define ADDSAME(len) ((len) << 8)
 
 const VTerm::StateOption VTerm::control_state[] = {
-    { 0,	0,	KEEP },
+	{ 0,	0,	KEEP },
 	{ 7,	&VTerm::bell,	KEEP },
 	{ 8,	&VTerm::bs,		KEEP },
 	{ 9,	&VTerm::tab,	KEEP },
@@ -100,14 +100,15 @@ const VTerm::StateOption VTerm::square_state[] = {
 	{ 'u', &VTerm::restore_cursor,	NORMAL },
 	{ '`', &VTerm::cursor_position_col,	NORMAL },
 	{ ']', &VTerm::linux_specific, NORMAL },
+	{ '}', &VTerm::fbterm_specific, NORMAL },
 	{ -1 }
 };
 
 const VTerm::StateOption VTerm::nonstd_state[] = {
-	{ '0' | ADDSAME(9), &VTerm::param_digit,	KEEP },
-	{ 'A' | ADDSAME(5), &VTerm::param_digit,	KEEP },
-	{ 'a' | ADDSAME(5), &VTerm::param_digit,	KEEP },
-	{ 'P', &VTerm::set_palette, KEEP },
+	{ '0' | ADDSAME(9), &VTerm::set_palette,    KEEP },
+	{ 'A' | ADDSAME(5), &VTerm::set_palette,    KEEP },
+	{ 'a' | ADDSAME(5), &VTerm::set_palette,    KEEP },
+	{ 'P', &VTerm::begin_set_palette, KEEP },
 	{ 'R', &VTerm::reset_palette, NORMAL },
 	{ -1 }
 };
