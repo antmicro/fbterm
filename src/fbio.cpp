@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -28,6 +28,7 @@
 #ifdef HAVE_EPOLL
 #include <sys/epoll.h>
 #define NR_EPOLL_FDS 10
+s32 epollFd;
 #else
 static fd_set fds;
 static u32 maxfd = 0;
@@ -43,8 +44,8 @@ IoDispatcher *IoDispatcher::createInstance()
 FbIoDispatcher::FbIoDispatcher()
 {
 #ifdef HAVE_EPOLL
-	mEpollFd = epoll_create(NR_EPOLL_FDS);
-	fcntl(mEpollFd, F_SETFD, fcntl(mEpollFd, F_GETFD) | FD_CLOEXEC);
+	epollFd = epoll_create(NR_EPOLL_FDS);
+	fcntl(epollFd, F_SETFD, fcntl(epollFd, F_GETFD) | FD_CLOEXEC);
 #else
 	FD_ZERO(&fds);
 #endif
@@ -57,7 +58,7 @@ FbIoDispatcher::~FbIoDispatcher()
 	}
 
 #ifdef HAVE_EPOLL
-	close(mEpollFd);
+	close(epollFd);
 #endif
 }
 
@@ -70,7 +71,7 @@ void FbIoDispatcher::addIoSource(IoPipe *src, bool isread)
 	epoll_event ev;
 	ev.data.fd = src->fd();
 	ev.events = (isread ? EPOLLIN : EPOLLOUT);
-	epoll_ctl(mEpollFd, EPOLL_CTL_ADD, src->fd(), &ev);
+	epoll_ctl(epollFd, EPOLL_CTL_ADD, src->fd(), &ev);
 #else
 	FD_SET(src->fd(), &fds);
 	if (src->fd() > maxfd) maxfd = src->fd();
@@ -86,7 +87,7 @@ void FbIoDispatcher::removeIoSource(IoPipe *src, bool isread)
 	epoll_event ev;
 	ev.data.fd = src->fd();
 	ev.events = (isread ? EPOLLIN : EPOLLOUT);
-	epoll_ctl(mEpollFd, EPOLL_CTL_DEL, src->fd(), &ev);
+	epoll_ctl(epollFd, EPOLL_CTL_DEL, src->fd(), &ev);
 #else
 	FD_CLR(src->fd(), &fds);
 #endif
@@ -96,7 +97,7 @@ void FbIoDispatcher::poll()
 {
 #ifdef HAVE_EPOLL
 	epoll_event evs[NR_EPOLL_FDS];
-	s32 nfds = epoll_wait(mEpollFd, evs, NR_EPOLL_FDS, -1);
+	s32 nfds = epoll_wait(epollFd, evs, NR_EPOLL_FDS, -1);
 
 	for (s32 i = 0; i < nfds; i++) {
 		IoPipe *src = ioPipeMap[evs[i].data.fd];

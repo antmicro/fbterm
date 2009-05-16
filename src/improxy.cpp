@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -22,69 +22,47 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include "improxy.h"
 #include "immessage.h"
 #include "fbconfig.h"
+#include "fbshell.h"
 #include "fbshellman.h"
 #include "font.h"
 #include "screen.h"
-#include "io.h"
 #include "input.h"
 #include "fbterm.h"
-
-class ImSocket: public IoPipe {
-public:
-	ImSocket(s32 fd);
-	~ImSocket();
-
-	bool actived() { return mActive; }
-	void toggleActive(u32 shell);
-	void sendKey(s8 *buf, u32 len);
-	void sendCursorPos(u16 x, u16 y);
-	void sendTermMode(bool crlf, bool appkey, bool curo);
-
-private:
-	virtual void readyRead(s8 *buf, u32 len);
-
-	void sendInfo();
-	void sendAck();
-	void sendDisconnect();
-
-	bool mConnected;
-	bool mActive;
-	bool mInputMode;
-};
 
 #define OFFSET(TYPE, MEMBER) ((size_t)(&(((TYPE *)0)->MEMBER)))
 #define MSG(a) ((Message *)(a))
 
-DEFINE_INSTANCE_DEFAULT(ImProxy)
-
-ImProxy::ImProxy()
+ImProxy::ImProxy(FbShell *shell)
 {
-	mSocket = 0;
+	mShell = shell;
 	mPid = -1;
+	mConnected = false;
+	mActive = false;
+	mMsgWaitState = NoMessageToWait;
 
 	createImProcess();
 }
 
 ImProxy::~ImProxy()
 {
-	if (mSocket) delete mSocket;
-}
+	mShell->ImExited();
+	if (!mConnected) return;
 
-void ImProxy::socketEnd()
-{
-	mSocket = 0;
+	if (FbShellManager::instance()->activeShell() == mShell) {
+		Screen::instance()->setClipRects(0, 0);
+		TtyInput::instance()->setRawMode(false);
+	}
+
+	sendDisconnect();
+	setFd(-1);
 
 	extern void waitChildProcessExit(s32 pid);
 	waitChildProcessExit(mPid);
-}
-
-void ImProxy::checkImProcessExited(s32 pid)
-{
-	if (mPid == pid && mSocket) delete mSocket;
 }
 
 void ImProxy::createImProcess()
@@ -95,7 +73,6 @@ void ImProxy::createImProcess()
 
 	int fds[2];
 	if (socketpair(AF_LOCAL, SOCK_STREAM, 0, fds) == -1) return;
-
 
 	mPid = fork();
 
@@ -121,93 +98,31 @@ void ImProxy::createImProcess()
 
 	default:
 		close(fds[1]);
-		mSocket = new ImSocket(fds[0]);
+		setFd(fds[0]);
+		waitImMessage(Connect);
 		break;
 	}
 }
 
 bool ImProxy::actived()
 {
-	if (mSocket) return mSocket->actived();
-	return false;
+	return mActive;
 }
 
-void ImProxy::toggleActive(u32 shell)
-{
-	if (mSocket) {
-		mSocket->toggleActive(shell);
-	}
-}
-
-void ImProxy::changeCursorPos(u16 col, u16 row)
-{
-	if (mSocket) {
-		mSocket->sendCursorPos(col, row);
-	}
-}
-
-void ImProxy::changeTermMode(bool crlf, bool appkey, bool curo)
-{
-	if (mSocket) {
-		mSocket->sendTermMode(crlf, appkey, curo);
-	}
-}
-
-void ImProxy::sendKey(s8 *buf, u32 len)
-{
-	if (mSocket) {
-		mSocket->sendKey(buf, len);
-	}
-}
-
-
-ImSocket::ImSocket(s32 fd)
-{
-	mConnected = false;
-	mActive = false;
-	setFd(fd);
-}
-
-ImSocket::~ImSocket()
-{
-	Screen::instance()->setClipRects(0, 0);
-	if (mActive) {
-		TtyInput::instance()->switchIm(false, false);
-	}
-
-	sendDisconnect();
-	setFd(-1);
-	ImProxy::instance()->socketEnd();
-}
-
-void ImSocket::toggleActive(u32 shell)
+void ImProxy::toggleActive()
 {
 	if (!mConnected) return;
 
+	TtyInput::instance()->setRawMode(mRawInput && !mActive);
 	mActive ^= true;
-	TtyInput::instance()->switchIm(mActive, mInputMode);
 
 	Message msg;
 	msg.type = (mActive ? Active : Deactive);
 	msg.len = sizeof(msg);
-	msg.shell = shell;
 	write((s8 *)&msg, sizeof(msg));
 }
 
-void ImSocket::sendKey(s8 *keys, u32 len)
-{
-	if (!mConnected || !mActive || !keys || !len) return;
-
-	s8 buf[OFFSET(Message, texts.text) + len];
-
-	MSG(buf)->type = SendKey;
-	MSG(buf)->len = sizeof(buf);
-	memcpy(MSG(buf)->texts.text, keys, len);
-
-	write(buf, MSG(buf)->len);
-}
-
-void ImSocket::sendCursorPos(u16 col, u16 row)
+void ImProxy::changeCursorPos(u16 col, u16 row)
 {
 	if (!mConnected || !mActive) return;
 
@@ -220,7 +135,7 @@ void ImSocket::sendCursorPos(u16 col, u16 row)
 	write((s8 *)&msg, sizeof(msg));
 }
 
-void ImSocket::sendTermMode(bool crlf, bool appkey, bool curo)
+void ImProxy::changeTermMode(bool crlf, bool appkey, bool curo)
 {
 	if (!mConnected || !mActive) return;
 
@@ -234,7 +149,38 @@ void ImSocket::sendTermMode(bool crlf, bool appkey, bool curo)
 	write((s8 *)&msg, sizeof(msg));
 }
 
-void ImSocket::sendInfo()
+void ImProxy::switchVt(bool enter, ImProxy *peer)
+{
+	if (!mConnected || !mActive) return;
+
+	TtyInput::instance()->setRawMode(enter && mRawInput);
+
+	Message msg;
+	msg.type = (enter ? ShowUI : HideUI);
+	msg.len = sizeof(msg);
+
+	write((s8 *)&msg, sizeof(msg));
+
+	if (!enter) {
+		waitImMessage(AckHideUI);
+		Screen::instance()->setClipRects(0, 0);
+	}
+}
+
+void ImProxy::sendKey(s8 *keys, u32 len)
+{
+	if (!mConnected || !mActive || !keys || !len) return;
+
+	s8 buf[OFFSET(Message, keys) + len];
+
+	MSG(buf)->type = SendKey;
+	MSG(buf)->len = sizeof(buf);
+	memcpy(MSG(buf)->keys, keys, len);
+
+	write(buf, MSG(buf)->len);
+}
+
+void ImProxy::sendInfo()
 {
 	u32 pixel_size = 12;
 	Config::instance()->getOption("font-size", pixel_size);
@@ -259,7 +205,7 @@ void ImSocket::sendInfo()
 	write(buf, MSG(buf)->len);
 }
 
-void ImSocket::sendAck()
+void ImProxy::sendAckWins()
 {
 	Message msg;
 	msg.type = AckWins;
@@ -267,7 +213,7 @@ void ImSocket::sendAck()
 	write((s8 *)&msg, sizeof(msg));
 }
 
-void ImSocket::sendDisconnect()
+void ImProxy::sendDisconnect()
 {
 	if (!mConnected) return;
 
@@ -277,30 +223,30 @@ void ImSocket::sendDisconnect()
 	write((s8 *)&msg, sizeof(msg));
 }
 
-void ImSocket::readyRead(s8 *buf, u32 len)
+void ImProxy::readyRead(s8 *buf, u32 len)
 {
 	for (s8 *end = buf + len; buf < end && MSG(buf)->len && MSG(buf)->len <= (end - buf); buf += MSG(buf)->len) {
+		if (mMsgWaitState == WaitingMessage && mMsgWaitType == MSG(buf)->type) mMsgWaitState = GotMessage;
 		if (!mConnected && MSG(buf)->type != Connect) continue;
 
 		switch (MSG(buf)->type) {
 		case Connect:
 			mConnected = true;
-			mInputMode = MSG(buf)->raw;
+			mRawInput = MSG(buf)->raw;
 
 			sendInfo();
 			break;
 
 		case PutText:
-			if (MSG(buf)->len > OFFSET(Message, texts.text)) {
-				FbShellManager::instance()->imInput(MSG(buf)->texts.shell, MSG(buf)->texts.text,
-					MSG(buf)->len - OFFSET(Message, texts.text));
+			if (MSG(buf)->len > OFFSET(Message, texts)) {
+				mShell->imInput(MSG(buf)->texts, MSG(buf)->len - OFFSET(Message, texts));
 			}
 			break;
 
 		case SetWins:
-			sendAck();
+			sendAckWins();
 
-			if (MSG(buf)->len >= OFFSET(Message, wins)) {
+			if (FbShellManager::instance()->activeShell() == mShell && MSG(buf)->len >= OFFSET(Message, wins)) {
 				ImWin *wins = MSG(buf)->wins;
 				u32 num = (MSG(buf)->len - OFFSET(Message, wins)) / sizeof(ImWin);
 
@@ -320,4 +266,30 @@ void ImSocket::readyRead(s8 *buf, u32 len)
 			break;
 		}
 	}
+}
+
+void ImProxy::waitImMessage(u32 type)
+{
+	mMsgWaitState = WaitingMessage;
+	mMsgWaitType = type;
+
+	timeval tv = {2, 0};
+
+	while (1) {
+		fd_set fds;
+		FD_ZERO(&fds);
+		FD_SET(fd(), &fds);
+
+		s32 ret = select(fd() + 1, &fds, 0, 0, &tv);
+
+		if (ret > 0 && FD_ISSET(fd(), &fds)) ready(true);
+		if ((ret == -1 && errno != EINTR) || !ret || mMsgWaitState == GotMessage) break;
+	};
+
+	mMsgWaitState = NoMessageToWait;
+}
+
+void ImProxy::ioError(bool read, s32 err)
+{
+	if (read && mMsgWaitState == WaitingMessage) mMsgWaitState = GotMessage;
 }

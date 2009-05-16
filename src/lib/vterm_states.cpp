@@ -1,6 +1,6 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
- *   This file is part of FbTerm.
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Thir file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
  *   This program is free software; you can redistribute it and/or
@@ -21,118 +21,116 @@
 
 #include "vterm.h"
 
-#define KEEP (VTerm::StateOption*)0
-#define NORMAL (VTerm::StateOption*)-1
 #define ADDSAME(len) ((len) << 8)
 
-const VTerm::StateOption VTerm::control_state[] = {
-	{ 0,	0,	KEEP },
-	{ 7,	&VTerm::bell,	KEEP },
-	{ 8,	&VTerm::bs,		KEEP },
-	{ 9,	&VTerm::tab,	KEEP },
-	{ 0xA,	&VTerm::lf,	KEEP },
-	{ 0xB,	&VTerm::lf,	KEEP },
-	{ 0xC,	&VTerm::lf,	KEEP },
-	{ 0xD,	&VTerm::cr,	KEEP },
-	{ 0xE,	&VTerm::active_g1,	KEEP },
-	{ 0xF,	&VTerm::active_g0,	KEEP },
-	{ 0x18, 0,	NORMAL },
-	{ 0x1A, 0,	NORMAL },
-	{ 0x1B, 0,	esc_state },
-	{ 0x7F, 0,	KEEP },
-	{ 0x9B, 0,	square_state },
-	{ -1 }
+const VTerm::Sequence VTerm::control_sequences[] = {
+	{ 0,	0,	ESkeep },
+	{ 7,	&VTerm::bell,	ESkeep },
+	{ 8,	&VTerm::bs,		ESkeep },
+	{ 9,	&VTerm::tab,	ESkeep },
+	{ 0xA,	&VTerm::lf,	ESkeep },
+	{ 0xB,	&VTerm::lf,	ESkeep },
+	{ 0xC,	&VTerm::lf,	ESkeep },
+	{ 0xD,	&VTerm::cr,	ESkeep },
+	{ 0xE,	&VTerm::active_g1,	ESkeep },
+	{ 0xF,	&VTerm::active_g0,	ESkeep },
+	{ 0x18, 0,	ESnormal },
+	{ 0x1A, 0,	ESnormal },
+	{ 0x1B, 0,	ESesc },
+	{ 0x7F, 0,	ESkeep },
+	{ 0x9B, 0,	ESsquare },
+	{ -1}
 };
 
-const VTerm::StateOption VTerm::esc_state[] = {
-	{ '[', &VTerm::clear_param,	square_state },
-	{ ']', &VTerm::clear_param,	nonstd_state },
-	{ '%', 0,	percent_state },
-	{ '#', 0,	hash_state },
-	{ '(', &VTerm::current_is_g0,	charset_state },
-	{ ')', &VTerm::current_is_g1,	charset_state },
-	{ 'c', &VTerm::reset,		NORMAL },
-	{ 'D', &VTerm::index_down,	NORMAL },
-	{ 'E', &VTerm::next_line,	NORMAL },
-	{ 'H', &VTerm::set_tab,		NORMAL },
-	{ 'M', &VTerm::index_up,	NORMAL },
-	{ 'Z', &VTerm::respond_id,	NORMAL },
-	{ '7', &VTerm::save_cursor,	NORMAL },
-	{ '8', &VTerm::restore_cursor,	NORMAL },
-	{ '>', &VTerm::keypad_numeric,	NORMAL },
-	{ '=', &VTerm::keypad_application,	NORMAL },
-	{ -1 }
-};
+const VTerm::Sequence VTerm::escape_sequences[] = {
+	{   0, 0, ESnormal },
 
-const VTerm::StateOption VTerm::square_state[] = {
-	{ '[', 0,	funckey_state },
-	{ '?', &VTerm::set_q_mode,	KEEP },
-	{ '0' | ADDSAME(9), &VTerm::param_digit,	KEEP },
-	{ ';', &VTerm::next_param,	KEEP },
-	{ '@', &VTerm::insert_char,	NORMAL },
-	{ 'A', &VTerm::cursor_up,	NORMAL },
-	{ 'B', &VTerm::cursor_down,	NORMAL },
-	{ 'C', &VTerm::cursor_right,NORMAL },
-	{ 'D', &VTerm::cursor_left,	NORMAL },
-	{ 'E', &VTerm::cursor_down_cr, NORMAL },
-	{ 'F', &VTerm::cursor_up_cr, NORMAL },
-	{ 'G', &VTerm::cursor_position_col,	NORMAL },
-	{ 'H', &VTerm::cursor_position,	NORMAL },
-	{ 'J', &VTerm::erase_display,	NORMAL },
-	{ 'K', &VTerm::erase_line,	NORMAL },
-	{ 'L', &VTerm::insert_line, NORMAL },
-	{ 'M', &VTerm::delete_line,	NORMAL },
-	{ 'P', &VTerm::delete_char,	NORMAL },
-	{ 'X', &VTerm::erase_char,	NORMAL },
-	{ 'a', &VTerm::cursor_right,NORMAL },
-	{ 'c', &VTerm::set_cursor_type,	NORMAL },
-	{ 'd', &VTerm::cursor_position_row, NORMAL },
-	{ 'e', &VTerm::cursor_down,	NORMAL },
-	{ 'f', &VTerm::cursor_position,	NORMAL },
-	{ 'g', &VTerm::clear_tab,	NORMAL },
-	{ 'h', &VTerm::set_mode,	NORMAL },
-	{ 'l', &VTerm::clear_mode,	NORMAL },
-	{ 'm', &VTerm::set_display_attr,	NORMAL },
-	{ 'n', &VTerm::status_report,	NORMAL },
-	{ 'q', &VTerm::set_led, NORMAL },
-	{ 'r', &VTerm::set_margins,	NORMAL },
-	{ 's', &VTerm::save_cursor,	NORMAL },
-	{ 'u', &VTerm::restore_cursor,	NORMAL },
-	{ '`', &VTerm::cursor_position_col,	NORMAL },
-	{ ']', &VTerm::linux_specific, NORMAL },
-	{ '}', &VTerm::fbterm_specific, NORMAL },
-	{ -1 }
-};
+	// ESnormal
+	{ -1 },
 
-const VTerm::StateOption VTerm::nonstd_state[] = {
-	{ '0' | ADDSAME(9), &VTerm::set_palette,    KEEP },
-	{ 'A' | ADDSAME(5), &VTerm::set_palette,    KEEP },
-	{ 'a' | ADDSAME(5), &VTerm::set_palette,    KEEP },
-	{ 'P', &VTerm::begin_set_palette, KEEP },
-	{ 'R', &VTerm::reset_palette, NORMAL },
-	{ -1 }
-};
+	// ESesc
+	{ '[', &VTerm::clear_param,	ESsquare },
+	{ ']', &VTerm::clear_param,	ESnonstd },
+	{ '%', 0,	ESpercent },
+	{ '#', 0,	EShash },
+	{ '(', &VTerm::current_is_g0,	EScharset },
+	{ ')', &VTerm::current_is_g1,	EScharset },
+	{ 'c', &VTerm::reset,		ESnormal },
+	{ 'D', &VTerm::index_down,	ESnormal },
+	{ 'E', &VTerm::next_line,	ESnormal },
+	{ 'H', &VTerm::set_tab,		ESnormal },
+	{ 'M', &VTerm::index_up,	ESnormal },
+	{ 'Z', &VTerm::respond_id,	ESnormal },
+	{ '7', &VTerm::save_cursor,	ESnormal },
+	{ '8', &VTerm::restore_cursor,	ESnormal },
+	{ '>', &VTerm::keypad_numeric,	ESnormal },
+	{ '=', &VTerm::keypad_application,	ESnormal },
+	{ -1 },
 
-const VTerm::StateOption VTerm::percent_state[] = {
-	{ '@', &VTerm::clear_utf8,	NORMAL },
-	{ 'G', &VTerm::set_utf8,	NORMAL },
-	{ '8', &VTerm::set_utf8,	NORMAL },
-	{ -1 }
-};
+	// ESsquare
+	{ '[', 0,	ESfunckey },
+	{ '?', &VTerm::set_q_mode,	ESkeep },
+	{ '0' | ADDSAME(9), &VTerm::param_digit,	ESkeep },
+	{ ';', &VTerm::next_param,	ESkeep },
+	{ '@', &VTerm::insert_char,	ESnormal },
+	{ 'A', &VTerm::cursor_up,	ESnormal },
+	{ 'B', &VTerm::cursor_down,	ESnormal },
+	{ 'C', &VTerm::cursor_right,ESnormal },
+	{ 'D', &VTerm::cursor_left,	ESnormal },
+	{ 'E', &VTerm::cursor_down_cr, ESnormal },
+	{ 'F', &VTerm::cursor_up_cr, ESnormal },
+	{ 'G', &VTerm::cursor_position_col,	ESnormal },
+	{ 'H', &VTerm::cursor_position,	ESnormal },
+	{ 'J', &VTerm::erase_display,	ESnormal },
+	{ 'K', &VTerm::erase_line,	ESnormal },
+	{ 'L', &VTerm::insert_line, ESnormal },
+	{ 'M', &VTerm::delete_line,	ESnormal },
+	{ 'P', &VTerm::delete_char,	ESnormal },
+	{ 'X', &VTerm::erase_char,	ESnormal },
+	{ 'a', &VTerm::cursor_right,ESnormal },
+	{ 'c', &VTerm::set_cursor_type,	ESnormal },
+	{ 'd', &VTerm::cursor_position_row, ESnormal },
+	{ 'e', &VTerm::cursor_down,	ESnormal },
+	{ 'f', &VTerm::cursor_position,	ESnormal },
+	{ 'g', &VTerm::clear_tab,	ESnormal },
+	{ 'h', &VTerm::set_mode,	ESnormal },
+	{ 'l', &VTerm::clear_mode,	ESnormal },
+	{ 'm', &VTerm::set_display_attr,	ESnormal },
+	{ 'n', &VTerm::status_report,	ESnormal },
+	{ 'q', &VTerm::set_led, ESnormal },
+	{ 'r', &VTerm::set_margins,	ESnormal },
+	{ 's', &VTerm::save_cursor,	ESnormal },
+	{ 'u', &VTerm::restore_cursor,	ESnormal },
+	{ '`', &VTerm::cursor_position_col,	ESnormal },
+	{ ']', &VTerm::linux_specific, ESnormal },
+	{ '}', &VTerm::fbterm_specific, ESnormal },
+	{ -1 },
 
-const VTerm::StateOption VTerm::charset_state[] = {
-	{ '0', &VTerm::set_charset, NORMAL },
-	{ 'B', &VTerm::set_charset, NORMAL },
-	{ 'U', &VTerm::set_charset, NORMAL },
-	{ 'K', &VTerm::set_charset, NORMAL },
-	{ -1 }
-};
+	// ESnonstd
+	{ '0' | ADDSAME(9), &VTerm::set_palette,    ESkeep },
+	{ 'A' | ADDSAME(5), &VTerm::set_palette,    ESkeep },
+	{ 'a' | ADDSAME(5), &VTerm::set_palette,    ESkeep },
+	{ 'P', &VTerm::begin_set_palette, ESkeep },
+	{ 'R', &VTerm::reset_palette, ESnormal },
+	{ -1 },
 
-const VTerm::StateOption VTerm::hash_state[] = {
-	{ '8', &VTerm::screen_align,	NORMAL },
-	{ -1 }
-};
+	// ESpercent
+	{ '@', &VTerm::clear_utf8,	ESnormal },
+	{ 'G', &VTerm::set_utf8,	ESnormal },
+	{ '8', &VTerm::set_utf8,	ESnormal },
+	{ -1 },
 
-const VTerm::StateOption VTerm::funckey_state[] = {
-	{ -1 }
+	// EScharset
+	{ '0', &VTerm::set_charset, ESnormal },
+	{ 'B', &VTerm::set_charset, ESnormal },
+	{ 'U', &VTerm::set_charset, ESnormal },
+	{ 'K', &VTerm::set_charset, ESnormal },
+	{ -1 },
+
+	// EShash
+	{ '8', &VTerm::screen_align,	ESnormal },
+	{ -1 },
+
+	// ESfunckey
+	{ -1 },
 };

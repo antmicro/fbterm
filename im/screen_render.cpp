@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -87,15 +87,15 @@ static void drawFtFontBpp15(char *dst, char *pixmap, unsigned width, unsigned fc
 	for (; width--; pixmap++, dst += 2) {
 		pixel = *pixmap;
 
-		if (pixel) {
+		if (!pixel) fb_writew(dst, fillColors[bc]);
+		else if (pixel == 0xff) fb_writew(dst, fillColors[fc]);
+		else {
 			red = palette[bc].red + (((palette[fc].red - palette[bc].red) * pixel) >> 8);
 			green = palette[bc].green + (((palette[fc].green - palette[bc].green) * pixel) >> 8);
 			blue = palette[bc].blue + (((palette[fc].blue - palette[bc].blue) * pixel) >> 8);
 
 			color = ((red >> 3 << 10) | (green >> 3 << 5) | (blue >> 3));
 			fb_writew(dst, color);
-		} else {
-			fb_writew(dst, fillColors[bc]);
 		}
 	}
 }
@@ -109,15 +109,15 @@ static void drawFtFontBpp16(char *dst, char *pixmap, unsigned width, unsigned fc
 	for (; width--; pixmap++, dst += 2) {
 		pixel = *pixmap;
 
-		if (pixel) {
+		if (!pixel) fb_writew(dst, fillColors[bc]);
+		else if (pixel == 0xff) fb_writew(dst, fillColors[fc]);
+		else {
 			red = palette[bc].red + (((palette[fc].red - palette[bc].red) * pixel) >> 8);
 			green = palette[bc].green + (((palette[fc].green - palette[bc].green) * pixel) >> 8);
 			blue = palette[bc].blue + (((palette[fc].blue - palette[bc].blue) * pixel) >> 8);
 
 			color = ((red >> 3 << 11) | (green >> 2 << 5) | (blue >> 3));
 			fb_writew(dst, color);
-		} else {
-			fb_writew(dst, fillColors[bc]);
 		}
 	}
 }
@@ -131,15 +131,15 @@ static void drawFtFontBpp32(char *dst, char *pixmap, unsigned width, unsigned fc
 	for (; width--; pixmap++, dst += 4) {
 		pixel = *pixmap;
 
-		if (pixel) {
+		if (!pixel) fb_writel(dst, fillColors[bc]);
+		else if (pixel == 0xff) fb_writel(dst, fillColors[fc]);
+		else {
 			red = palette[bc].red + (((palette[fc].red - palette[bc].red) * pixel) >> 8);
 			green = palette[bc].green + (((palette[fc].green - palette[bc].green) * pixel) >> 8);
 			blue = palette[bc].blue + (((palette[fc].blue - palette[bc].blue) * pixel) >> 8);
 
 			color = ((red << 16) | (green << 8) | blue);
 			fb_writel(dst, color);
-		} else {
-			fb_writel(dst, fillColors[bc]);
 		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
@@ -628,7 +628,7 @@ void VTerm::linux_specific()
 
 void VTerm::begin_set_palette()
 {
-	if (palette_mode || npar) normal_state = true;
+	if (palette_mode || npar) esc_state = ESnormal;
 	else palette_mode = true;
 }
 
@@ -648,7 +648,7 @@ void VTerm::set_palette()
 		request(PaletteSet, val);
 	}
 
-	normal_state = true;
+	esc_state = ESnormal;
 }
 
 void VTerm::reset_palette()

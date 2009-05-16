@@ -32,7 +32,7 @@ IM server may want to draw it's UI (e.g. a IM status bar) on framebuffer screen.
 it's UI, IM server first sends a SetWins message, tell FbTerm the screen areas occupied by IM's UI, and waits FbTerm 
 to response a AckWins message. Now IM server can begin to draw it's UI.
 
-While user pressing Ctrl + Space again, FbTerm sends a Deactive message to IM server. IM server should responses a 
+While user pressing Ctrl + Space again, FbTerm sends a Deactive message to IM server. IM server should response a 
 SetWins message with a empty screen areas list to hide it's UI and ask FbTerm to redraw IM's UI areas contained in 
 the last previous SetWins message.
 
@@ -56,9 +56,10 @@ the last previous SetWins message.
     |                   |                  |                   |
 
 
-When IM state is on, FbTerm dosn't process any keyboard input, it redirects them to IM server with SendKey messages. 
-After receiving SendKey message, IM server may draw it's preedit and candidate UI, as described above, it should 
-first send a SetWins message to FbTerm and wait for a responsed AckWins message before drawing UI.
+When IM state is on, FbTerm dosn't process any keyboard input except its shortcuts and Alt-Fn, it redirects them 
+to IM server with SendKey messages. After receiving SendKey message, IM server may draw it's preedit and candidate UI,
+as described above, it should first send a SetWins message to FbTerm and wait for a responsed AckWins message
+before drawing UI.
 
 IM server sends the converted texts in a PutText message back to FbTerm, and FbTerm will write them to the running 
 program. In the common case, the running program will change cursor position, FbTerm notifies it to IM server with a 
@@ -83,6 +84,33 @@ and redraw it's UI.
     |                   |                  |------------------>|
     |                   |                  |                   |
     |                   |                  |                   |<draw UI>
+
+
+When IM state is on, user presses shortcuts for switching to other sub-window or Alt-Fn for other virtual console, FbTerm
+sends a HideUI message to IM server, then waits for a AckHideUI message responsed from IM server before switching. Maybe
+IM server is busy with the previous SendKey message when HideUI message is arrived, it continues it's work, then processes
+this HideUI, sends back a AckHideUI message to FbTerm.
+
+When switching back, FbTerm sends a ShowUI message to IM server, indicates IM server to redraw it's UI.
+
+ +------+           +------+            +------+           +------+
+ |FbTerm|           |  IM  |            |FbTerm|           |  IM  |
+ +--.---+           +---.--+            +--.---+           +---.--+
+    |                   |                  |                   |
+    |                   |                  |                   |
+    |       HideUI      |                  |      ShowUI       |
+    |------------------>|                  |------------------>|
+    |                   |                  |                   |
+    |      SetWins      |                  |      SetWins      |
+    |<------------------|                  |<------------------|
+    |                   |                  |                   |
+    |      AckWins      |                  |      AckWins      |
+    |------------------>|                  |<------------------|
+    |                   |                  |                   |
+    |     AckHideUI     |                  |                   |<draw UI>
+    |<------------------|                  |                   |
+    |                   |                  |                   |
+    |<do switching>     |                  |                   |         
 
 
 
@@ -121,6 +149,8 @@ descriptors among with the one from get_im_socket().
 
 	typedef void (*ActiveFun)();
 	typedef void (*DeactiveFun)();
+	typedef void (*ShowUIFun)();
+	typedef void (*HideUIFun)();
 	typedef void (*SendKeyFun)(char *keys, unsigned short len);
 	typedef void (*CursorPositionFun)(unsigned x, unsigned y);
 	typedef void (*FbTermInfoFun)(Info *info);
@@ -128,6 +158,8 @@ descriptors among with the one from get_im_socket().
 	typedef struct {
 		ActiveFun active;
 		DeactiveFun deactive;
+		ShowUIFun show_ui;
+		HideUIFun hide_ui;
 		SendKeyFun send_key;
 		CursorPositionFun cursor_position;
 		FbTermInfoFun fbterm_info;
@@ -138,6 +170,8 @@ IM server call this function to register callbacks.
 
 When receiving a Active message, function provided by IM server in active member of ImCallbacks will be called;
 When receiving a Deactive message, function provided by IM server in deactive member will be called;
+When receiving a ShowUI message, function provided by IM server in show_ui member will be called;
+When receiving a HideUI message, function provided by IM server in hide_ui member will be called;
 When receiving a SendKey message, function provided by IM server in send_key member will be called;
 When receiving a CursorPosition message, function provided by IM server in cursor_position member will be called;
 When receiving a FbTermInfo message, function provided by IM server in fbterm_info member will be called.

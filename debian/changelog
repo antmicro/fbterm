@@ -1,3 +1,9 @@
+fbterm (1.5-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Nobuhiro Iwamatsu <iwamatsu@nigauri.org>  Sun, 17 May 2009 06:53:08 +0900
+
 fbterm (1.4-2) unstable; urgency=low
 
   * Fix build error in some architecture. (Closes: #520864)

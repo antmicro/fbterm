@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -39,13 +39,11 @@ public:
 	void nextShell();
 	void prevShell();
 
-	void toggleIm();
-	void imInput(u32 shell, s8 *text, u32 len);
 	void drawCursor();
 	void historyScroll(bool down);
 	void redraw(u16 x, u16 y, u16 w, u16 h);
 	void switchVc(bool enter);
-	void checkShellProcessExited(s32 pid);
+	void childProcessExited(s32 pid);
 
 private:
 	u32 getIndex(FbShell *shell, bool forward, bool stepfirst);

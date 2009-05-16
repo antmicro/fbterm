@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -44,9 +44,13 @@ static fb_fix_screeninfo finfo;
 static fb_var_screeninfo vinfo;
 static u32 bytes_per_pixel;
 
-static RotateType rtype;
+static enum { Redraw = 0, YPan, YWrap } scroll_type;
+static RotateType rotate_type;
 static u32 screenw;
 static u32 screenh;
+
+static s32 fbdev_fd;
+static u8 *fbdev_mem;
 
 #include "screen_clip.cpp"
 #include "screen_render.cpp"
@@ -55,22 +59,23 @@ DEFINE_INSTANCE(Screen)
 
 Screen *Screen::createInstance()
 {
-	s8 devname[32];
-	s32 devFd;
-	for (u32 i = 0; i < FB_MAX; i++) {
-		snprintf(devname, sizeof(devname), "/dev/fb%d", i);
-		devFd = open(devname, O_RDWR);
-		if (devFd >= 0) break;
+	s8 *fbdev = getenv("FRAMEBUFFER");
+
+	if (fbdev) {
+		fbdev_fd = open(fbdev, O_RDWR);
+	} else {
+		fbdev_fd = open("/dev/fb0", O_RDWR);
+		if (fbdev_fd < 0) fbdev_fd = open("/dev/fb/0", O_RDWR);
 	}
 
-	if (devFd < 0) {
+	if (fbdev_fd < 0) {
 		fprintf(stderr, "can't open framebuffer device!\n");
 		return 0;
 	}
 
-	fcntl(devFd, F_SETFD, fcntl(devFd, F_GETFD) | FD_CLOEXEC);
-	ioctl(devFd, FBIOGET_FSCREENINFO, &finfo);
-	ioctl(devFd, FBIOGET_VSCREENINFO, &vinfo);
+	fcntl(fbdev_fd, F_SETFD, fcntl(fbdev_fd, F_GETFD) | FD_CLOEXEC);
+	ioctl(fbdev_fd, FBIOGET_FSCREENINFO, &finfo);
+	ioctl(fbdev_fd, FBIOGET_VSCREENINFO, &vinfo);
 
 	if (finfo.type != FB_TYPE_PACKED_PIXELS) {
 		fprintf(stderr, "unsupported framebuffer device!\n");
@@ -102,9 +107,9 @@ Screen *Screen::createInstance()
 	u32 type = Rotate0;
 	Config::instance()->getOption("screen-rotate", type);
 	if (type > Rotate270) type = Rotate0;
-	rtype = (RotateType)type;
+	rotate_type = (RotateType)type;
 
-	if (rtype == Rotate0 || rtype == Rotate180) {
+	if (rotate_type == Rotate0 || rotate_type == Rotate180) {
 		screenw = vinfo.xres;
 		screenh = vinfo.yres;
 	} else {
@@ -125,42 +130,42 @@ Screen *Screen::createInstance()
 	if (vinfo.bits_per_pixel == 15) bytes_per_pixel = 2;
 	else bytes_per_pixel = (vinfo.bits_per_pixel >> 3);
 
-	initFillDraw();
-	return new Screen(devFd);
+	return new Screen();
 }
 
-Screen::Screen(s32 fd)
+Screen::Screen()
 {
-	mFd = fd;
-	mpMemStart = (u8 *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, mFd, 0);
+	fbdev_mem = (u8 *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbdev_fd, 0);
 
 	mCols = screenw / FW(1);
 	mRows = screenh / FH(1);
-	mScrollAccel = 0;
+	scroll_type = Redraw;
 
-	if (rtype == Rotate0 || rtype == Rotate180) {
+	if (rotate_type == Rotate0 || rotate_type == Rotate180) {
 		bool ypan = (vinfo.yres_virtual > vinfo.yres && finfo.ypanstep && !(FH(1) % finfo.ypanstep));
 		bool ywrap = (finfo.ywrapstep && !(FH(1) % finfo.ywrapstep));
 		if (ywrap && !(vinfo.vmode & FB_VMODE_YWRAP)) {
 			vinfo.vmode |= FB_VMODE_YWRAP;
-			ioctl(mFd, FBIOPUT_VSCREENINFO, &vinfo);
+			ioctl(fbdev_fd, FBIOPUT_VSCREENINFO, &vinfo);
 			ywrap = (vinfo.vmode & FB_VMODE_YWRAP);
 		}
 
-		if ((ypan || ywrap) && !ioctl(mFd, FBIOPAN_DISPLAY, &vinfo)) mScrollAccel = (ywrap ? 2 : 1);
+		if ((ypan || ywrap) && !ioctl(fbdev_fd, FBIOPAN_DISPLAY, &vinfo)) scroll_type = (ywrap ? YWrap : YPan);
 	}
 
 	s32 ret = write(STDIN_FILENO, hide_cursor, sizeof(hide_cursor) - 1);
 	ret = write(STDIN_FILENO, disable_blank, sizeof(disable_blank) - 1);
+
+	initFillDraw();
 }
 
 Screen::~Screen()
 {
 	setupSysPalette(true);
-	munmap(mpMemStart, finfo.smem_len);
-	close(mFd);
+	munmap(fbdev_mem, finfo.smem_len);
+	close(fbdev_fd);
 
-	if (mScrollAccel) {
+	if (scroll_type) {
 		ioctl(STDIN_FILENO, KDSETMODE, KD_GRAPHICS);
 		ioctl(STDIN_FILENO, KDSETMODE, KD_TEXT);
 	}
@@ -170,16 +175,27 @@ Screen::~Screen()
 	ret = write(STDIN_FILENO, clear_screen, sizeof(clear_screen) - 1);
 
 	Font::uninstance();
+	endFillDraw();
+}
+
+void Screen::showInfo(bool verbose)
+{
+	if (!verbose) return;
+
+	static const s8* const scrollstr[3] = {
+		"redraw", "ypan", "ywrap"
+	};
+	printf("[screen] %s, mode: %dx%d-%dbpp, scrolling: %s\n", finfo.id, screenw, screenh, vinfo.bits_per_pixel, scrollstr[scroll_type]);
 }
 
 void Screen::switchVc(bool enter)
 {
 	if (enter) {
-		ioctl(mFd, FBIOGET_VSCREENINFO, &vinfo);
-		ioctl(mFd, FBIOPAN_DISPLAY, &vinfo);
+		ioctl(fbdev_fd, FBIOGET_VSCREENINFO, &vinfo);
+		ioctl(fbdev_fd, FBIOPAN_DISPLAY, &vinfo);
 
 		setupSysPalette(false);
-		eraseMargin(true, mRows);
+		if (palette) eraseMargin(true, mRows);
 	} else {
 		setupSysPalette(true);
 	}
@@ -187,7 +203,7 @@ void Screen::switchVc(bool enter)
 
 bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 {
-	if (clipEnable || mScrollAccel == 0 || scol != dcol) return false;
+	if (clipEnable || scroll_type == Redraw || scol != dcol) return false;
 
 	u16 top = MIN(srow, drow), bot = MAX(srow, drow) + h;
 	u16 left = scol, right = scol + w;
@@ -199,11 +215,11 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 
 	s32 yoffset = vinfo.yoffset;
 
-	if (rtype == Rotate0) yoffset += FH((s32)srow - drow);
+	if (rotate_type == Rotate0) yoffset += FH((s32)srow - drow);
 	else yoffset -= FH((s32)srow - drow);
 
 	bool redraw_all = false;
-	if (mScrollAccel == 1) {
+	if (scroll_type == YPan) {
 		u32 ytotal = vinfo.yres_virtual - vinfo.yres;
 		redraw_all = true;
 
@@ -216,7 +232,7 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 	}
 
 	vinfo.yoffset = yoffset;
-	ioctl(mFd, FBIOPAN_DISPLAY, &vinfo);
+	ioctl(fbdev_fd, FBIOPAN_DISPLAY, &vinfo);
 
 	if (top) redraw(0, 0, mCols, top);
 	if (bot < mRows) redraw(0, bot, mCols, mRows - bot);
@@ -343,7 +359,7 @@ static inline u32 offsetY(u32 y)
 {
 	y += vinfo.yoffset;
 	if (y >= vinfo.yres_virtual) y -= vinfo.yres_virtual;
-	return y;
+	return (y * finfo.line_length);
 }
 
 void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color, bool clip)
@@ -367,11 +383,10 @@ void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color, bool clip)
 		u32 w = rects[num].ex - rects[num].sx;
 		if (!h || !w) continue;
 
-		u8 *dst8 = mpMemStart + rects[num].sx * bytes_per_pixel;
-		for(; h--;)
-		{
-			u8 *dst = dst8 + offsetY(rects[num].sy++) * finfo.line_length;
-			fill(dst, w, color);
+		u32 xoffset = rects[num].sx * bytes_per_pixel;
+
+		for(; h--;) {
+			fill(xoffset + offsetY(rects[num].sy++), w, color);
 		}
 	}
 
@@ -428,13 +443,13 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip)
 	u32 wdiff = glyph->width - width, hdiff = glyph->height - height;
 
 	if (wdiff) {
-		if (rtype == Rotate180) pixmap += wdiff;
-		else if (rtype == Rotate270) pixmap += wdiff * glyph->pitch;
+		if (rotate_type == Rotate180) pixmap += wdiff;
+		else if (rotate_type == Rotate270) pixmap += wdiff * glyph->pitch;
 	}
 
 	if (hdiff) {
-		if (rtype == Rotate90) pixmap += hdiff;
-		else if (rtype == Rotate180) pixmap += hdiff * glyph->pitch;
+		if (rotate_type == Rotate90) pixmap += hdiff;
+		else if (rotate_type == Rotate180) pixmap += hdiff * glyph->pitch;
 	}
 
 	Rectangle rect = { x, y, x + nwidth, y + nheight }, *rects = &rect;
@@ -450,12 +465,11 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip)
 		u32 h = rects[num].ey - rects[num].sy;
 		if (!w || !h) continue;
 
+		u32 xoffset = rects[num].sx * bytes_per_pixel;
 		u8 *pm = pixmap + (rects[num].sy - y) * glyph->pitch + (rects[num].sx - x);
-		u8 *dst, *dst_line = mpMemStart + rects[num].sx * bytes_per_pixel;
 
 		for (; h--; pm += glyph->pitch) {
-			dst = dst_line + offsetY(rects[num].sy++) * finfo.line_length;
-			draw(dst, pm, w, fc, bc);
+			draw(xoffset + offsetY(rects[num].sy++), pm, w, fc, bc);
 		}
 	}
 
@@ -465,13 +479,13 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip)
 
 RotateType Screen::rotateType()
 {
-	return rtype;
+	return rotate_type;
 }
 
 void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 {
 	u32 tmp;
-	switch (rtype) {
+	switch (rotate_type) {
 	case Rotate0:
 		break;
 
@@ -505,7 +519,7 @@ void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 void Screen::rotatePoint(u32 W, u32 H, u32 &x, u32 &y)
 {
 	u32 tmp;
-	switch (rtype) {
+	switch (rotate_type) {
 	case Rotate0:
 		break;
 

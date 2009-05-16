@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -37,6 +37,7 @@ void waitChildProcessExit(s32 pid)
 {
 	if (pid < 0) return;
 
+	kill(pid, SIGTERM);
 	sched_yield();
 
 	s32 ret = waitpid(pid, 0, WNOHANG);
@@ -69,7 +70,7 @@ Shell::~Shell()
 	waitChildProcessExit(mPid);
 }
 
-void Shell::createChildProcess()
+void Shell::createShellProcess(s8 **command)
 {
 	s32 fd;
 	mPid = forkpty(&fd, NULL, NULL, NULL);
@@ -78,15 +79,24 @@ void Shell::createChildProcess()
 	case -1:
 		break;
 
-	case 0: {  // child process
-		initChildProcess();
+	case 0:  // child process
+		initShellProcess();
 		setenv("TERM", "linux", 1);
 
-		struct passwd *userpd = getpwuid(getuid());
-		execlp(userpd->pw_shell, userpd->pw_shell, NULL);
+		if (command) {
+			execvp(command[0], command);
+		} else {
+			s8 *shell = getenv("SHELL");
+			if (shell) execlp(shell, shell, NULL);
+
+			struct passwd *userpd = getpwuid(getuid());
+			execlp(userpd->pw_shell, userpd->pw_shell, NULL);
+
+			execlp("/bin/sh", "/bin/sh", NULL);
+		}
+
 		exit(1);
 		break;
-	}
 
 	default:
 		setFd(fd);

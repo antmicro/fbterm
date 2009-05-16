@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -20,6 +20,7 @@
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/time.h>
@@ -29,10 +30,11 @@
 #include "screen.h"
 #include "improxy.h"
 #include "fbterm.h"
+#include "font.h"
+#include "input.h"
 
 #define screen (Screen::instance())
 #define manager (FbShellManager::instance())
-#define improxy (ImProxy::instance())
 
 static const Color defaultPalette[NR_COLORS] = {
 	{0x00, 0x00, 0x00}, /* 0 */
@@ -300,6 +302,8 @@ static const Color defaultPalette[NR_COLORS] = {
 	{0xee, 0xee, 0xee}, /* 255 */
 };
 
+static bool firstShell = true;
+
 u16 VTerm::init_history_lines()
 {
 	u32 val = 1000;
@@ -332,14 +336,20 @@ void Shell::initWordChars(s8 *buf, u32 len)
 
 FbShell::FbShell()
 {
+	mImStarted = false;
+	mImProxy = 0;
 	mPaletteChanged = false;
 	mPalette = 0;
-	createChildProcess();
+	createShellProcess(Config::instance()->getShellCommand());
 	resize(screen->cols(), screen->rows());
+
+	firstShell = false;
 }
 
 FbShell::~FbShell()
 {
+	if (mImProxy) delete mImProxy;
+
 	manager->shellExited(this);
 	if (mPalette) delete[] mPalette;
 }
@@ -347,6 +357,7 @@ FbShell::~FbShell()
 void FbShell::drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars, bool *dws)
 {
 	if (manager->activeShell() != this) return;
+
 	adjustCharAttr(attr);
 	screen->drawText(x, y, w, attr.fcolor, attr.bcolor, num, chars, dws);
 }
@@ -521,9 +532,14 @@ void FbShell::request(RequestType type,  u32 val)
 
 void FbShell::switchVt(bool enter, FbShell *peer)
 {
+	if (mImProxy) {
+		mImProxy->switchVt(enter, peer ? peer->mImProxy : 0);
+	}
+
 	if (enter) {
 		screen->setPalette(mPaletteChanged ? mPalette : defaultPalette);
 		modeChanged(AllModes);
+		reportCursor();
 	} else if (!peer) {
 		changeMode(CursorKeyEscO, false);
 		changeMode(ApplicKeypad, false);
@@ -535,9 +551,21 @@ void FbShell::switchVt(bool enter, FbShell *peer)
 	}
 }
 
-void FbShell::initChildProcess()
+void FbShell::initShellProcess()
 {
 	FbTerm::instance()->initChildProcess();
+	if (!firstShell) return;
+
+	bool verbose = false;
+	Config::instance()->getOption("verbose", verbose);
+
+	TtyInput::instance()->showInfo(verbose);
+	Screen::instance()->showInfo(verbose);
+	Font::instance()->showInfo(verbose);
+
+	if (verbose) {
+		printf("[term] size: %dx%d, default codec: %s\n", screen->cols(), screen->rows(), localCodec());
+	}
 }
 
 void FbShell::switchCodec(u8 index)
@@ -579,8 +607,11 @@ void FbShell::switchCodec(u8 index)
 
 void FbShell::keyInput(s8 *buf, u32 len)
 {
-	clearMousePointer();
-	Shell::keyInput(buf, len);
+	if (mImProxy && mImProxy->actived()) {
+		mImProxy->sendKey(buf, len);
+	} else {
+		imInput(buf, len);
+	}
 }
 
 void FbShell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
@@ -636,7 +667,7 @@ void FbShell::adjustCharAttr(CharAttr &attr)
 	else if (attr.intensity == 0) attr.fcolor = 8; // gray
 
 	if (attr.blink && attr.bcolor < 8) attr.bcolor ^= 8;
-	if (attr.intensity == 2 && attr.bcolor < 8) attr.fcolor ^= 8;
+	if (attr.intensity == 2 && attr.fcolor < 8) attr.fcolor ^= 8;
 
 	if (attr.reverse) {
 		u16 temp = attr.bcolor;
@@ -663,10 +694,45 @@ void FbShell::changeMode(ModeType type, u16 val)
 
 void FbShell::reportCursor()
 {
-	improxy->changeCursorPos(mCursor.x, mCursor.y);
+	if (mImProxy) mImProxy->changeCursorPos(mCursor.x, mCursor.y);
 }
 
 void FbShell::reportMode()
 {
-	improxy->changeTermMode(mode(CRWithLF), mode(ApplicKeypad), mode(CursorKeyEscO));
+	if (mImProxy) mImProxy->changeTermMode(mode(CRWithLF), mode(ApplicKeypad), mode(CursorKeyEscO));
+}
+
+void FbShell::toggleIm()
+{
+	if (!mImStarted) {
+		mImStarted = true;
+		mImProxy = new ImProxy(this);
+	}
+
+	if (mImProxy) {
+		mImProxy->toggleActive();
+		reportCursor();
+		reportMode();
+	}
+}
+
+void FbShell::imInput(s8 *buf, u32 len)
+{
+	clearMousePointer();
+	Shell::keyInput(buf, len);
+}
+
+bool FbShell::childProcessExited(s32 pid)
+{
+	if (mImProxy && pid == mImProxy->imProcessId()) {
+		delete mImProxy;
+		return true;
+	}
+
+	if (pid == shellProcessId()) {
+		delete this;
+		return true;
+	}
+
+	return false;
 }

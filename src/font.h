@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -43,21 +43,9 @@ public:
 	u32 height() {
 		return mHeight;
 	}
+	void showInfo(bool verbose);
 
 private:
-	struct FontRec {
-		void *pattern;
-		void *face;
-		int load_flags;
-	};
-
-	Font(FontRec *fonts, u32 num, void *unicover);
-	void openFont(u32 index);
-	int fontIndex(u32 unicode);
-
-	void *mpUniCover;
-	FontRec *mpFontList;
-	u32 mFontNum;
 	u32 mWidth, mHeight;
 };
 

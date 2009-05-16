@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -45,8 +45,15 @@ const s8 *IoPipe::localCodec()
 		// The output character set of gettext is, by default, the value of nl_langinfo(CODESET),
 		// which depends on the LC_CTYPE part of the current locale.
 		setlocale(LC_CTYPE, "");
-		strncpy(local_codec, nl_langinfo(CODESET), sizeof(local_codec) - 1);
+
+		s8 *locale = setlocale(LC_CTYPE, "");
+		if (!locale || !strcmp(locale, "C")) {
+			strcpy(local_codec, "UTF-8");
+		} else {
+			strncpy(local_codec, nl_langinfo(CODESET), sizeof(local_codec) - 1);
+		}
 	}
+
 	return local_codec;
 }
 
@@ -94,6 +101,7 @@ void IoPipe::setFd(s32 fd)
 	}
 }
 
+
 void IoPipe::setCodec(const s8 *up, const s8 *down)
 {
 	if (!up || !down) return;
@@ -126,7 +134,9 @@ void IoPipe::ready(bool isread)
 	s8 buf[BUF_SIZE];
 	s32 len = read(mFd, buf + mBufLenRead, sizeof(buf) - mBufLenRead);
 
-	if (len == -1) {
+	if (!len) {
+		ioError(true, 0); // end of file
+	} else if (len == -1) {
 		if (errno != EAGAIN && errno != EINTR) {
 			ioError(true, errno);
 		}

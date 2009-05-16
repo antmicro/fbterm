@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -22,25 +22,40 @@
 #define IM_PROXY_H
 
 #include "type.h"
-#include "instance.h"
+#include "io.h"
 
-class ImProxy {
-	DECLARE_INSTANCE(ImProxy)
+class FbShell;
+
+class ImProxy: public IoPipe {
 public:
+	ImProxy(FbShell *shell);
+	~ImProxy();
+
+	s32 imProcessId() { return mPid; }
 	bool actived();
-	void toggleActive(u32 shell);
+	void toggleActive();
 	void sendKey(s8 *buf, u32 len);
 	void changeCursorPos(u16 col, u16 row);
 	void changeTermMode(bool crlf, bool appkey, bool curo);
-	void checkImProcessExited(s32 pid);
+	void switchVt(bool enter, ImProxy *peer);
 
 private:
-	friend class ImSocket;
-	void createImProcess();
-	void socketEnd();
+	virtual void readyRead(s8 *buf, u32 len);
+	virtual void ioError(bool read, s32 err);
 
+	void createImProcess();
+	void waitImMessage(u32 type);
+	void sendInfo();
+	void sendAckWins();
+	void sendDisconnect();
+
+	FbShell *mShell;
 	s32 mPid;
-	class ImSocket *mSocket;
+	bool mConnected;
+	bool mActive;
+	bool mRawInput;
+	enum {NoMessageToWait, WaitingMessage, GotMessage} mMsgWaitState;
+	u32 mMsgWaitType;
 };
 
 #endif

@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -29,6 +29,10 @@ public:
 	void mouseInput(u16 x, u16 y, s32 type, s32 buttons);
 	void switchCodec(u8 index);
 	void expose(u16 x, u16 y, u16 w, u16 h);
+	void toggleIm();
+	void imInput(s8 *buf, u32 len);
+	void ImExited() { mImProxy = 0; }
+	bool childProcessExited(s32 pid);
 
 private:
 	friend class FbShellManager;
@@ -41,7 +45,7 @@ private:
 	virtual void modeChanged(ModeType type);
 	virtual void request(RequestType type, u32 val = 0);
 
-	virtual void initChildProcess();
+	virtual void initShellProcess();
 	virtual void readyRead(s8 *buf, u32 len);
 
 	void switchVt(bool enter, FbShell *peer);
@@ -75,6 +79,8 @@ private:
 
 	bool mPaletteChanged;
 	struct Color *mPalette;
+	bool mImStarted;
+	class ImProxy *mImProxy;
 };
 
 #endif

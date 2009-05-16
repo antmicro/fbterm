@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -28,7 +28,8 @@ class TtyInput : public IoPipe {
 	DECLARE_INSTANCE(TtyInput)
 public:
 	void switchVc(bool enter);
-	void switchIm(bool enter, bool raw);
+	void setRawMode(bool raw, bool force = false);
+	void showInfo(bool verbose);
 
 private:
 	virtual void readyRead(s8 *buf, u32 len);
@@ -36,7 +37,6 @@ private:
 	void processRawKeys(s8* buf, u32 len);
 
 	bool mRawMode;
-	bool mImEnable;
 };
 
 #endif

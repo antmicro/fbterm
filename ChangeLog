@@ -1,3 +1,40 @@
+2009-04-26 version 1.5
+	* fbconfig.cpp fbshell.cpp shell.cpp:
+	added command line arguments to customize command executed in sub-window, which is user's login shell by default
+	
+	* improxy.cpp input.cpp fbshell.cpp fbshellman.cpp:
+	added Alt-Fn and all FbTerm's shortcuts support when input method is actived
+	
+	* screen_render.cpp:
+	added support for text rendering with background image
+	
+	* fbconfig.cpp fbshell.cpp input.cpp font.cpp screen.cpp:
+	showInfo(): added option "-v/--verbose" to show extra system information
+	
+	* lib/shell.cpp:
+	createShellProcess(): changed shell program selection algorithm
+	
+	* screen.cpp:
+	createInstance(): changed frame buffer device selection behavior
+	
+	* font.cpp:
+	createInstance(): removed duplicate fonts with same family from ordered font list
+	
+	* lib/io.cpp:
+	localCodec(): fixed UTF-8 characters not showed correctly when locale is C/POSIX
+	
+	* lib/vterm.h:
+	fixed a bug with character color for underline/halfbright attribute in version 1.4
+	
+	* fbterm.cpp:
+	fixed a clearing screen issue on startup even in inactive tty
+	
+	* fbconfig.cpp:
+	Config(): fixed a bug when user try to execute FbTerm in initscripts and variable HOME is not defined
+	
+	* input.cpp:
+	fixed a bug that ctrl/space release keycodes are sent to im server when user enable it by pressing ctrl+space
+
 2009-03-14 version 1.4
 	* screen_render.cpp:
 	improved text rendering performence

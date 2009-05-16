@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
@@ -26,7 +26,7 @@
 #include "type.h"
 
 class VTerm {
-protected:
+public:
 	struct CharAttr {
 		typedef enum { Single = 0, DoubleLeft, DoubleRight } CharType;
 
@@ -87,6 +87,7 @@ protected:
 	u16 charCode(u16 x, u16 y) { return text[get_line(y) * max_width + x]; }
 	CharAttr charAttr(u16 x, u16 y) { return attrs[get_line(y) * max_width + x]; }
 
+protected:
 	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars, bool *dws) = 0;
 	virtual bool moveChars(u16 sx, u16 sy, u16 dx, u16 dy, u16 w, u16 h) { return false; }
 	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c) {}
@@ -179,17 +180,26 @@ private:
 	static u16 init_history_lines();
 	static u8 init_default_color(bool foreground);
 
-	typedef void (VTerm::*StateFunc)();
-	struct StateOption {
-		u16 key;	// char value to look for, -1 = default/end
-		StateFunc action; // 0 = do nothing
-		const StateOption *next_state; // 0 = keep current state, -1 = return normal
+	typedef enum {
+		ESnormal = 0, ESesc, ESsquare, ESnonstd, ESpercent, EScharset, EShash, ESfunckey, ESkeep
+	} EscapeState;
+
+	EscapeState esc_state;
+
+	typedef void (VTerm::*ActionFunc)();
+	struct Sequence {
+		u16 code;
+		ActionFunc action;
+		EscapeState next;
 	};
 
-	static const StateOption control_state[], esc_state[], square_state[], nonstd_state[], percent_state[], hash_state[], charset_state[], funckey_state[];
-	static const StateOption *hash_control_state[], *hash_esc_state[], *hash_square_state[];
-	const StateOption *current_state;
-	bool normal_state;
+	static const Sequence control_sequences[], escape_sequences[];
+
+	#define NR_STATES ESkeep
+	#define MAX_CONTROL_CODE 256
+	#define MAX_ESCAPE_CODE 128
+
+	static u8 control_map[MAX_CONTROL_CODE], escape_map[NR_STATES][MAX_ESCAPE_CODE];
 
 	//utf8 parse
 	u16 utf8_count;
@@ -237,7 +247,8 @@ private:
 	CharAttr char_attr, s_char_attr;
 
 	static CharAttr default_char_attr;
-	u8 cur_fcolor, cur_bcolor, cur_underline_color, cur_halfbright_color;
+	u8 cur_fcolor, cur_bcolor;
+	s8 cur_underline_color, cur_halfbright_color;
 
 	// action parameters
 	#define NPAR 16
