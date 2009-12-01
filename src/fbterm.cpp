@@ -153,19 +153,22 @@ void FbTerm::init()
 	mInit = true;
 }
 
-void FbTerm::run()
+static bool isActiveTerm()
 {
-	if (!mInit) return;
-
 	struct vt_stat vtstat;
 	ioctl(STDIN_FILENO, VT_GETSTATE, &vtstat);
 
 	struct stat ttystat;
 	fstat(STDIN_FILENO, &ttystat);
 
-	if (vtstat.v_active == MINOR(ttystat.st_rdev)) {
-		processSignal(SIGUSR2);
-	}
+	return vtstat.v_active == MINOR(ttystat.st_rdev);
+}
+
+void FbTerm::run()
+{
+	if (!mInit) return;
+
+	if (isActiveTerm()) processSignal(SIGUSR2);
 
 	FbShellManager::instance()->createShell();
 
@@ -177,6 +180,8 @@ void FbTerm::run()
 		pollSignal();
 #endif
 	}
+
+	if (isActiveTerm()) processSignal(SIGUSR1);
 }
 
 void FbTerm::processSignal(u32 signo)
@@ -195,10 +200,12 @@ void FbTerm::processSignal(u32 signo)
 		FbShellManager::instance()->switchVc(false);
 		Screen::instance()->switchVc(false);
 		TtyInput::instance()->switchVc(false);
+		Mouse::instance()->switchVc(false);
 		ioctl(STDIN_FILENO, VT_RELDISP, 1);
 		break;
 
 	case SIGUSR2:
+		Mouse::instance()->switchVc(true);
 		TtyInput::instance()->switchVc(true);
 		Screen::instance()->switchVc(true);
 		FbShellManager::instance()->switchVc(true);
@@ -224,6 +231,7 @@ void FbTerm::processSysKey(u32 key)
 {
 	FbShellManager *manager = FbShellManager::instance();
 
+	printf("%d\n", key);
 	switch (key) {
 	case CTRL_ALT_E:
 		exit();
@@ -282,11 +290,8 @@ void FbTerm::initChildProcess()
 	signal(SIGPIPE, SIG_DFL);
 }
 
-u32 effective_uid;
-
 int main(int argc, char **argv)
 {
-	effective_uid = geteuid();
 	seteuid(getuid());
 
 	if (Config::instance()->parseArgs(argc, argv)) {

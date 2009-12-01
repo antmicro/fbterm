@@ -18,20 +18,21 @@
  *
  */
 
-#ifndef MOUSE_H
-#define MOUSE_H
+#ifndef FBDEV_H
+#define FBDEV_H
 
-#include "io.h"
-#include "instance.h"
+#include "screen.h"
 
-class Mouse : public IoPipe {
-	DECLARE_INSTANCE(Mouse)
-public:
-	void switchVc(bool enter);
+class FbDev : public Screen {
 private:
-	virtual void readyRead(s8 *buf, u32 len);
+	friend class Screen;
+	static FbDev *initFbDev();
 
-	u16 x, y;
+	FbDev();
+	~FbDev();
+
+	virtual void setupOffset();
+	virtual void setupPalette(bool restore);
+	virtual const s8 *drvId();
 };
-
 #endif

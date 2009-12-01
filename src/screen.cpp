@@ -20,15 +20,16 @@
 
 #include <stdio.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <linux/kd.h>
-#include <linux/fb.h>
-#include "fbshellman.h"
-#include "font.h"
+#include <string.h>
 #include "screen.h"
+#include "font.h"
+#include "fbshellman.h"
 #include "fbconfig.h"
+#include "fbdev.h"
+#include "config.h"
+#ifdef ENABLE_VESA
+#include "vesadev.h"
+#endif
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -40,170 +41,110 @@ static const s8 disable_blank[] = "\e[9;0]";
 static const s8 enable_blank[] = "\e[9;10]";
 static const s8 clear_screen[] = "\e[2J\e[H";
 
-static fb_fix_screeninfo finfo;
-static fb_var_screeninfo vinfo;
-static u32 bytes_per_pixel;
-
-static enum { Redraw = 0, YPan, YWrap } scroll_type;
-static RotateType rotate_type;
-static u32 screenw;
-static u32 screenh;
-
-static s32 fbdev_fd;
-static u8 *fbdev_mem;
-
-#include "screen_clip.cpp"
-#include "screen_render.cpp"
-
 DEFINE_INSTANCE(Screen)
 
 Screen *Screen::createInstance()
 {
-	s8 *fbdev = getenv("FRAMEBUFFER");
-
-	if (fbdev) {
-		fbdev_fd = open(fbdev, O_RDWR);
-	} else {
-		fbdev_fd = open("/dev/fb0", O_RDWR);
-		if (fbdev_fd < 0) fbdev_fd = open("/dev/fb/0", O_RDWR);
-	}
-
-	if (fbdev_fd < 0) {
-		fprintf(stderr, "can't open framebuffer device!\n");
-		return 0;
-	}
-
-	fcntl(fbdev_fd, F_SETFD, fcntl(fbdev_fd, F_GETFD) | FD_CLOEXEC);
-	ioctl(fbdev_fd, FBIOGET_FSCREENINFO, &finfo);
-	ioctl(fbdev_fd, FBIOGET_VSCREENINFO, &vinfo);
-
-	if (finfo.type != FB_TYPE_PACKED_PIXELS) {
-		fprintf(stderr, "unsupported framebuffer device!\n");
-		return 0;
-	}
-
-	switch (vinfo.bits_per_pixel) {
-	case 8:
-		if (finfo.visual != FB_VISUAL_PSEUDOCOLOR) {
-			fprintf(stderr, "only support pseudocolor visual with 8bpp depth!\n");
-			return 0;
-		}
-		break;
-
-	case 15:
-	case 16:
-	case 32:
-		if (finfo.visual != FB_VISUAL_TRUECOLOR && finfo.visual != FB_VISUAL_DIRECTCOLOR) {
-			fprintf(stderr, "only support truecolor/directcolor visual with 15/16/32bpp depth!\n");
-			return 0;
-		}
-		break;
-
-	default:
-		fprintf(stderr, "only support framebuffer device with 8/15/16/32 color depth!\n");
-		return 0;
-	}
-
-	u32 type = Rotate0;
-	Config::instance()->getOption("screen-rotate", type);
-	if (type > Rotate270) type = Rotate0;
-	rotate_type = (RotateType)type;
-
-	if (rotate_type == Rotate0 || rotate_type == Rotate180) {
-		screenw = vinfo.xres;
-		screenh = vinfo.yres;
-	} else {
-		screenw = vinfo.yres;
-		screenh = vinfo.xres;
-	}
-
-	if (!Font::instance() || FW(1) == 0 || FH(1) == 0) {
+	if (!Font::instance() || !FW(1) || !FH(1)) {
 		fprintf(stderr, "init font error!\n");
 		return 0;
 	}
 
-	if (screenw / FW(1) == 0 || screenh / FH(1) == 0) {
-		fprintf(stderr, "font size is too huge!\n");
+	Screen *pScreen = 0;
+
+#ifdef ENABLE_VESA
+	s8 buf[16];
+	Config::instance()->getOption("vesa-mode", buf, sizeof(buf));
+	if (!strcmp(buf, "list")) {
+		VesaDev::printModes();
 		return 0;
 	}
 
-	if (vinfo.bits_per_pixel == 15) bytes_per_pixel = 2;
-	else bytes_per_pixel = (vinfo.bits_per_pixel >> 3);
+	u32 mode = 0;
+	Config::instance()->getOption("vesa-mode", mode);
 
-	return new Screen();
+	if (!mode) pScreen = FbDev::initFbDev();
+	if (!pScreen) pScreen = VesaDev::initVesaDev(mode);
+	if (!pScreen) return 0;
+#else
+	pScreen = FbDev::initFbDev();
+#endif
+
+	if (pScreen->mRotateType == Rotate90 || pScreen->mRotateType == Rotate270) {
+		u32 tmp = pScreen->mWidth;
+		pScreen->mWidth = pScreen->mHeight;
+		pScreen->mHeight = tmp;
+	}
+
+	if (!pScreen->mCols) pScreen->mCols = pScreen->mWidth / FW(1);
+	if (!pScreen->mRows) pScreen->mRows = pScreen->mHeight / FH(1);
+
+	if (!pScreen->mCols || !pScreen->mRows) {
+		fprintf(stderr, "font size is too huge!\n");
+		delete pScreen;
+		return 0;
+	}
+
+	pScreen->initFillDraw();
+	return pScreen;
 }
 
 Screen::Screen()
 {
-	fbdev_mem = (u8 *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbdev_fd, 0);
+	mWidth = mHeight = 0;
+	mCols = mRows = 0;
+	mBitsPerPixel = mBytesPerLine = 0;
 
-	mCols = screenw / FW(1);
-	mRows = screenh / FH(1);
-	scroll_type = Redraw;
+	mScrollEnable = true;
+	mScrollType = Redraw;
+	mOffsetMax = 0;
+	mOffsetCur = 0;
 
-	if (rotate_type == Rotate0 || rotate_type == Rotate180) {
-		bool ypan = (vinfo.yres_virtual > vinfo.yres && finfo.ypanstep && !(FH(1) % finfo.ypanstep));
-		bool ywrap = (finfo.ywrapstep && !(FH(1) % finfo.ywrapstep));
-		if (ywrap && !(vinfo.vmode & FB_VMODE_YWRAP)) {
-			vinfo.vmode |= FB_VMODE_YWRAP;
-			ioctl(fbdev_fd, FBIOPUT_VSCREENINFO, &vinfo);
-			ywrap = (vinfo.vmode & FB_VMODE_YWRAP);
-		}
+	mVMemBase = 0;
+	mPalette = 0;
 
-		if ((ypan || ywrap) && !ioctl(fbdev_fd, FBIOPAN_DISPLAY, &vinfo)) scroll_type = (ywrap ? YWrap : YPan);
-	}
+	u32 type = Rotate0;
+	Config::instance()->getOption("screen-rotate", type);
+	if (type > Rotate270) type = Rotate0;
+	mRotateType = (RotateType)type;
 
 	s32 ret = write(STDIN_FILENO, hide_cursor, sizeof(hide_cursor) - 1);
 	ret = write(STDIN_FILENO, disable_blank, sizeof(disable_blank) - 1);
-
-	initFillDraw();
 }
 
 Screen::~Screen()
 {
-	setupSysPalette(true);
-	munmap(fbdev_mem, finfo.smem_len);
-	close(fbdev_fd);
-
-	if (scroll_type) {
-		ioctl(STDIN_FILENO, KDSETMODE, KD_GRAPHICS);
-		ioctl(STDIN_FILENO, KDSETMODE, KD_TEXT);
-	}
+	Font::uninstance();
+	endFillDraw();
 
 	s32 ret = write(STDIN_FILENO, show_cursor, sizeof(show_cursor) - 1);
 	ret = write(STDIN_FILENO, enable_blank, sizeof(enable_blank) - 1);
 	ret = write(STDIN_FILENO, clear_screen, sizeof(clear_screen) - 1);
-
-	Font::uninstance();
-	endFillDraw();
 }
 
 void Screen::showInfo(bool verbose)
 {
 	if (!verbose) return;
 
-	static const s8* const scrollstr[3] = {
-		"redraw", "ypan", "ywrap"
+	static const s8* const scrollstr[4] = {
+		"redraw", "ypan", "ywrap", "xpan"
 	};
-	printf("[screen] %s, mode: %dx%d-%dbpp, scrolling: %s\n", finfo.id, screenw, screenh, vinfo.bits_per_pixel, scrollstr[scroll_type]);
+	printf("[screen] driver: %s, mode: %dx%d-%dbpp, scrolling: %s\n",
+		drvId(), mWidth, mHeight, mBitsPerPixel, scrollstr[mScrollType]);
 }
 
 void Screen::switchVc(bool enter)
 {
-	if (enter) {
-		ioctl(fbdev_fd, FBIOGET_VSCREENINFO, &vinfo);
-		ioctl(fbdev_fd, FBIOPAN_DISPLAY, &vinfo);
+	mOffsetCur = 0;
+	setupOffset();
 
-		setupSysPalette(false);
-		if (palette) eraseMargin(true, mRows);
-	} else {
-		setupSysPalette(true);
-	}
+	setupPalette(!enter);
+	if (enter && mPalette) eraseMargin(true, mRows);
 }
 
 bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 {
-	if (clipEnable || scroll_type == Redraw || scol != dcol) return false;
+	if (!mScrollEnable || mScrollType == Redraw || scol != dcol) return false;
 
 	u16 top = MIN(srow, drow), bot = MAX(srow, drow) + h;
 	u16 left = scol, right = scol + w;
@@ -213,26 +154,22 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 
 	if (noaccel_redraw_area <= accel_redraw_area) return false;
 
-	s32 yoffset = vinfo.yoffset;
-
-	if (rotate_type == Rotate0) yoffset += FH((s32)srow - drow);
-	else yoffset -= FH((s32)srow - drow);
+	if (mRotateType == Rotate0 || mRotateType == Rotate270) mOffsetCur += FH((s32)srow - drow);
+	else mOffsetCur -= FH((s32)srow - drow);
 
 	bool redraw_all = false;
-	if (scroll_type == YPan) {
-		u32 ytotal = vinfo.yres_virtual - vinfo.yres;
+	if (mScrollType == YPan || mScrollType == XPan) {
 		redraw_all = true;
 
-		if (yoffset < 0) yoffset = ytotal;
-		else if ((u32)yoffset > ytotal) yoffset = 0;
+		if (mOffsetCur < 0) mOffsetCur = mOffsetMax;
+		else if ((u32)mOffsetCur > mOffsetMax) mOffsetCur = 0;
 		else redraw_all = false;
 	} else {
-		if (yoffset < 0) yoffset += vinfo.yres_virtual;
-		else if ((u32)yoffset >= vinfo.yres_virtual) yoffset -= vinfo.yres_virtual;
+		if (mOffsetCur < 0) mOffsetCur += mOffsetMax + 1;
+		else if ((u32)mOffsetCur > mOffsetMax) mOffsetCur -= mOffsetMax + 1;
 	}
 
-	vinfo.yoffset = yoffset;
-	ioctl(fbdev_fd, FBIOPAN_DISPLAY, &vinfo);
+	setupOffset();
 
 	if (top) redraw(0, 0, mCols, top);
 	if (bot < mRows) redraw(0, bot, mCols, mRows - bot);
@@ -250,34 +187,18 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 
 void Screen::eraseMargin(bool top, u16 h)
 {
-	if (screenw % FW(1)) {
-		fillRect(FW(mCols), top ? 0 : FH(mRows - h), screenw % FW(1), FH(h), 0);
+	if (mWidth % FW(1)) {
+		fillRect(FW(mCols), top ? 0 : FH(mRows - h), mWidth % FW(1), FH(h), 0);
 	}
 
-	if (screenh % FH(1)) {
-		fillRect(0, FH(mRows), screenw, screenh % FH(1), 0);
+	if (mHeight % FH(1)) {
+		fillRect(0, FH(mRows), mWidth, mHeight % FH(1), 0);
 	}
 }
 
-void Screen::drawUnderline(u16 col, u16 row, u8 color)
+void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
 {
-	fillRect(FW(col), FH(row + 1) - 1, FW(1),  1, color);
-}
-
-void Screen::clear(u16 col, u16 row, u16 w, u16 h, u8 color)
-{
-	fillRect(FW(col), FH(row), FW(w), FH(h), color);
-}
-
-void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
-{
-	u32 startx, x = FW(col), y = FH(row), fw = FW(1);
-
-	Rectangle rect = { x, y, x + FW(w), y + FH(1) };
-	u32 state = intersectWithClipRects(rect);
-
-	if (state == InSide) return;
-	bool clip = (state == Intersect);
+	u32 startx, fw = FW(1);
 
 	u16 startnum, *starttext;
 	bool *startdw, draw_space = false, draw_text = false;
@@ -286,15 +207,7 @@ void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text,
 		if (*text == 0x20) {
 			if (draw_text) {
 				draw_text = false;
-
-				if (clip) {
-					Rectangle rect = { startx, y, x, y + FH(1) };
-					state = intersectWithClipRects(rect);
-				}
-
-				if (state != InSide) {
-					drawGlyphs(startx, y, x - startx, fc, bc, startnum - num, starttext, startdw, state == Intersect);
-				}
+				drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw);
 			}
 
 			if (!draw_space) {
@@ -304,7 +217,7 @@ void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text,
 		} else {
 			if (draw_space) {
 				draw_space = false;
-				fillRect(startx, y, x - startx, FH(1), bc, clip);
+				fillRect(startx, y, x - startx, FH(1), bc);
 			}
 
 			if (!draw_text) {
@@ -320,90 +233,52 @@ void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text,
 	}
 
 	if (draw_text) {
-		if (clip) {
-			Rectangle rect = { startx, y, x, y + FH(1) };
-			state = intersectWithClipRects(rect);
-		}
-
-		if (state != InSide) {
-			drawGlyphs(startx, y, x - startx, fc, bc, startnum - num, starttext, startdw, state == Intersect);
-		}
+		drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw);
 	} else if (draw_space) {
-		fillRect(startx, y, x - startx, FH(1), bc, clip);
+		fillRect(startx, y, x - startx, FH(1), bc);
 	}
 }
 
-void Screen::drawGlyphs(u32 x, u32 y, u32 w, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool clip)
+void Screen::drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
 {
-	if (clip) {
-		Rectangle rect = { x, y, x, y + FH(1) };
-
-		for (; num--; text++, dw++) {
-			rect.sx = rect.ex;
-			rect.ex += *dw ? FW(2) : FW(1);
-
-			u32 state = intersectWithClipRects(rect);
-			if (state != InSide) {
-				drawGlyph(rect.sx, y, fc, bc, *text, *dw, state == Intersect);
-			}
-		}
-	} else {
-		for (; num--; text++, dw++) {
-			drawGlyph(x, y, fc, bc, *text, *dw, clip);
-			x += *dw ? FW(2) : FW(1);
-		}
+	for (; num--; text++, dw++) {
+		drawGlyph(x, y, fc, bc, *text, *dw);
+		x += *dw ? FW(2) : FW(1);
 	}
 }
 
-static inline u32 offsetY(u32 y)
+void Screen::adjustOffset(u32 &x, u32 &y)
 {
-	y += vinfo.yoffset;
-	if (y >= vinfo.yres_virtual) y -= vinfo.yres_virtual;
-	return (y * finfo.line_length);
+	if (mScrollType == XPan) x += mOffsetCur;
+	else y += mOffsetCur;
 }
 
-void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color, bool clip)
+void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color)
 {
-	if (x >= screenw || y >= screenh || !w || !h) return;
-	if (x + w > screenw) w = screenw - x;
-	if (y + h > screenh) h = screenh - y;
+	if (x >= mWidth || y >= mHeight || !w || !h) return;
+	if (x + w > mWidth) w = mWidth - x;
+	if (y + h > mHeight) h = mHeight - y;
 
 	rotateRect(x, y, w, h);
+	adjustOffset(x, y);
 
-	Rectangle rect = { x, y, x + w, y + h }, *rects = &rect;
-	u32 num = 1;
-	bool isalloc = false;
-
-	if (clip) {
-		isalloc = subtractWithRotatedClipRects(rect, rects, num);
+	for (; h--;) {
+		if (mScrollType == YWrap && y > mOffsetMax) y -= mOffsetMax + 1;
+		(this->*fill)(x, y++, w, color);
 	}
-
-	for (; num--;) {
-		u32 h = rects[num].ey - rects[num].sy;
-		u32 w = rects[num].ex - rects[num].sx;
-		if (!h || !w) continue;
-
-		u32 xoffset = rects[num].sx * bytes_per_pixel;
-
-		for(; h--;) {
-			fill(xoffset + offsetY(rects[num].sy++), w, color);
-		}
-	}
-
-	if (isalloc) delete[] rects;
 }
 
-void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip)
+void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw)
 {
-	if (x >= screenw || y >= screenh) return;
+	if (x >= mWidth || y >= mHeight) return;
 
 	s32 w = (dw ? FW(2) : FW(1)), h = FH(1);
-	if (x + w > screenw) w = screenw - x;
-	if (y + h > screenh) h = screenh - y;
+	if (x + w > mWidth) w = mWidth - x;
+	if (y + h > mHeight) h = mHeight - y;
 
 	Font::Glyph *glyph = (Font::Glyph *)Font::instance()->getGlyph(code);
 	if (!glyph) {
-		fillRect(x, y, w, h, bc, clip);
+		fillRect(x, y, w, h, bc);
 		return;
 	}
 
@@ -415,26 +290,26 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip)
 
 	s32 width = glyph->width;
 	if (width > w - left) width = w - left;
-	if ((s32)x + left + width > (s32)screenw) width = screenw - ((s32)x + left);
+	if ((s32)x + left + width > (s32)mWidth) width = mWidth - ((s32)x + left);
 	if (width < 0) width = 0;
 
 	s32 height = glyph->height;
 	if (height > h - top) height = h - top;
-	if (y + top + height > screenh) height = screenh - (y + top);
+	if (y + top + height > mHeight) height = mHeight - (y + top);
 	if (height < 0) height = 0;
 
-	if (top) fillRect(x, y, w, top, bc, clip);
-	if (left > 0) fillRect(x, y + top, left, height, bc, clip);
+	if (top) fillRect(x, y, w, top, bc);
+	if (left > 0) fillRect(x, y + top, left, height, bc);
 
 	s32 right = width + left;
-	if (w > right) fillRect((s32)x + right, y + top, w - right, height, bc, clip);
+	if (w > right) fillRect((s32)x + right, y + top, w - right, height, bc);
 
 	s32 bot = top + height;
-	if (h > bot) fillRect(x, y + bot, w, h - bot, bc, clip);
+	if (h > bot) fillRect(x, y + bot, w, h - bot, bc);
 
 	x += left;
 	y += top;
-	if (x >= screenw || y >= screenh || !width || !height) return;
+	if (x >= mWidth || y >= mHeight || !width || !height) return;
 
 	u32 nwidth = width, nheight = height;
 	rotateRect(x, y, nwidth, nheight);
@@ -443,55 +318,32 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip)
 	u32 wdiff = glyph->width - width, hdiff = glyph->height - height;
 
 	if (wdiff) {
-		if (rotate_type == Rotate180) pixmap += wdiff;
-		else if (rotate_type == Rotate270) pixmap += wdiff * glyph->pitch;
+		if (mRotateType == Rotate180) pixmap += wdiff;
+		else if (mRotateType == Rotate270) pixmap += wdiff * glyph->pitch;
 	}
 
 	if (hdiff) {
-		if (rotate_type == Rotate90) pixmap += hdiff;
-		else if (rotate_type == Rotate180) pixmap += hdiff * glyph->pitch;
+		if (mRotateType == Rotate90) pixmap += hdiff;
+		else if (mRotateType == Rotate180) pixmap += hdiff * glyph->pitch;
 	}
 
-	Rectangle rect = { x, y, x + nwidth, y + nheight }, *rects = &rect;
-	u32 num = 1;
-	bool isalloc = false;
-
-	if (clip) {
-		isalloc = subtractWithRotatedClipRects(rect, rects, num);
+	adjustOffset(x, y);
+	for (; nheight--; y++, pixmap += glyph->pitch) {
+		if ((mScrollType == YWrap) && y > mOffsetMax) y -= mOffsetMax + 1;
+		(this->*draw)(x, y, nwidth, fc, bc, pixmap);
 	}
-
-	for (; num--;) {
-		u32 w = rects[num].ex - rects[num].sx;
-		u32 h = rects[num].ey - rects[num].sy;
-		if (!w || !h) continue;
-
-		u32 xoffset = rects[num].sx * bytes_per_pixel;
-		u8 *pm = pixmap + (rects[num].sy - y) * glyph->pitch + (rects[num].sx - x);
-
-		for (; h--; pm += glyph->pitch) {
-			draw(xoffset + offsetY(rects[num].sy++), pm, w, fc, bc);
-		}
-	}
-
-	if (isalloc) delete[] rects;
-	return;
-}
-
-RotateType Screen::rotateType()
-{
-	return rotate_type;
 }
 
 void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 {
 	u32 tmp;
-	switch (rotate_type) {
+	switch (mRotateType) {
 	case Rotate0:
 		break;
 
 	case Rotate90:
 		tmp = x;
-		x = screenh - y - h;
+		x = mHeight - y - h;
 		y = tmp;
 
 		tmp = w;
@@ -500,13 +352,13 @@ void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 		break;
 
 	case Rotate180:
-		x = screenw - x - w;
-		y = screenh - y - h;
+		x = mWidth - x - w;
+		y = mHeight - y - h;
 		break;
 
 	case Rotate270:
 		tmp = y;
-		y = screenw - x - w;
+		y = mWidth - x - w;
 		x = tmp;
 
 		tmp = w;
@@ -519,7 +371,7 @@ void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 void Screen::rotatePoint(u32 W, u32 H, u32 &x, u32 &y)
 {
 	u32 tmp;
-	switch (rotate_type) {
+	switch (mRotateType) {
 	case Rotate0:
 		break;
 

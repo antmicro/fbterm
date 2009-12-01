@@ -1,3 +1,15 @@
+fbterm (1.6-1) unstable; urgency=low
+
+  * New upstream release
+  * Change e-mail address.
+  * Remove DM-Upload-Allowed field.
+  * Update Standards-Version.
+  * Add README.source file.
+  * Update patch.
+    patches/01_add_terminfo_path.dpatch
+
+ -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Tue, 01 Dec 2009 23:12:53 +0900
+
 fbterm (1.5-1) unstable; urgency=low
 
   * New upstream release

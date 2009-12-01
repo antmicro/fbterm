@@ -441,7 +441,7 @@ static bool bisearch(u32 ucs, const struct interval *table, u32 max)
 	return 0;
 }
 
-static bool is_double_width(u32 ucs)
+bool is_double_width(u32 ucs)
 {
 	static const struct interval double_width[] = {
 		{ 0x1100, 0x115F}, { 0x2329, 0x232A}, { 0x2E80, 0x303E},
