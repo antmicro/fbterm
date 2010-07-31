@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Nobuhiro Iwamatsu <iwamatsu@debian.org>
 Build-Depends: cdbs, debhelper (>= 7), autotools-dev, libfreetype6-dev,
 		libfontconfig1-dev, libgpm-dev, pkg-config, dpatch
-Standards-Version: 3.8.3
+Standards-Version: 3.9.1
 Homepage: http://code.google.com/p/fbterm/
 
 Package: fbterm

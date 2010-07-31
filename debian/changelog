@@ -1,3 +1,12 @@
+fbterm (1.6-2) unstable; urgency=low
+
+  * Update debian/control.
+    - Bumped standards-Version to 3.9.1.
+  * Fix 1px padding of unifont (Closes: #590831).
+    - patches/02_force-font-height.dpatch
+
+ -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Sun, 01 Aug 2010 03:56:08 +0900
+
 fbterm (1.6-1) unstable; urgency=low
 
   * New upstream release

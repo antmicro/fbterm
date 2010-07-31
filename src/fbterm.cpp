@@ -231,7 +231,6 @@ void FbTerm::processSysKey(u32 key)
 {
 	FbShellManager *manager = FbShellManager::instance();
 
-	printf("%d\n", key);
 	switch (key) {
 	case CTRL_ALT_E:
 		exit();

@@ -1,0 +1,73 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## Author: Trent W. Buck <trentbuck@gmail.com>
+## Bug-Debian: http://bugs.debian.org/590831
+
+@DPATCH@
+Index: fbterm-1.6/doc/fbterm.1.in
+===================================================================
+--- fbterm-1.6.orig/doc/fbterm.1.in	2010-07-30 01:13:34.000000000 +1000
++++ fbterm-1.6/doc/fbterm.1.in	2010-07-30 01:13:52.000000000 +1000
+@@ -43,6 +43,9 @@
+ \fB--font-width=\fR\fInum\fR
+ force font width
+ .TP
++\fB--font-height=\fR\fInum\fR
++force font height
++.TP
+ \fB-f, --color-foreground=\fR\fInum\fR
+ specify foreground color
+ .TP
+Index: fbterm-1.6/src/fbconfig.cpp
+===================================================================
+--- fbterm-1.6.orig/src/fbconfig.cpp	2010-07-30 01:13:30.000000000 +1000
++++ fbterm-1.6/src/fbconfig.cpp	2010-07-30 01:14:13.000000000 +1000
+@@ -173,9 +173,10 @@
+ 		"font-names=mono\n"
+ 		"font-size=12\n"
+ 		"\n"
+-		"# force font width, usually for non-fixed width fonts\n"
++		"# force font width (and/or height), usually for non-fixed width fonts\n"
+ 		"# legal value format: n (fw_new = n), +n (fw_new = fw_old + n), -n (fw_new = fw_old - n)\n"
+ 		"#font-width=\n"
++		"#font-height=\n"
+ 		"\n"
+ 		"# default color of foreground/background text\n"
+ 		"# available colors: 0 = black, 1 = red, 2 = green, 3 = brown, 4 = blue, 5 = magenta, 6 = cyan, 7 = white\n"
+@@ -234,6 +235,7 @@
+ #ifdef ENABLE_VESA
+ 		{ "vesa-mode", required_argument, 0, 3 },
+ #endif
++		{ "font-height", required_argument, 0, 4 },
+ 		{ 0, 0, 0, 0 }
+ 	};
+ 
+@@ -256,6 +258,7 @@
+ 				"  -n, --font-names=TEXT           specify font family names\n"
+ 				"  -s, --font-size=NUM             specify font pixel size\n"
+ 				"      --font-width=NUM            force font width\n"
++				"      --font-height=NUM           force font height\n"
+ 				"  -f, --color-foreground=NUM      specify foreground color\n"
+ 				"  -b, --color-background=NUM      specify background color\n"
+ 				"  -e, --text-encodings=TEXT       specify additional text encodings\n"
+Index: fbterm-1.6/src/font.cpp
+===================================================================
+--- fbterm-1.6.orig/src/font.cpp	2010-07-30 01:13:31.000000000 +1000
++++ fbterm-1.6/src/font.cpp	2010-07-30 01:13:52.000000000 +1000
+@@ -154,6 +154,17 @@
+ 		if (buf[0] == '+' || buf[0] == '-') mWidth += (s32)width;
+ 		else mWidth = width;
+ 	}
++
++	u32 height = 0;
++	Config::instance()->getOption("font-height", height);
++
++	if (height) {
++		s8 buf[64];
++		Config::instance()->getOption("font-height", buf, sizeof(buf));
++
++		if (buf[0] == '+' || buf[0] == '-') mHeight += (s32)height;
++		else mHeight = height;
++	}
+ }
+ 
+ Font::~Font()
