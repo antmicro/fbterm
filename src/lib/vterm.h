@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
@@ -87,6 +87,8 @@ public:
 	u16 charCode(u16 x, u16 y) { return text[get_line(y) * max_width + x]; }
 	CharAttr charAttr(u16 x, u16 y) { return attrs[get_line(y) * max_width + x]; }
 
+	static s32 charWidth(u32 ucs);
+
 protected:
 	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars, bool *dws) = 0;
 	virtual bool moveChars(u16 sx, u16 sy, u16 dx, u16 dy, u16 w, u16 h) { return false; }
@@ -162,6 +164,7 @@ private:
 	void current_is_g0();
 	void current_is_g1();
 	void set_charset();
+	u32 translate_char(u32);
 	void set_cursor_type();
 	void linux_specific();
 	void begin_set_palette();
@@ -179,6 +182,7 @@ private:
 	static void init_state();
 	static u16 init_history_lines();
 	static u8 init_default_color(bool foreground);
+	static bool init_ambiguous_wide();
 
 	typedef enum {
 		ESnormal = 0, ESesc, ESsquare, ESnonstd, ESpercent, EScharset, EShash, ESfunckey, ESkeep
@@ -205,11 +209,19 @@ private:
 	u16 utf8_count;
 	u32 cur_char;
 
+	//treat cjk ambiguous width characters as wide
+	static bool ambiguous_wide;
+
 	//charset
+
+	typedef enum { Lat1Map = 0, GrafMap, IbmpcMap, UserMap } CharsetMap;
+
 	bool utf8;
 	bool g0_is_current;
-	u8 charset, g0_charset, g1_charset;
-	u8 s_charset, s_g0_charset, s_g1_charset;
+	bool g0_is_active, s_g0_is_active;
+	CharsetMap charset;
+	CharsetMap g0_charset, g1_charset;
+	CharsetMap s_g0_charset, s_g1_charset;
 
 	// terminal info
 	u16 *text;

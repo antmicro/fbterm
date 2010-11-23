@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
@@ -95,6 +95,7 @@ VTerm::VTerm(u16 w, u16 h)
 		history_lines = init_history_lines();
 		default_char_attr.fcolor = init_default_color(true);
 		default_char_attr.bcolor = init_default_color(false);
+		ambiguous_wide = init_ambiguous_wide();
 	}
 
 	text = 0;
@@ -131,7 +132,11 @@ void VTerm::reset()
 {
 	utf8 = true;
 	utf8_count = 0;
-//	g0_is_active = true;
+	g0_is_active = true;
+	g0_charset = Lat1Map;
+	g1_charset = GrafMap;
+	charset = g0_charset;
+
 	esc_state = ESnormal;
 
 	pending_scroll = 0;
@@ -298,7 +303,7 @@ void VTerm::input(const u8 *buf, u32 count)
 		/* Do no translation at all in control states */
 		if (esc_state != ESnormal) {
 			tc = c;
-		} else { // if (utf8 && !mode_flags.display_ctrl) {
+		} else if (utf8 && (!mode_flags.display_ctrl || c < 0x20)) {
 			rescan_last_byte:
 			if ((c & 0xc0) == 0x80) {
 				/* Continuation byte received */
@@ -310,7 +315,7 @@ void VTerm::input(const u8 *buf, u32 count)
 						/* Still need some bytes */
 						continue;
 					}
-					/* Got a whole s8acter */
+					/* Got a whole character */
 					c = cur_char;
 					/* Reject overlong sequences */
 					if (c <= utf8_length_changes[npar - 1] ||
@@ -363,9 +368,9 @@ void VTerm::input(const u8 *buf, u32 count)
 			if ((c >= 0xd800 && c <= 0xdfff) || c == 0xfffe || c == 0xffff)
 				c = 0xfffd;
 			tc = c;
-		} // else {	/* no utf or alternate charset mode */
-			//tc = c;
-		//}
+		}  else {	/* no utf or alternate charset mode */
+			tc = translate_char(mode_flags.toggle_meta ? (c | 0x80) : c);
+		}
 
 		cur_char = tc;
 
@@ -392,10 +397,6 @@ void VTerm::input(const u8 *buf, u32 count)
 					&& (c != 128+27);
 
 		if ((esc_state == ESnormal) && ok) {
-			if (c == 0xfeff || (c >= 0x200b && c <= 0x200f)) { // zero width
-				continue;
-			}
-
 			do_normal_char();
 
 			if (rescan) {
@@ -413,49 +414,14 @@ void VTerm::input(const u8 *buf, u32 count)
 	draw_cursor();
 }
 
-/* is_double_width() is based on the wcwidth() implementation by
- * Markus Kuhn -- 2007-05-26 (Unicode 5.0)
- * Latest version: http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c
- */
-struct interval {
-	u32 first;
-	u32 last;
-};
-
-static bool bisearch(u32 ucs, const struct interval *table, u32 max)
-{
-	u32 min = 0;
-	u32 mid;
-
-	if (ucs < table[0].first || ucs > table[max].last)
-		return 0;
-	while (max >= min) {
-		mid = (min + max) / 2;
-		if (ucs > table[mid].last)
-			min = mid + 1;
-		else if (ucs < table[mid].first)
-			max = mid - 1;
-		else
-			return 1;
-	}
-	return 0;
-}
-
-bool is_double_width(u32 ucs)
-{
-	static const struct interval double_width[] = {
-		{ 0x1100, 0x115F}, { 0x2329, 0x232A}, { 0x2E80, 0x303E},
-		{ 0x3040, 0xA4CF}, { 0xAC00, 0xD7A3}, { 0xF900, 0xFAFF},
-		{ 0xFE10, 0xFE19}, { 0xFE30, 0xFE6F}, { 0xFF00, 0xFF60},
-		{ 0xFFE0, 0xFFE6}, { 0x20000, 0x2FFFD}, { 0x30000, 0x3FFFD}
-	};
-	return bisearch(ucs, double_width, sizeof(double_width) / sizeof(struct interval) - 1);
-}
-
 void VTerm::do_normal_char()
 {
-	bool dw = is_double_width(cur_char);
 	if (cur_char > 0xffff) cur_char = 0xfffd;
+
+	s32 cw = charWidth(cur_char);
+	if (cw <= 0) return;
+
+	bool dw = (cw == 2);
 
 	u32 yp = linenumbers[cursor_y] * max_width;
 	if ((!dw && cursor_x >= width) || (dw && (cursor_x >= width - 1))) {
@@ -479,7 +445,7 @@ void VTerm::do_normal_char()
 		changed_line(cursor_y, cursor_x, width - 1);
 
 		u16 step = dw ? 2 : 1;
-		for (u16 i = cursor_x; i < width - step; i++) {
+		for (u16 i = width - step - 1; i >= cursor_x; i--) {
 			text[yp + i + step] = text[yp + i];
 			attrs[yp + i + step] = attrs[yp + i];
 		}

@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -173,9 +173,10 @@ void Config::checkConfigFile(const s8 *name)
 		"font-names=mono\n"
 		"font-size=12\n"
 		"\n"
-		"# force font width, usually for non-fixed width fonts\n"
+		"# force font width (and/or height), usually for non-fixed width fonts\n"
 		"# legal value format: n (fw_new = n), +n (fw_new = fw_old + n), -n (fw_new = fw_old - n)\n"
 		"#font-width=\n"
+		"#font-height=\n"
 		"\n"
 		"# default color of foreground/background text\n"
 		"# available colors: 0 = black, 1 = red, 2 = green, 3 = brown, 4 = blue, 5 = magenta, 6 = cyan, 7 = white\n"
@@ -203,6 +204,9 @@ void Config::checkConfigFile(const s8 *name)
 		"\n"
 		"# specify the favorite input method program to run\n"
 		"input-method=\n"
+		"\n"
+		"# treat ambiguous width characters as wide\n"
+		"#ambiguous-wide=yes\n"
 		;
 
 	struct stat cstat;
@@ -231,6 +235,8 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "cursor-shape", required_argument, 0, 0 },
 		{ "cursor-interval", required_argument, 0, 1 },
 		{ "font-width", required_argument, 0, 2 },
+		{ "font-height", required_argument, 0, 4 },
+		{ "ambiguous-wide", no_argument, 0, 'a' },
 #ifdef ENABLE_VESA
 		{ "vesa-mode", required_argument, 0, 3 },
 #endif
@@ -238,7 +244,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 	};
 
 	s32 index;
-	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:", options, 0)) != -1) {
+	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:a", options, 0)) != -1) {
 		switch (index) {
 		case 'V':
 			printf("FbTerm version " VERSION "\n");
@@ -256,10 +262,12 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"  -n, --font-names=TEXT           specify font family names\n"
 				"  -s, --font-size=NUM             specify font pixel size\n"
 				"      --font-width=NUM            force font width\n"
+				"      --font-height=NUM           force font height\n"
 				"  -f, --color-foreground=NUM      specify foreground color\n"
 				"  -b, --color-background=NUM      specify background color\n"
 				"  -e, --text-encodings=TEXT       specify additional text encodings\n"
 				"  -r, --screen-rotate=NUM         specify orientation of screen display\n"
+				"  -a, --ambiguous-wide            treat ambiguous width characters as wide\n"
 				"  -i, --input-method=TEXT         specify input method program\n"
 				"      --cursor-shape=NUM          specify default cursor shape\n"
 				"      --cursor-interval=NUM       specify cursor flash interval\n"

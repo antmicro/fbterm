@@ -1,6 +1,6 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
- *   Thir file is part of FbTerm.
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
  *   This program is free software; you can redistribute it and/or

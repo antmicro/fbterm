@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -30,6 +30,7 @@ public:
 	void switchCodec(u8 index);
 	void expose(u16 x, u16 y, u16 w, u16 h);
 	void toggleIm();
+	void killIm();
 	void imInput(s8 *buf, u32 len);
 	void ImExited() { mImProxy = 0; }
 	bool childProcessExited(s32 pid);
@@ -79,7 +80,6 @@ private:
 
 	bool mPaletteChanged;
 	struct Color *mPalette;
-	bool mImStarted;
 	class ImProxy *mImProxy;
 };
 

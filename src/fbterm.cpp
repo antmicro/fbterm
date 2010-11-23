@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -124,9 +124,7 @@ void FbTerm::init()
 	sigset_t sigmask;
 	sigemptyset(&sigmask);
 
-#ifndef HAVE_EPOLL
 	sigaddset(&sigmask, SIGCHLD);
-#endif
 	sigaddset(&sigmask, SIGUSR1);
 	sigaddset(&sigmask, SIGUSR2);
 	sigaddset(&sigmask, SIGALRM);
@@ -138,9 +136,7 @@ void FbTerm::init()
 #else
 	sighandler_t sh = signalHandler;
 
-#ifndef HAVE_EPOLL
 	signal(SIGCHLD, sh);
-#endif
 	signal(SIGUSR1, sh);
 	signal(SIGUSR2, sh);
 	signal(SIGALRM, sh);
@@ -211,7 +207,6 @@ void FbTerm::processSignal(u32 signo)
 		FbShellManager::instance()->switchVc(true);
 		break;
 
-#ifndef HAVE_EPOLL
 	case SIGCHLD:
 		if (mRun) {
 			s32 pid = waitpid(WAIT_ANY, 0, WNOHANG);
@@ -220,7 +215,6 @@ void FbTerm::processSignal(u32 signo)
 			}
 		}
 		break;
-#endif
 
 	default:
 		break;
@@ -272,6 +266,11 @@ void FbTerm::processSysKey(u32 key)
 			manager->activeShell()->toggleIm();
 		}
 		break;
+
+	case CTRL_ALT_K:
+		if (manager->activeShell()) {
+			manager->activeShell()->killIm();
+		}
 
 	default:
 		break;

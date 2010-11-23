@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
@@ -98,6 +98,10 @@ void VTerm::clear_param()
 
 void VTerm::save_cursor()
 {
+	s_g0_charset = g0_charset;
+	s_g1_charset = g1_charset;
+	s_g0_is_active = g0_is_active;
+
 	s_cursor_x = cursor_x;
 	s_cursor_y = cursor_y;
 	s_char_attr = char_attr;
@@ -105,6 +109,11 @@ void VTerm::save_cursor()
 
 void VTerm::restore_cursor()
 {
+	g0_charset = s_g0_charset;
+	g1_charset = s_g1_charset;
+	g0_is_active = s_g0_is_active;
+	charset = (g0_is_active ? g0_charset : g1_charset);
+
 	char_attr = s_char_attr;
 	move_cursor(s_cursor_x, s_cursor_y);
 }
@@ -477,14 +486,17 @@ void VTerm::set_display_attr()
 			char_attr.reverse = true;
 			break;
 		case 10:
+			charset = (g0_is_active ? g0_charset : g1_charset);
 			mode_flags.display_ctrl = false;
 			mode_flags.toggle_meta = false;
 			break;
 		case 11:
+			charset = IbmpcMap;
 			mode_flags.display_ctrl = true;
 			mode_flags.toggle_meta = false;
 			break;
 		case 12:
+			charset = IbmpcMap;
 			mode_flags.display_ctrl = true;
 			mode_flags.toggle_meta = true;
 			break;
@@ -544,24 +556,30 @@ void VTerm::set_cursor_type()
 
 void VTerm::set_utf8()
 {
-//	utf8 = true;
+	utf8 = true;
 }
 
 void VTerm::clear_utf8()
 {
-//	utf8 = false;
+	utf8 = false;
 }
 
 void VTerm::set_charset()
 {
+	CharsetMap &m = (g0_is_current ? g0_charset : g1_charset);
+
 	switch (cur_char) {
 	case '0':
+		m = Lat1Map;
 		break;
 	case 'B':
+		m = GrafMap;
 		break;
 	case 'U':
+		m = IbmpcMap;
 		break;
 	case 'K':
+		m = UserMap;
 		break;
 	default:
 		break;
@@ -571,12 +589,14 @@ void VTerm::set_charset()
 void VTerm::active_g0()
 {
 	charset = g0_charset;
+	g0_is_active = true;
 	mode_flags.display_ctrl = false;
 }
 
 void VTerm::active_g1()
 {
 	charset = g1_charset;
+	g0_is_active = false;
 	mode_flags.display_ctrl = true;
 }
 

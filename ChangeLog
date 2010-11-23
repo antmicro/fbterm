@@ -1,3 +1,28 @@
+2010-10-5 version 1.7
+	* vterm.cpp charsetmap.cpp:
+	improved escape sequences support, now curses h/v lines should be drawed correctly 
+	
+	* fbshell.cpp:
+	added redirecting /dev/tty0 output to FbTerm's sub-window
+	
+	* improxy.cpp input.cpp:
+	added shortcut CTRL_ALT_K to kill the frozen IM server
+	
+	* vterm.cpp wcwidth.cpp fbconfig.cpp:
+	added option "ambiguous-wide" to treat ambiguous CJK characters as wide width
+	
+	* font.cpp fbcofnig.cpp:
+	added option "font-height" to force font height
+	
+	* vterm.cpp:
+	do_normal_char(): fixed logical error in insert mode
+	
+	* shell.cpp:
+	autoTextSelect(): fixed logical error
+	
+	* improxy.cpp:
+	improved screen redrawing performance when im is active 
+
 2009-11-14 version 1.6
 	* screen.cpp screen.h screen_render.cpp:
 	reorganized class Screen API for VESA support
@@ -33,7 +58,7 @@
 	fixed several spelling errors
 	
 	* imapi.c:
-	fixed a IM dead loop bug triggerd by FbTerm's crash
+	fixed a IM dead loop bug triggered by FbTerm's crash
 	fixed a bug where IM maybe doesn't process pending messages until a new message arrives
 
 2009-04-26 version 1.5

@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -21,13 +21,11 @@
 #ifndef IM_PROXY_H
 #define IM_PROXY_H
 
-#include "type.h"
+#include <list>
 #include "io.h"
 #include "immessage.h"
 
 class FbShell;
-
-typedef enum { Intersect, Inside, Outside } IntersectState;
 
 class ImProxy: public IoPipe {
 public:
@@ -41,8 +39,6 @@ public:
 	void changeCursorPos(u16 col, u16 row);
 	void changeTermMode(bool crlf, bool appkey, bool curo);
 	void switchVt(bool enter, ImProxy *peer);
-
-	IntersectState intersectWithImWin(const Rectangle &rect);
 	void redrawImWin(const Rectangle &rect);
 
 private:
@@ -56,6 +52,9 @@ private:
 	void sendAckPing();
 	void sendDisconnect();
 	void setImWin(u32 winid, Rectangle &rect);
+	bool addWinMsg(Message *m);
+	void doFillRect(Message *m);
+	void doDrawText(Message *m);
 
 	FbShell *mShell;
 	s32 mPid;
@@ -64,8 +63,11 @@ private:
 	bool mRawInput;
 	enum {NoMessageToWait, WaitingMessage, GotMessage} mMsgWaitState;
 	u32 mMsgWaitType;
-	Rectangle mWins[NR_IM_WINS];
+
 	u32 mValidWinNum;
+	typedef std::list<Message *> MsgList;
+	MsgList mWinMsgs[NR_IM_WINS];
+	Rectangle mWins[NR_IM_WINS];
 };
 
 #endif

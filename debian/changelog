@@ -1,3 +1,12 @@
+fbterm (1.7-1) experimental; urgency=low
+
+  * New upstream release
+  * Remove patches/02_force-font-height.dpatch
+    Merged to upstream.
+  * Add libx86-dev to Build-Depends.
+
+ -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Wed, 24 Nov 2010 02:22:25 +0900
+
 fbterm (1.6-2) unstable; urgency=low
 
   * Update debian/control.
