@@ -1,0 +1,4 @@
+version=3
+opts=uversionmangle=s/(\d)[_\.\-\+]?((RC|rc|pre|dev|beta|alpha|b|a)[\-\.]?\d*)$/$1~$2/,dversionmangle=s/\+(debian|dfsg|ds|deb)\d*$//,\
+downloadurlmangle=s%.*/([^/]*)/downloads/detail\?name=([^=&]*).*%http://$1.googlecode.com/files/$2% \
+http://code.google.com/p/fbterm/downloads/list?can=1 .*=fbterm[_\-\.]?(\d\S+)\.(?:tgz|tbz2|txz|tar\.(?:gz|bz2|xz)).*

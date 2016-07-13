@@ -1,3 +1,27 @@
+fbterm (1.7-4) unstable; urgency=medium
+
+  * Fix FTBFS with gcc-6. (Closes: #811719)
+    Add debian/patches/0001-Fix-build-with-gcc-6.patch
+  * Update Standards-Version to 3.9.8.
+  * Update debian/copyright.
+    Update to deb5 format.
+
+ -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Wed, 13 Jul 2016 14:01:59 +0900
+
+fbterm (1.7-3) unstable; urgency=low
+
+  * Drop dpatch support.
+  * Update debian/control.
+    - Dump Standards-Version to 3.9.4.
+    - Update to dh 9.
+    - Update short description. Fix lintian warning.
+  * Update debian/rules.
+    - Change to using dh.
+  * Update source format to 3.0.
+  * Add debian/watch.
+
+ -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Thu, 18 Jul 2013 09:14:47 +0900
+
 fbterm (1.7-2) unstable; urgency=low
 
   * Upload to unstable.

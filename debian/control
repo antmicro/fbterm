@@ -2,16 +2,16 @@ Source: fbterm
 Section: utils
 Priority: optional
 Maintainer: Nobuhiro Iwamatsu <iwamatsu@debian.org>
-Build-Depends: cdbs, debhelper (>= 7), autotools-dev, libfreetype6-dev,
-		libfontconfig1-dev, libgpm-dev, pkg-config, dpatch,
+Build-Depends: debhelper (>= 9), autotools-dev, libfreetype6-dev,
+		libfontconfig1-dev, libgpm-dev, pkg-config,
 		libx86-dev [i386 amd64]
-Standards-Version: 3.9.1
-Homepage: http://code.google.com/p/fbterm/
+Standards-Version: 3.9.8
+Homepage: https://code.google.com/archive/p/fbterm/
 
 Package: fbterm
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: A fast framebuffer based terminal emulator for Linux
+Description: fast framebuffer based terminal emulator for Linux
  FbTerm is a fast terminal emulator for Linux with frame buffer device.
  .
  Features include:
