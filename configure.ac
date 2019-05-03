@@ -2,12 +2,12 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.61])
-AC_INIT([FbTerm], [1.6])
+AC_INIT([FbTerm], [1.7])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/fbterm.cpp])
 AC_CONFIG_HEADERS([config.h])
 
-AC_SUBST([RELEASE_DATE], "November 2009")
+AC_SUBST([RELEASE_DATE], "October 2010")
 
 # Checks for programs.
 AC_PROG_CXX
@@ -17,35 +17,29 @@ PKG_PROG_PKG_CONFIG
 
 AC_ARG_ENABLE(gpm, 
               AC_HELP_STRING([--disable-gpm], [disable gpm mouse support [[default=auto]]]), 
-              [GPM="$enalbeval"],
+              [GPM="$enableval"],
               [GPM=auto])
               
 AC_ARG_ENABLE(vesa, 
               AC_HELP_STRING([--disable-vesa], [disable VESA video card support [[default=auto]]]), 
-              [VESA="$enalbeval"],
+              [VESA="$enableval"],
               [VESA=auto])
 
 AC_ARG_ENABLE(epoll, 
               AC_HELP_STRING([--disable-epoll], [do not use epoll system call [[default=auto]]]), 
-              [EPOLL="$enalbeval"],
+              [EPOLL="$enableval"],
               [EPOLL=auto])
 
 AC_ARG_ENABLE(signalfd,
               AC_HELP_STRING([--disable-signalfd], [do not use signalfd system call [[default=auto]]]),
-              [SIGNALFD="$enalbeval"],
+              [SIGNALFD="$enableval"],
               [SIGNALFD=auto])
 
                                           
 # Checks for libraries.
 AC_CHECK_LIB([util], [forkpty])
-PKG_CHECK_MODULES([freetype2], [freetype2])
-PKG_CHECK_MODULES([fontconfig], [fontconfig])
-
-AC_SUBST([FT2_INC], ["$freetype2_CFLAGS"])
-AC_SUBST([FT2_LIB], ["$freetype2_LIBS"])
-
-AC_SUBST([FC_INC], ["$fontconfig_CFLAGS"])
-AC_SUBST([FC_LIB], ["$fontconfig_LIBS"])
+PKG_CHECK_MODULES([FT2], [freetype2])
+PKG_CHECK_MODULES([FC], [fontconfig])
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -109,7 +103,7 @@ AM_CONDITIONAL(VESA, test x"$VESA" = xyes)
 
 x86_LIBS=
 [[ "$VESA" = "yes" ]] && x86_LIBS="-lx86"
-AC_SUBST([X86_LIB], ["$x86_LIBS"])
+AC_SUBST([X86_LIBS], ["$x86_LIBS"])
 
 AH_TEMPLATE([ENABLE_GPM])
 AH_TEMPLATE([ENABLE_VESA])
@@ -126,4 +120,4 @@ AC_CONFIG_LINKS([im/input_key.h:src/input_key.h im/immessage.h:src/immessage.h])
 AC_OUTPUT
 
 [[ "$GPM_WARN" = "yes" ]] && AC_MSG_WARN([gpm.h doesn't exist! gpm mouse support will be disabled!])
-[[ "$VESA_WARN" = "yes" ]] && AC_MSG_WARN([libx86.h doesn't exist! VESA support will be disabled!])
+[[ "$VESA_WARN" = "yes" ]] && AC_MSG_WARN([libx86.h doesn't exist! VESA support will be disabled!]) || exit 0

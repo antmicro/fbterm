@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -134,6 +134,7 @@ void TtyInput::setupSysKey(bool restore)
 		{T_CTRL_ALT, KEY_F4,       CTRL_ALT_F4},
 		{T_CTRL_ALT, KEY_F5,       CTRL_ALT_F5},
 		{T_CTRL_ALT, KEY_F6,       CTRL_ALT_F6},
+		{T_CTRL_ALT, KEY_K,       CTRL_ALT_K},
 	};
 
 	if (!syskey_saved && restore) return;
@@ -144,7 +145,9 @@ void TtyInput::setupSysKey(bool restore)
 	Config::instance()->getOption("input-method", imapp, sizeof(imapp));
 
 	for (u32 i = 0; i < sizeof(sysKeyTable) / sizeof(KeyEntry); i++) {
-		if (!imapp[0] && sysKeyTable[i].new_val == CTRL_SPACE) continue;
+		if (!imapp[0]
+				&& (sysKeyTable[i].new_val == CTRL_SPACE
+					|| sysKeyTable[i].new_val == CTRL_ALT_K)) continue;
 
 		kbentry entry;
 		entry.kb_table = sysKeyTable[i].table;

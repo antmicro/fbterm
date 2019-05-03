@@ -1,5 +1,5 @@
 /*
- *   Copyright ? 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright ? 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or

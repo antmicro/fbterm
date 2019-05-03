@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -18,7 +18,6 @@
  *
  */
 
-#include <time.h>
 #include <errno.h>
 #include <pty.h>
 #include <pwd.h>
@@ -37,15 +36,14 @@ void waitChildProcessExit(s32 pid)
 {
 	if (pid < 0) return;
 
-	//kill(pid, SIGTERM);
+	kill(pid, SIGTERM);
 	sched_yield();
 
 	s32 ret = waitpid(pid, 0, WNOHANG);
 	if (ret > 0 || (ret == -1 && errno == ECHILD)) return;
 
-	for (u32 i = 10; i--;) {
-		timespec ts = { 0, 100 * 1000000UL };
-		nanosleep(&ts, 0);
+	for (u32 i = 5; i--;) {
+		usleep(100 * 1000);
 
 		ret = waitpid(pid, 0, WNOHANG);
 		if (ret > 0) break;
@@ -361,31 +359,38 @@ void Shell::autoTextSelect(u16 x, u16 y)
 	}
 
 	#define inword(c) ((c) > 0xff || (( inwordLut[(c) >> 5] >> ((c) & 0x1f) ) & 1))
-	#define isspace(c)	((c) == ' ')
 
 	u16 code = charCode(x, y);
-	bool spc = isspace(code);
+	bool inw = inword(code);
+	bool found = false;
 
 	u16 sx = x;
-	while (1) {
-		if (!sx || (spc && !isspace(code)) || (!spc && !inword(code))) break;
-		sx--;
-		code = charCode(sx, y);
+	while (sx) {
+		if (inw ^ inword(code)) {
+			found = true;
+			break;
+		}
+
+		code = charCode(--sx, y);
 	}
 
-	if (sx < x) sx++;
+	if (found) sx++;
 
 	code = charCode(x, y);
-	spc = isspace(code);
+	inw = inword(code);
+	found = false;
 
 	u16 ex = x;
-	while (1) {
-		if (ex == w() -1 || (spc && !isspace(code)) || (!spc && !inword(code))) break;
-		ex++;
-		code = charCode(ex, y);
+	while (ex != w() -1) {
+		if (inw ^ inword(code)) {
+			found = true;
+			break;
+		}
+
+		code = charCode(++ex, y);
 	}
 
-	if (ex > x) ex--;
+	if (found) ex--;
 
 	mSelState.start = y * w() + sx;
 	mSelState.end = y * w() + ex;

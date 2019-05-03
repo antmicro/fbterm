@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -23,7 +23,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
+#include <termios.h>
+#include <fcntl.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
 #include "fbshell.h"
 #include "fbshellman.h"
 #include "fbconfig.h"
@@ -329,6 +332,13 @@ u8 VTerm::init_default_color(bool foreground)
 	return color;
 }
 
+bool VTerm::init_ambiguous_wide()
+{
+	bool val = false;
+	Config::instance()->getOption("ambiguous-wide", val);
+	return val;
+}
+
 void Shell::initWordChars(s8 *buf, u32 len)
 {
 	Config::instance()->getOption("word-chars", buf, len);
@@ -336,7 +346,6 @@ void Shell::initWordChars(s8 *buf, u32 len)
 
 FbShell::FbShell()
 {
-	mImStarted = false;
 	mImProxy = 0;
 	mPaletteChanged = false;
 	mPalette = 0;
@@ -359,17 +368,11 @@ void FbShell::drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars,
 	if (manager->activeShell() != this) return;
 
 	adjustCharAttr(attr);
+	screen->drawText(FW(x), FH(y), attr.fcolor, attr.bcolor, num, chars, dws);
 
 	if (mImProxy) {
 		Rectangle rect = { FW(x), FH(y), FW(w), FH(1) };
-
-		IntersectState state =  mImProxy->intersectWithImWin(rect);
-		if (state != Inside) {
-			screen->drawText(FW(x), FH(y), attr.fcolor, attr.bcolor, num, chars, dws);
-			if (state == Intersect) mImProxy->redrawImWin(rect);
-		}
-	} else {
-		screen->drawText(FW(x), FH(y), attr.fcolor, attr.bcolor, num, chars, dws);
+		mImProxy->redrawImWin(rect);
 	}
 }
 
@@ -421,16 +424,13 @@ void FbShell::updateCursor()
 	case CurNone:
 		break;
 
-	case CurUnderline: {
-		Rectangle rect = { FW(mCursor.x), FH(mCursor.y + 1) - 1, FW(1), 1 };
-		IntersectState state = Outside;
-
-		if (mImProxy) state = mImProxy->intersectWithImWin(rect);
-		if (state != Inside) {
-			screen->fillRect(rect.x, rect.y, rect.w, rect.h, mCursor.showed ? mCursor.attr.fcolor : mCursor.attr.bcolor);
+	case CurUnderline:
+		screen->fillRect(FW(mCursor.x), FH(mCursor.y + 1) - 1, FW(1), 1, mCursor.showed ? mCursor.attr.fcolor : mCursor.attr.bcolor);
+		if (mImProxy) {
+			Rectangle rect = { FW(mCursor.x), FH(mCursor.y + 1) - 1, FW(1), 1 };
+			mImProxy->redrawImWin(rect);
 		}
 		break;
-	}
 
 	default: {
 		bool dw = (mCursor.attr.type != CharAttr::Single);
@@ -548,8 +548,22 @@ void FbShell::request(RequestType type,  u32 val)
 	}
 }
 
+static s32 tty0_fd = -1;
+
 void FbShell::switchVt(bool enter, FbShell *peer)
 {
+	if (tty0_fd == -1) tty0_fd = open("/dev/tty0", O_RDWR);
+	if (tty0_fd != -1) {
+		seteuid(0);
+		ioctl(tty0_fd, TIOCCONS, 0);
+		if (enter) {
+			s32 slavefd = open(ptsname(fd()), O_RDWR);
+			ioctl(slavefd, TIOCCONS, 0);
+			close(slavefd);
+		}
+		seteuid(getuid());
+	}
+
 	if (mImProxy) {
 		mImProxy->switchVt(enter, peer ? peer->mImProxy : 0);
 	}
@@ -571,7 +585,9 @@ void FbShell::switchVt(bool enter, FbShell *peer)
 
 void FbShell::initShellProcess()
 {
+	if (tty0_fd != -1) close(tty0_fd);
 	FbTerm::instance()->initChildProcess();
+
 	if (!firstShell) return;
 
 	bool verbose = false;
@@ -720,12 +736,13 @@ void FbShell::reportMode()
 	if (mImProxy) mImProxy->changeTermMode(mode(CRWithLF), mode(ApplicKeypad), mode(CursorKeyEscO));
 }
 
+void FbShell::killIm()
+{
+	if (mImProxy) delete mImProxy;
+}
 void FbShell::toggleIm()
 {
-	if (!mImStarted) {
-		mImStarted = true;
-		mImProxy = new ImProxy(this);
-	}
+	if (!mImProxy) mImProxy = new ImProxy(this);
 
 	if (mImProxy) {
 		mImProxy->toggleActive();

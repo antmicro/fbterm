@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -153,6 +153,17 @@ Font::Font()
 
 		if (buf[0] == '+' || buf[0] == '-') mWidth += (s32)width;
 		else mWidth = width;
+	}
+
+	u32 height = 0;
+	Config::instance()->getOption("font-height", height);
+
+	if (height) {
+		s8 buf[64];
+		Config::instance()->getOption("font-height", buf, sizeof(buf));
+
+		if (buf[0] == '+' || buf[0] == '-') mHeight += (s32)height;
+		else mHeight = height;
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -65,10 +65,11 @@ Screen *Screen::createInstance()
 
 	if (!mode) pScreen = FbDev::initFbDev();
 	if (!pScreen) pScreen = VesaDev::initVesaDev(mode);
-	if (!pScreen) return 0;
 #else
 	pScreen = FbDev::initFbDev();
 #endif
+
+	if (!pScreen) return 0;
 
 	if (pScreen->mRotateType == Rotate90 || pScreen->mRotateType == Rotate270) {
 		u32 tmp = pScreen->mWidth;

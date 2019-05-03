@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008-2009 dragchan <zgchan317@gmail.com>
+ *   Copyright © 2008-2010 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -49,7 +49,8 @@ enum Keys {
 	CTRL_ALT_F4,
 	CTRL_ALT_F5,
 	CTRL_ALT_F6,
-	AC_END = CTRL_ALT_F6
+	CTRL_ALT_K,
+	AC_END = CTRL_ALT_K
 };
 
 #endif
