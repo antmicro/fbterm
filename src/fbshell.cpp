@@ -359,7 +359,18 @@ void FbShell::drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars,
 	if (manager->activeShell() != this) return;
 
 	adjustCharAttr(attr);
-	screen->drawText(x, y, w, attr.fcolor, attr.bcolor, num, chars, dws);
+
+	if (mImProxy) {
+		Rectangle rect = { FW(x), FH(y), FW(w), FH(1) };
+
+		IntersectState state =  mImProxy->intersectWithImWin(rect);
+		if (state != Inside) {
+			screen->drawText(FW(x), FH(y), attr.fcolor, attr.bcolor, num, chars, dws);
+			if (state == Intersect) mImProxy->redrawImWin(rect);
+		}
+	} else {
+		screen->drawText(FW(x), FH(y), attr.fcolor, attr.bcolor, num, chars, dws);
+	}
 }
 
 bool FbShell::moveChars(u16 sx, u16 sy, u16 dx, u16 dy, u16 w, u16 h)
@@ -410,9 +421,16 @@ void FbShell::updateCursor()
 	case CurNone:
 		break;
 
-	case CurUnderline:
-		screen->drawUnderline(mCursor.x, mCursor.y, mCursor.showed ? mCursor.attr.fcolor : mCursor.attr.bcolor);
+	case CurUnderline: {
+		Rectangle rect = { FW(mCursor.x), FH(mCursor.y + 1) - 1, FW(1), 1 };
+		IntersectState state = Outside;
+
+		if (mImProxy) state = mImProxy->intersectWithImWin(rect);
+		if (state != Inside) {
+			screen->fillRect(rect.x, rect.y, rect.w, rect.h, mCursor.showed ? mCursor.attr.fcolor : mCursor.attr.bcolor);
+		}
 		break;
+	}
 
 	default: {
 		bool dw = (mCursor.attr.type != CharAttr::Single);
@@ -420,14 +438,14 @@ void FbShell::updateCursor()
 		u16 x = mCursor.x;
 		if (mCursor.attr.type == CharAttr::DoubleRight) x--;
 
-		u8 fc = mCursor.attr.fcolor, bc = mCursor.attr.bcolor;
+		CharAttr attr = mCursor.attr;
 		if (mCursor.showed) {
-			u8 temp = fc;
-			fc = bc;
-			bc = temp;
+			u8 temp = attr.fcolor;
+			attr.fcolor = attr.bcolor;
+			attr.bcolor = temp;
 		}
 
-		screen->drawText(x, mCursor.y, dw ? 2 : 1, fc, bc, 1, &mCursor.code, &dw);
+		drawChars(attr, x, mCursor.y, dw ? FW(2) : FW(1), 1, &mCursor.code, &dw);
 		break;
 	}
 	}
@@ -626,7 +644,7 @@ void FbShell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 		u16 code = charCode(x, y);
 
 		if (attr.type == CharAttr::DoubleRight) x--;
-		screen->drawText(x, y, dw ? 2 : 1, attr.bcolor, attr.fcolor, 1, &code, &dw);
+		screen->drawText(FW(x), FH(y), attr.bcolor, attr.fcolor, 1, &code, &dw);
 
 		mMousePointer.x = x;
 		mMousePointer.y = y;

@@ -22,7 +22,7 @@
 DEFINE_INSTANCE(Mouse)
 
 #include "config.h"
-#ifdef HAVE_GPM_H
+#ifdef ENABLE_GPM
 
 #include <stddef.h>
 #include <unistd.h>
@@ -140,10 +140,36 @@ void Mouse::readyRead(s8 *buf, u32 len)
 		y = newy;
 	}
 }
+
+void Mouse::switchVc(bool enter)
+{
+}
+
 #else
+
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <linux/kd.h>
 
 Mouse *Mouse::createInstance()
 {
-	return 0;
+	return new Mouse();
+}
+
+Mouse::Mouse()
+{
+}
+
+Mouse::~Mouse()
+{
+}
+
+void Mouse::switchVc(bool enter)
+{
+	ioctl(STDIN_FILENO, KDSETMODE, enter ? KD_GRAPHICS : KD_TEXT);
+}
+
+void Mouse::readyRead(s8 *buf, u32 len)
+{
 }
 #endif

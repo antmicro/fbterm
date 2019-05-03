@@ -33,6 +33,12 @@
 #include "screen.h"
 #include "input.h"
 #include "fbterm.h"
+#include <time.h>
+
+#define SW Screen::instance()->width()
+#define SH Screen::instance()->height()
+#define sw FW(Screen::instance()->cols())
+#define sh FH(Screen::instance()->rows())
 
 #define OFFSET(TYPE, MEMBER) ((size_t)(&(((TYPE *)0)->MEMBER)))
 #define MSG(a) ((Message *)(a))
@@ -45,6 +51,9 @@ ImProxy::ImProxy(FbShell *shell)
 	mActive = false;
 	mMsgWaitState = NoMessageToWait;
 
+	mValidWinNum = 0;
+	memset(&mWins, 0, sizeof(mWins));
+
 	createImProcess();
 }
 
@@ -54,7 +63,6 @@ ImProxy::~ImProxy()
 	if (!mConnected) return;
 
 	if (FbShellManager::instance()->activeShell() == mShell) {
-		Screen::instance()->setClipRects(0, 0);
 		TtyInput::instance()->setRawMode(false);
 	}
 
@@ -158,12 +166,13 @@ void ImProxy::switchVt(bool enter, ImProxy *peer)
 	Message msg;
 	msg.type = (enter ? ShowUI : HideUI);
 	msg.len = sizeof(msg);
+	if (enter) msg.winid = (unsigned)-1;
 
 	write((s8 *)&msg, sizeof(msg));
 
 	if (!enter) {
 		waitImMessage(AckHideUI);
-		Screen::instance()->setClipRects(0, 0);
+		Screen::instance()->enableScroll(true);
 	}
 }
 
@@ -182,33 +191,29 @@ void ImProxy::sendKey(s8 *keys, u32 len)
 
 void ImProxy::sendInfo()
 {
-	u32 pixel_size = 12;
-	Config::instance()->getOption("font-size", pixel_size);
+	Message msg;
+	msg.type = FbTermInfo;
+	msg.len = sizeof(msg);
+	msg.info.fontHeight = FH(1);
+	msg.info.fontWidth = FW(1);
+	msg.info.screenHeight = sh;
+	msg.info.screenWidth = sw;
 
-	s8 name[64];
-	Config::instance()->getOption("font-names", name, sizeof(name));
-	if (!*name) {
-		memcpy(name, "mono", 5);
-	}
-
-	u32 len = strlen(name) + 1;
-	char buf[OFFSET(Message, info.fontName) + len];
-
-	MSG(buf)->type = FbTermInfo;
-	MSG(buf)->len = sizeof(buf);
-	MSG(buf)->info.rotate = Screen::instance()->rotateType();
-	MSG(buf)->info.fontSize = pixel_size;
-	MSG(buf)->info.fontHeight = FH(1);
-	MSG(buf)->info.fontWidth = FW(1);
-	memcpy(MSG(buf)->info.fontName, name, len);
-
-	write(buf, MSG(buf)->len);
+	write((s8 *)&msg, sizeof(msg));
 }
 
-void ImProxy::sendAckWins()
+void ImProxy::sendAckWin()
 {
 	Message msg;
-	msg.type = AckWins;
+	msg.type = AckWin;
+	msg.len = sizeof(msg);
+	write((s8 *)&msg, sizeof(msg));
+}
+
+void ImProxy::sendAckPing()
+{
+	Message msg;
+	msg.type = AckPing;
 	msg.len = sizeof(msg);
 	write((s8 *)&msg, sizeof(msg));
 }
@@ -221,6 +226,25 @@ void ImProxy::sendDisconnect()
 	msg.type = Disconnect;
 	msg.len = sizeof(msg);
 	write((s8 *)&msg, sizeof(msg));
+}
+
+static void utf8_to_utf16(u8 *utf8, u16 *utf16, u16 &len)
+{
+	u8 *end = utf8 + len;
+	len = 0;
+
+	for (; utf8 < end;) {
+		if ((*utf8 & 0x80) == 0) {
+			utf16[len++] = *utf8;
+			utf8++;
+		} else if ((*utf8 & 0xe0) == 0xc0) {
+			utf16[len++] = ((*utf8 & 0x1f) << 6) | (utf8[1] & 0x3f);
+			utf8 += 2;
+		} else if ((*utf8 & 0xf0) == 0xe0) {
+			utf16[len++] = ((*utf8 & 0xf) << 12) | ((utf8[1] & 0x3f) << 6) | (utf8[2] & 0x3f);
+			utf8 += 3;
+		} else utf8++;
+	}
 }
 
 void ImProxy::readyRead(s8 *buf, u32 len)
@@ -243,23 +267,43 @@ void ImProxy::readyRead(s8 *buf, u32 len)
 			}
 			break;
 
-		case SetWins:
-			sendAckWins();
-
-			if (FbShellManager::instance()->activeShell() == mShell && MSG(buf)->len >= OFFSET(Message, wins)) {
-				ImWin *wins = MSG(buf)->wins;
-				u32 num = (MSG(buf)->len - OFFSET(Message, wins)) / sizeof(ImWin);
-
-				Rectangle rects[num];
-				for (u32 i = 0; i < num; i++) {
-					rects[i].sx = wins[i].x;
-					rects[i].sy = wins[i].y;
-					rects[i].ex = wins[i].x + wins[i].w;
-					rects[i].ey = wins[i].y + wins[i].h;
-				}
-
-				Screen::instance()->setClipRects(rects, num);
+		case SetWin:
+			if (MSG(buf)->len == sizeof(Message)) { // keep compatibility with v1.5
+				setImWin(MSG(buf)->win.winid, MSG(buf)->win.rect);
 			}
+			sendAckWin();
+			break;
+
+		case FillRect:
+			if (mActive && FbShellManager::instance()->activeShell() == mShell) {
+				Rectangle &rect = MSG(buf)->fillRect.rect;
+				Screen::instance()->fillRect(rect.x, rect.y, rect.w, rect.h, MSG(buf)->fillRect.color);
+			}
+			break;
+
+		case DrawText:
+			if (mActive && FbShellManager::instance()->activeShell() == mShell&& MSG(buf)->len > OFFSET(Message, drawText.texts)) {
+				u8 *utf8 = (u8 *)(MSG(buf)->drawText.texts);
+				u16 len = MSG(buf)->len - OFFSET(Message, drawText.texts);
+
+				u16 utf16[len];
+				utf8_to_utf16(utf8, utf16, len);
+
+				if (len) {
+					bool dws[len];
+					for (u16 i = 0; i < len; i++) {
+						extern bool is_double_width(u32 ucs);
+						dws[i] = is_double_width(utf16[i]);
+					}
+
+					Screen::instance()->drawText(MSG(buf)->drawText.x, MSG(buf)->drawText.y,
+							MSG(buf)->drawText.fc, MSG(buf)->drawText.bc, len, utf16, dws);
+				}
+			}
+			break;
+
+		case Ping:
+			sendAckPing();
 			break;
 
 		default:
@@ -292,4 +336,84 @@ void ImProxy::waitImMessage(u32 type)
 void ImProxy::ioError(bool read, s32 err)
 {
 	if (read && mMsgWaitState == WaitingMessage) mMsgWaitState = GotMessage;
+}
+
+static inline IntersectState intersectRectangles(const Rectangle &r1, const Rectangle &r2)
+{
+	if (!r1.w || !r1.h) return Inside;
+	if (!r2.w || !r2.h) return Outside;
+	if (r1.x >= (r2.x + r2.w) || r1.y >= (r2.y + r2.h) || (r1.x + r1.w) <= r2.x || (r1.y + r1.h) <= r2.y) return Outside;
+	if (r1.x >= r2.x && r1.y >= r2.y && (r1.x + r1.w) <= (r2.x + r2.w) && (r1.y + r1.h) <= (r2.y + r2.h)) return Inside;
+	return Intersect;
+}
+
+IntersectState ImProxy::intersectWithImWin(const Rectangle &rect)
+{
+	IntersectState state = Outside;
+
+	for (u32 num = mValidWinNum, i = 0; num && i < NR_IM_WINS; i++) {
+		if (!mWins[i].w || !mWins[i].h) continue;
+		num--;
+		state = intersectRectangles(rect, mWins[i]);
+		if (state != Outside) break;
+	}
+
+	const char *str[3] = { "intersect", "inside", "outside" };
+	return state;
+}
+
+void ImProxy::redrawImWin(const Rectangle &rect)
+{
+	for (u32 num = mValidWinNum, i = 0; num && i < NR_IM_WINS; i++) {
+		if (!mWins[i].w || !mWins[i].h) continue;
+		num--;
+
+		IntersectState state = intersectRectangles(rect, mWins[i]);
+		if (state == Outside) continue;
+
+		Message msg;
+		msg.type = ShowUI;
+		msg.len = sizeof(msg);
+		msg.winid = i;
+		write((s8 *)&msg, sizeof(msg));
+	}
+}
+
+void ImProxy::setImWin(u32 id, Rectangle &rect)
+{
+	if (!rect.w || !rect.h || rect.x >= SW || rect.y >= SH)
+		memset(&rect, 0, sizeof(rect));
+
+	if (rect.x + rect.w >= SW) rect.w = SW - rect.x;
+	if (rect.y + rect.h >= SH) rect.h = SH - rect.y;
+
+	if (FbShellManager::instance()->activeShell() == mShell && intersectRectangles(mWins[id], rect) != Inside) {
+
+		Rectangle oldrect = mWins[id];
+		u32 endx = oldrect.x + oldrect.w, endy = oldrect.y + oldrect.h;
+
+		u16 col = oldrect.x / FW(1);
+		u16 row = oldrect.y / FH(1);
+		u16 endcol = endx / FW(1);
+		u16 endrow = endy / FH(1);
+
+		mValidWinNum--;
+		memset(&mWins[id], 0, sizeof(rect));
+		mShell->expose(col, row, endcol - col + 1, endrow - row + 1);
+
+		if (endy > sh && sh < SH) {
+			Screen::instance()->fillRect(oldrect.x, sh, oldrect.w, endy - sh, 0);
+		}
+
+		if (endx > sw && sw < SW) {
+			Screen::instance()->fillRect(sw, oldrect.y, endx - sw, oldrect.h, 0);
+		}
+	}
+
+	if (!mWins[id].w && rect.w) mValidWinNum++;
+	mWins[id] = rect;
+
+	if (FbShellManager::instance()->activeShell() == mShell) {
+		Screen::instance()->enableScroll(!mValidWinNum);
+	}
 }

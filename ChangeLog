@@ -1,3 +1,41 @@
+2009-11-14 version 1.6
+	* screen.cpp screen.h screen_render.cpp:
+	reorganized class Screen API for VESA support
+	
+	* screen_clip.cpp:
+	removed this file because similar function has been recoded in improxy.cpp
+	
+	* vesa.cpp vesa.h vbe.h:
+	added general VESA video card support
+	
+	* fbdev.cpp fbdev.h:
+	moved frame buffer device support from class Screen to new class FbDev
+	
+	* immessage.h improxy.cpp:
+	added IM rendering message for IM server development
+	
+	* input.cpp:
+	moved tty initialing code from ttyInput() to switchVc()
+	Ctrl+Space won't be a shortcut if user run FbTerm without input-method option
+	
+	* mouse.cpp:
+	fixed a bug where FbTerm isn't compiled with gpm mouse support but run with gpm server enabled
+	
+	* fbconfig.cpp:
+	added options for VESA support
+	fixed some spelling errors in FbTerm's help message
+	
+	* doc/inputmethod.txt:
+	removed content of this file to be comments of im/immessage.h and im/imapi.h
+	
+	* doc/fbterm.1.in:
+	added description for VESA support
+	fixed several spelling errors
+	
+	* imapi.c:
+	fixed a IM dead loop bug triggerd by FbTerm's crash
+	fixed a bug where IM maybe doesn't process pending messages until a new message arrives
+
 2009-04-26 version 1.5
 	* fbconfig.cpp fbshell.cpp shell.cpp:
 	added command line arguments to customize command executed in sub-window, which is user's login shell by default
@@ -37,7 +75,7 @@
 
 2009-03-14 version 1.4
 	* screen_render.cpp:
-	improved text rendering performence
+	improved text rendering performance
 	
 	* lib/vterm_state.cpp lib/vterm_action.cpp fbshell.cpp:
 	added private escape sequences for 256 color support 
@@ -73,7 +111,7 @@
 	* screen.cpp:
 	drawGlyph(): fixed a spelling error of '=' as '-', which even appears in version 1.0
 	move(): fixed a duplicate repaint bug while fast scrolling type is ypan
-	moved paint code to a seperate source file screen_render.cpp
+	moved paint code to a separate source file screen_render.cpp
 	
 	* screen_render.cpp:
 	setupSysPalette(): added support visual FB_VISUAL_DIRECTCOLOR
@@ -96,7 +134,7 @@
 	
 	* fbshell.cpp:
 	fixed a bug of maybe not restore original console state after FbTerm exited
-	moved class FbShellManager to seperate source files fbshellman.h and fbshellman.cpp
+	moved class FbShellManager to separate source files fbshellman.h and fbshellman.cpp
 	
 	* fbshellman.cpp:
 	switchShell(): fixed a duplicate repaint bug while switch to same window
@@ -110,7 +148,7 @@
 	
 	* fbshell.cpp:
 	added support linux console sequences for changing the color palette and cursor shape
-	moved shell management code to a seperate class FbShellManager
+	moved shell management code to a separate class FbShellManager
 	
 	* fbconfig.cpp fbshell.cpp:
 	added option to adjust default cursor shape and flash interval
@@ -155,5 +193,5 @@
 	* screen.cpp:
 	createInstance(): fixed a compile failure under certain systems
 
-2008-07-05 verson 1.0
+2008-07-05 version 1.0
 	first release

@@ -32,10 +32,12 @@
 #include "fbshellman.h"
 #include "fbterm.h"
 #include "improxy.h"
+#include "fbconfig.h"
 
 static termios oldTm;
 static long oldKbMode;
 static bool keymapFailure = false;
+static bool inited = false;
 
 DEFINE_INSTANCE(TtyInput)
 
@@ -57,22 +59,13 @@ TtyInput *TtyInput::createInstance()
 
 TtyInput::TtyInput()
 {
-	tcgetattr(STDIN_FILENO, &oldTm);
-
-	termios tm = oldTm;
-	cfmakeraw(&tm);
-	tm.c_cc[VMIN] = 1;
-	tm.c_cc[VTIME] = 0;
-	tcsetattr(STDIN_FILENO, TCSAFLUSH, &tm);
-
-	ioctl(STDIN_FILENO, KDGKBMODE, &oldKbMode);
-	setRawMode(false, true);
-
 	setFd(dup(STDIN_FILENO));
 }
 
 TtyInput::~TtyInput()
 {
+	if (!inited) return;
+
 	setupSysKey(true);
 	ioctl(STDIN_FILENO, KDSKBMODE, oldKbMode);
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTm);
@@ -88,6 +81,20 @@ void TtyInput::showInfo(bool verbose)
 void TtyInput::switchVc(bool enter)
 {
 	setupSysKey(!enter);
+
+	if (!enter || inited) return;
+	inited = true;
+
+	tcgetattr(STDIN_FILENO, &oldTm);
+
+	ioctl(STDIN_FILENO, KDGKBMODE, &oldKbMode);
+	setRawMode(false, true);
+
+	termios tm = oldTm;
+	cfmakeraw(&tm);
+	tm.c_cc[VMIN] = 1;
+	tm.c_cc[VTIME] = 0;
+	tcsetattr(STDIN_FILENO, TCSAFLUSH, &tm);
 }
 
 void TtyInput::setupSysKey(bool restore)
@@ -131,10 +138,14 @@ void TtyInput::setupSysKey(bool restore)
 
 	if (!syskey_saved && restore) return;
 
-	extern s32 effective_uid;
-	seteuid(effective_uid);
+	seteuid(0);
+
+	s8 imapp[128];
+	Config::instance()->getOption("input-method", imapp, sizeof(imapp));
 
 	for (u32 i = 0; i < sizeof(sysKeyTable) / sizeof(KeyEntry); i++) {
+		if (!imapp[0] && sysKeyTable[i].new_val == CTRL_SPACE) continue;
+
 		kbentry entry;
 		entry.kb_table = sysKeyTable[i].table;
 		entry.kb_index = sysKeyTable[i].keycode;

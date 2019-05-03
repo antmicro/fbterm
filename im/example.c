@@ -23,12 +23,9 @@
 #include <string.h>
 #include "imapi.h"
 #include "keycode.h"
-#include "font.h"
-#include "screen.h"
 
 static char raw_mode = 1;
-static char first_show = 1;
-static unsigned short cursorx, cursory;
+static unsigned cursorx, cursory;
 
 static void im_active()
 {
@@ -39,13 +36,15 @@ static void im_active()
 
 static void im_deactive()
 {
-	set_im_windows(0, 0);
-	first_show = 1;
+	Rectangle rect = { 0, 0, 0, 0 };
+	set_im_window(0, rect);
+	set_im_window(1, rect);
 }
 
-static void process_raw_key(char *buf, unsigned short len)
+static void process_raw_key(char *buf, unsigned len)
 {
-	for (unsigned short i = 0; i < len; i++) {
+	unsigned i;
+	for (i = 0; i < len; i++) {
 		char down = !(buf[i] & 0x80);
 		short code = buf[i] & 0x7f;
 
@@ -64,7 +63,7 @@ static void process_raw_key(char *buf, unsigned short len)
 	}
 }
 
-static void process_key(char *keys, unsigned short len)
+static void process_key(char *keys, unsigned len)
 {
 	if (raw_mode) {
 		process_raw_key(keys, len);
@@ -73,59 +72,39 @@ static void process_key(char *keys, unsigned short len)
 	}
 }
 
-static void im_show()
+static void im_show(unsigned winid)
 {
 	static const char str[] = "a IM example";
-	#define NSTR (sizeof(str) - 1)
 
-	ImWin wins[] = {
-		{ cursorx + 10, cursory + 10, 40, 20 },
-		{ cursorx + 10, cursory + 40, FW(NSTR) + 10, FH(1) + 10 }
-	};
-	set_im_windows(wins, 2);
+	Rectangle rect;
+	rect.x = cursorx + 10, rect.y = cursory + 10;
+	rect.w = 40, rect.h = 20;
 
-	if (first_show) {
-		first_show = 0;
+	set_im_window(0, rect);
+	fill_rect(rect, Gray);
 
-		// should call this function once when IM begins to reshow UI after hiding UI last time
-		Screen::instance()->updateYOffset();
-	}
+	rect.y += rect.h + 10;
+	rect.w = 180;
+	rect.h = 30;
 
-	Screen::instance()->fillRect(wins[0].x, wins[0].y, wins[0].w, wins[0].h, White);
-
-	// the better way is only filling margins
-	Screen::instance()->fillRect(wins[1].x, wins[1].y, wins[1].w, wins[1].h, White);
-
-	unsigned short unistr[NSTR];
-	bool dws[NSTR];
-	for (int i = 0; i < NSTR; i++) {
-		unistr[i] = str[i];
-		dws[i] = is_double_width(str[i]);
-	}
-
-	Screen::instance()->drawText(wins[1].x + 5, wins[1].y + 5, Black, White, NSTR, unistr, dws);
+	set_im_window(1, rect);
+	fill_rect(rect, Gray);
+	draw_text(rect.x + 5, rect.y + 5, Black, Gray, str, sizeof(str) - 1);
 }
 
 static void im_hide()
 {
-	first_show = 1;
-	set_im_windows(0, 0);
 }
 
 static void cursor_pos_changed(unsigned x, unsigned y)
 {
 	cursorx = x;
 	cursory = y;
-	im_show();
+	im_show(-1);
 }
 
 static void update_fbterm_info(Info *info)
 {
-	Font::setFontInfo(info->fontName, info->fontSize, info->fontHeight, info->fontWidth);
-	Screen::setRotateType((RotateType)info->rotate);
-	if (!Screen::instance()) {
-		exit(1);
-	}
 }
 
 static ImCallbacks cbs = {
@@ -145,6 +124,5 @@ int main()
 	connect_fbterm(raw_mode);
 	while (check_im_message()) ;
 
-	Screen::uninstance();
 	return 0;
 }

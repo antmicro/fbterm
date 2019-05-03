@@ -231,6 +231,9 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "cursor-shape", required_argument, 0, 0 },
 		{ "cursor-interval", required_argument, 0, 1 },
 		{ "font-width", required_argument, 0, 2 },
+#ifdef ENABLE_VESA
+		{ "vesa-mode", required_argument, 0, 3 },
+#endif
 		{ 0, 0, 0, 0 }
 	};
 
@@ -245,7 +248,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		case '?':
 			printf(
 				"Usage: fbterm [options] [--] [command [arguments]]\n"
-				"A fast framebuffer based terminal emulator for linux\n"
+				"A fast framebuffer/vesa based terminal emulator for linux\n"
 				"\n"
 				"  -h, --help                      display this help and exit\n"
 				"  -V, --version                   display FbTerm version and exit\n"
@@ -255,11 +258,15 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"      --font-width=NUM            force font width\n"
 				"  -f, --color-foreground=NUM      specify foreground color\n"
 				"  -b, --color-background=NUM      specify background color\n"
-				"  -e, --text-encodings=TEXT       specify additional text endcodings\n"
+				"  -e, --text-encodings=TEXT       specify additional text encodings\n"
 				"  -r, --screen-rotate=NUM         specify orientation of screen display\n"
-				"  -i, --input-method=TEXT         sepcify input method program\n"
+				"  -i, --input-method=TEXT         specify input method program\n"
 				"      --cursor-shape=NUM          specify default cursor shape\n"
 				"      --cursor-interval=NUM       specify cursor flash interval\n"
+#ifdef ENABLE_VESA
+				"      --vesa-mode=NUM             force VESA video mode\n"
+				"                  list            display available VESA video modes\n"
+#endif
 				"\n"
 				"See comments in ~/.fbtermrc for details of these options.\n"
 			);

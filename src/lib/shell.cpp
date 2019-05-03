@@ -37,7 +37,7 @@ void waitChildProcessExit(s32 pid)
 {
 	if (pid < 0) return;
 
-	kill(pid, SIGTERM);
+	//kill(pid, SIGTERM);
 	sched_yield();
 
 	s32 ret = waitpid(pid, 0, WNOHANG);

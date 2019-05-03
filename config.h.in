@@ -1,6 +1,12 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* */
+#undef ENABLE_GPM
+
+/* */
+#undef ENABLE_VESA
+
+/* */
 #undef HAVE_EPOLL
 
 /* Define to 1 if you have the <fcntl.h> header file. */
@@ -20,6 +26,9 @@
 
 /* Define to 1 if you have the `util' library (-lutil). */
 #undef HAVE_LIBUTIL
+
+/* Define to 1 if you have the <libx86.h> header file. */
+#undef HAVE_LIBX86_H
 
 /* Define to 1 if you have the <linux/fb.h> header file. */
 #undef HAVE_LINUX_FB_H
@@ -145,6 +154,9 @@
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION

@@ -24,6 +24,7 @@
 #include "fbterm.h"
 #include "screen.h"
 #include "improxy.h"
+#include "font.h"
 
 #define screen (Screen::instance())
 #define SHELL_ANY ((FbShell *)-1)
@@ -161,7 +162,7 @@ void FbShellManager::redraw(u16 x, u16 y, u16 w, u16 h)
 	if (mActiveShell) {
 		mActiveShell->expose(x, y, w, h);
 	} else {
-		screen->clear(x, y, w, h, 0);
+		screen->fillRect(FW(x), FH(y), FW(w), FH(h), 0);
 	}
 }
 

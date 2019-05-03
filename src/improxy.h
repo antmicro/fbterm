@@ -23,8 +23,11 @@
 
 #include "type.h"
 #include "io.h"
+#include "immessage.h"
 
 class FbShell;
+
+typedef enum { Intersect, Inside, Outside } IntersectState;
 
 class ImProxy: public IoPipe {
 public:
@@ -39,6 +42,9 @@ public:
 	void changeTermMode(bool crlf, bool appkey, bool curo);
 	void switchVt(bool enter, ImProxy *peer);
 
+	IntersectState intersectWithImWin(const Rectangle &rect);
+	void redrawImWin(const Rectangle &rect);
+
 private:
 	virtual void readyRead(s8 *buf, u32 len);
 	virtual void ioError(bool read, s32 err);
@@ -46,8 +52,10 @@ private:
 	void createImProcess();
 	void waitImMessage(u32 type);
 	void sendInfo();
-	void sendAckWins();
+	void sendAckWin();
+	void sendAckPing();
 	void sendDisconnect();
+	void setImWin(u32 winid, Rectangle &rect);
 
 	FbShell *mShell;
 	s32 mPid;
@@ -56,6 +64,8 @@ private:
 	bool mRawInput;
 	enum {NoMessageToWait, WaitingMessage, GotMessage} mMsgWaitState;
 	u32 mMsgWaitType;
+	Rectangle mWins[NR_IM_WINS];
+	u32 mValidWinNum;
 };
 
 #endif

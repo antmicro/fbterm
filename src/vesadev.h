@@ -18,47 +18,25 @@
  *
  */
 
-#ifndef FONT_H
-#define FONT_H
+#ifndef VESADEV_H
+#define VESADEV_H
 
-#include "instance.h"
+#include "screen.h"
 
-#define FW(cols) (Font::instance()->width() * (cols))
-#define FH(rows) (Font::instance()->height() * (rows))
-
-class Font {
-	DECLARE_INSTANCE(Font)
-public:
-	struct Glyph {
-		short pitch, width, height;
-		short left, top;
-		char pixmap[0];
-	};
-
-	Glyph *getGlyph(unsigned unicode);
-	unsigned width() {
-		return mWidth;
-	}
-	unsigned height() {
-		return mHeight;
-	}
-	static void setFontInfo(char *name, unsigned short pixelsize, unsigned short height, unsigned short width);
-
+class VesaDev : public Screen {
 private:
-	struct FontRec {
-		void *pattern;
-		void *face;
-		int load_flags;
-	};
+	friend class Screen;
+	static void printModes();
+	static VesaDev *initVesaDev(s16 mode);
 
-	Font(FontRec *fonts, unsigned num, void *unicover);
-	void openFont(unsigned index);
-	int fontIndex(unsigned unicode);
+	VesaDev();
+	~VesaDev();
 
-	void *mpUniCover;
-	FontRec *mpFontList;
-	unsigned mFontNum;
-	unsigned mWidth, mHeight;
+	virtual void setupOffset();
+	virtual void setupPalette(bool restore);
+	virtual void switchVc(bool enter);
+	virtual const s8 *drvId();
+
+	void initScrollType();
 };
-
 #endif
