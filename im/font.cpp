@@ -18,30 +18,36 @@
  *
  */
 
+#include <string.h>
 #include <fontconfig/fontconfig.h>
 #include <ft2build.h>
 #include FT_GLYPH_H
 #include "font.h"
 #include "screen.h"
-#include "fbconfig.h"
 
 #define OFFSET(TYPE, MEMBER) ((size_t)(&(((TYPE *)0)->MEMBER)))
 
 DEFINE_INSTANCE(Font)
 
+static char fontName[64];
+static unsigned short fontSize;
+
+void Font::setFontInfo(char *name, unsigned short pixelsize)
+{
+	if (!name || strlen(name) >= sizeof(fontName)) return;
+
+	memcpy(fontName, name, strlen(name) + 1);
+	fontSize = pixelsize;
+}
+
 Font *Font::createInstance()
 {
+	if (!fontName[0] || !fontSize) return 0;
+
 	FcInit();
 
-    s8 buf[64];
-    Config::instance()->getOption("font-names", buf, sizeof(buf));
-
-    FcPattern *pat = FcNameParse((FcChar8 *)(*buf ? buf : "mono"));
-
-    u32 pixel_size = 12;
-    Config::instance()->getOption("font-size", pixel_size);
-    FcPatternAddDouble(pat, FC_PIXEL_SIZE, (double)pixel_size);
-
+	FcPattern *pat = FcNameParse((FcChar8 *)fontName);
+	FcPatternAddDouble(pat, FC_PIXEL_SIZE, (double)fontSize);
 	FcPatternAddString(pat, FC_LANG, (FcChar8 *)"en");
 
 	FcConfigSubstitute(NULL, pat, FcMatchPattern);
@@ -52,11 +58,11 @@ Font *Font::createInstance()
 	FcFontSet *fs = FcFontSort(NULL, pat, FcTrue, &cs, &result);
 
 	FontRec *fonts = 0;
-	u32 index = 0;
+	unsigned index = 0;
 	if (fs) {
 		fonts = new FontRec[fs->nfont];
 	
-		for (s32 i = 0; i < fs->nfont; i++) {
+		for (int i = 0; i < fs->nfont; i++) {
 			FcPattern *font = FcFontRenderPrepare(NULL, pat, fs->fonts[i]);
 			if (font) {
 				fonts[index].face = 0;
@@ -85,7 +91,7 @@ static FT_Library ftlib = 0;
 static Font::Glyph **glyphCache;
 static bool *glyphCacheInited;
 
-Font::Font(FontRec *fonts, u32 num, void *unicover)
+Font::Font(FontRec *fonts, unsigned num, void *unicover)
 {
 	mpFontList = fonts;
 	mFontNum = num;
@@ -115,7 +121,7 @@ Font::~Font()
 {
 	FcCharSetDestroy((FcCharSet*)mpUniCover);
 
-	for (u32 i = 0; i < mFontNum; i++) {	
+	for (unsigned i = 0; i < mFontNum; i++) {	
 		FcPatternDestroy((FcPattern*)mpFontList[i].pattern);
 
 		FT_Face face = (FT_Face)mpFontList[i].face;
@@ -129,12 +135,12 @@ Font::~Font()
 
 	delete[] mpFontList;	
 
-	for (u32 i = 0; i < 256; i++) {
+	for (unsigned i = 0; i < 256; i++) {
 		if (!glyphCacheInited[i]) continue;
 
-		for (u32 j = 0; j < 256; j++) {
+		for (unsigned j = 0; j < 256; j++) {
 			if (glyphCache[i * 256 + j]) {
-				delete[] (u8 *)glyphCache[i * 256 + j];
+				delete[] (char *)glyphCache[i * 256 + j];
 			}
 		}
 	}
@@ -143,7 +149,7 @@ Font::~Font()
 	delete[] glyphCacheInited;
 }
 
-void Font::openFont(u32 index)
+void Font::openFont(unsigned index)
 {
 	if (index >= mFontNum) return;
 
@@ -192,12 +198,12 @@ void Font::openFont(u32 index)
 	mpFontList[index].load_flags = load_flags;
 }
 
-int Font::fontIndex(u32 unicode)
+int Font::fontIndex(unsigned unicode)
 {
 	if (!FcCharSetHasChar((FcCharSet *)mpUniCover, (FcChar32)unicode)) return -1;
 
 	FcCharSet *charset;
-	for (u32 i = 0; i < mFontNum; i++) {
+	for (unsigned i = 0; i < mFontNum; i++) {
 		FcPatternGetCharSet((FcPattern *)mpFontList[i].pattern, FC_CHARSET, 0, &charset);
 		if (FcCharSetHasChar(charset, unicode)) return i;
 	}
@@ -205,7 +211,7 @@ int Font::fontIndex(u32 unicode)
 	return -1;
 }
 
-Font::Glyph *Font::getGlyph(u32 unicode)
+Font::Glyph *Font::getGlyph(unsigned unicode)
 {
 	if (unicode >= 256 * 256) return 0;
 	
@@ -229,13 +235,13 @@ Font::Glyph *Font::getGlyph(u32 unicode)
 	FT_Load_Glyph(face, index, FT_LOAD_RENDER | mpFontList[i].load_flags);
 	FT_Bitmap &bitmap = face->glyph->bitmap;
 	
-	u32 x, y, w, h, nx, ny, nw, nh;
+	unsigned x, y, w, h, nx, ny, nw, nh;
 	x = y = 0;
 	w = nw = bitmap.width;
 	h = nh = bitmap.rows;
 	Screen::rotateRect(x, y, nw, nh);
 
-	Glyph *glyph = (Glyph *)new u8[OFFSET(Glyph, pixmap) + nw * nh];
+	Glyph *glyph = (Glyph *)new char[OFFSET(Glyph, pixmap) + nw * nh];
 	glyph->left = face->glyph->metrics.horiBearingX >> 6;
 	glyph->top = mHeight - 1 + (face->size->metrics.descender >> 6) - (face->glyph->metrics.horiBearingY >> 6);
 	glyph->advance = face->glyph->metrics.horiAdvance >> 6;
@@ -244,7 +250,7 @@ Font::Glyph *Font::getGlyph(u32 unicode)
 	glyph->pitch = nw;
 	glyph->isbitmap = false;
 
-	u8 *buf = bitmap.buffer;
+	unsigned char *buf = bitmap.buffer;
 	for (y = 0; y < h; y++, buf += bitmap.pitch) {
 		for (x = 0; x < w; x++) {
 			nx = x, ny = y;

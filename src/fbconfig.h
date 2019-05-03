@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -29,13 +30,16 @@ public:
 	void getOption(const s8 *key, s8 *val, u32 len);
 	void getOption(const s8 *key, u32 &val);
 	void getOption(const s8 *key, bool &val);
+	bool parseArgs(s32 argc, s8 **argv);
 
 private:
+	void checkConfigFile(const s8 *name);
 	void parseOption(s8 *str);
+	void addEntry(const s8 *key, const s8 *val);
 
 	struct OptionEntry {
-		s8 *key;
-		s8 *val;
+		const s8 *key;
+		const s8 *val;
 		OptionEntry *next;
 	};
 

@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -22,14 +23,13 @@
 
 #include <linux/keyboard.h>
 
-#define AC(code) (K(KT_LATIN, (code)))
-
 enum Keys {
-	AC_START = AC(0x80),
+	AC_START = K(KT_LATIN, 0x80),
 	SHIFT_PAGEUP = AC_START,
 	SHIFT_PAGEDOWN,
 	SHIFT_LEFT,
 	SHIFT_RIGHT,
+	CTRL_SPACE,
 	CTRL_ALT_1,
 	CTRL_ALT_2,
 	CTRL_ALT_3,

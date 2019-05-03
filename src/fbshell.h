@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -20,35 +21,38 @@
 #ifndef FBSHELL_H
 #define FBSHELL_H
 
-#include "instance.h"
 #include "shell.h"
 
-#define NR_COLORS 16
-
-struct Color {
-	u8 blue, green, red;
-};
-	
 class FbShell : public Shell {
 public:
+	void keyInput(s8 *buf, u32 len);
+	void mouseInput(u16 x, u16 y, s32 type, s32 buttons);
 	void switchCodec(u8 index);
+	void expose(u16 x, u16 y, u16 w, u16 h);
 
 private:
 	friend class FbShellManager;
 	FbShell();
 	~FbShell();
 
-	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 num, u16 *chars, bool *dws);
+	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars, bool *dws);
 	virtual bool moveChars(u16 sx, u16 sy, u16 dx, u16 dy, u16 w, u16 h);
 	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c);
 	virtual void modeChanged(ModeType type);
 	virtual void request(RequestType type, u32 val = 0);
 
 	virtual void initChildProcess();
-	virtual void switchVt(bool enter);
+	virtual void readyRead(s8 *buf, u32 len);
 
+	void switchVt(bool enter, FbShell *peer);
+	void adjustCharAttr(CharAttr &attr);
 	void enableCursor(bool enable);
 	void updateCursor();
+	void clearMousePointer();
+
+	void changeMode(ModeType type, u16 val);
+	void reportCursor();
+	void reportMode();
 
 	struct Cursor {
 		Cursor() {
@@ -60,35 +64,17 @@ private:
 		u16 code;
 		CharAttr attr;
 	} mCursor;
+	
+	struct MousePointer {
+		MousePointer() {
+			drawed = false;
+		}
+		u16 x, y;
+		bool drawed;
+	} mMousePointer;
 
 	bool mPaletteChanged;
-	Color mPalette[NR_COLORS];
+	struct Color *mPalette;
 };
 
-class FbShellManager {
-	DECLARE_INSTANCE(FbShellManager)
-public:
-	FbShell *activeShell() {
-		return mActiveShell;
-	}
-	void createShell();
-	void deleteShell();
-	void shellExited(FbShell *shell);
-	void switchShell(u32 num);
-	void nextShell();
-	void prevShell();
-	void drawCursor();
-	void historyScroll(bool down);
-	void redraw(u16 x, u16 y, u16 w, u16 h);
-	void switchVc(bool enter);
-
-private:
-	u32 getIndex(FbShell *shell, bool forward, bool stepfirst);
-	void setActive(FbShell *shell);
-
-	#define NR_SHELLS 10
-	FbShell *mShellList[NR_SHELLS], *mActiveShell;
-	u32 mShellCount, mCurShell;
-	bool mVcCurrent;
-};
 #endif

@@ -10,8 +10,10 @@ DESCRIPTION
   * dynamicly create/destroy up to 10 windows initially running default shell
   * record scrollback history for every window
   * auto-detect current locale and convert text encoding, support double width scripts like Chinese, Japanese etc
-  * switch between configurable additional text encoding with hot keys on the fly
+  * switch between configurable additional text encodings with hot keys on the fly
   * copy/past selected text between windows with mouse when gpm server is running
+  * change the orientation of screen display, a.k.a. screen rotation
+  * lightweight input method framework with client-server architecture
 
 
 CONFIGURE FILE
@@ -43,6 +45,7 @@ SHIFT_PAGEUP:    history scroll up
 SHIFT_PAGEDOWN:  history scroll down
 CTRL_ALT_F1:                 switch to encoding of current locale
 CTRL_ALT_F2 to CTRL_ALT_F6:  switch to additional encodings
+CTRL_SPACE:    toggle input method
 
 mouse:
 move when left button down:      select text
@@ -80,3 +83,14 @@ title Ubuntu
     root (hd0,0)
     kernel /boot/vmlinuz ro root=LABEL=UBUNTU splash vga=0x317 video=vesafb:ywrap,mtrr:3
     initrd /boot/initrd.img
+
+
+INPUT METHOD
+
+  Instead of adding input method directly in FbTerm, a client-server based input method framework is designed to do 
+this work. FbTerm acts as a client, standalone IM program as a server, and they run in seperated processes.
+
+  As a normal IM user, please visit FbTerm's homepage (http://code.google.com/p/fbterm/) to check current available IM 
+programs. If you want to develope a new IM program for FbTerm, im/inputmethod.txt is a guide document. There is also 
+a IM example in im/ directory, which help you to understand IM architecture and provide some base sources to simplify 
+the development.

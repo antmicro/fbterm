@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
  *   This program is free software; you can redistribute it and/or
@@ -25,11 +26,6 @@
 #include "type.h"
 
 class VTerm {
-public:
-	u16 w() { return width; }
-	u16 h() { return height; }
-	void historyDisplay(bool absolute, s32 num);
-
 protected:
 	struct CharAttr {
 		typedef enum { Single = 0, DoubleLeft, DoubleRight } CharType;
@@ -38,15 +34,15 @@ protected:
 			return fcolor != a.fcolor || bcolor != a.bcolor || intensity != a.intensity
 				|| italic != a.italic || underline != a.underline || blink != a.blink || reverse != a.reverse;
 		}
-
-		s32 fcolor : 5;	// -1 = default
-		s32 bcolor : 5;	// -1 = default
-		u32 intensity : 2; // 0 = half-bright, 1 = normal, 2 = bold
-		u32 italic : 1;
-		u32 underline : 1;
-		u32 blink : 1;
-		u32 reverse : 1;
-		CharType type : 2;
+		
+		u16 fcolor : 4;
+		u16 bcolor : 4;
+		u16 intensity : 2; // 0 = half-bright, 1 = normal, 2 = bold
+		u16 italic : 1;
+		u16 underline : 1;
+		u16 blink : 1;
+		u16 reverse : 1;
+		u16 type : 2;
 	};
 
 	typedef enum {
@@ -64,6 +60,7 @@ protected:
 		CursorKeyEscO = 8,
 		AutoRepeatKey = 16,
 		ApplicKeypad = 32,
+		CRWithLF = 64,
 		AllModes = 0xff,
 	} ModeType;
 
@@ -78,17 +75,21 @@ protected:
 	VTerm(u16 w = 0, u16 h = 0);
 	virtual ~VTerm();
 
+	u16 w() { return width; }
+	u16 h() { return height; }
+	void historyDisplay(bool absolute, s32 num);
 	u16 mode(ModeType type);
 	void resize(u16 w, u16 h);
 	void input(const u8 *buf, u32 count);
 	void expose(u16 x, u16 y, u16 w, u16 h);
+	void inverse(u16 sx, u16 sy, u16 ex, u16 ey);
 
 	u16 charCode(u16 x, u16 y) { return text[get_line(y) * max_width + x]; }
 	CharAttr charAttr(u16 x, u16 y) { return attrs[get_line(y) * max_width + x]; }
 
-	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 num, u16 *chars, bool *dws) = 0;
+	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars, bool *dws) = 0;
 	virtual bool moveChars(u16 sx, u16 sy, u16 dx, u16 dy, u16 w, u16 h) { return false; }
-	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c) {};
+	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c) {}
 	virtual void sendBack(const s8 *data) {}
 	virtual void modeChanged(ModeType type) {}
 	virtual void historyChanged(u32 cur, u32 total) {}
@@ -174,6 +175,7 @@ private:
 
 	static void init_state();
 	static u16 init_history_lines();
+	static u8 init_default_color(bool foreground);
 
 	typedef void (VTerm::*StateFunc)();
 	struct StateOption {
@@ -232,8 +234,8 @@ private:
 	u16 cursor_x, cursor_y, s_cursor_x, s_cursor_y;
 	CharAttr char_attr, s_char_attr;
 
-	static const CharAttr default_char_attr;
-	s8 default_fcolor, default_bcolor, default_underline_color, default_halfbright_color;
+	static CharAttr default_char_attr;
+	s8 cur_fcolor, cur_bcolor, cur_underline_color, cur_halfbright_color;
 
 	// action parameters
 	#define NPAR 16

@@ -18,25 +18,42 @@
  *
  */
 
-#ifndef INPUT_H
-#define INPUT_H
+#ifndef FBSHELL_MANAGER_H
+#define FBSHELL_MANAGER_H
 
-#include "io.h"
+#include "type.h"
 #include "instance.h"
 
-class TtyInput : public IoPipe {
-	DECLARE_INSTANCE(TtyInput)
+class FbShell;
+
+class FbShellManager {
+	DECLARE_INSTANCE(FbShellManager)
 public:
+	FbShell *activeShell() {
+		return mActiveShell;
+	}
+	void createShell();
+	void deleteShell();
+	void shellExited(FbShell *shell);
+	void switchShell(u32 num);
+	void nextShell();
+	void prevShell();
+
+	void toggleIm();
+	void imInput(u32 shell, s8 *text, u32 len);
+	void drawCursor();
+	void historyScroll(bool down);
+	void redraw(u16 x, u16 y, u16 w, u16 h);
 	void switchVc(bool enter);
-	void switchIm(bool enter, bool raw);
 
 private:
-	virtual void readyRead(s8 *buf, u32 len);
-	void setupSysKey(bool restore);
-	void processRawKeys(s8* buf, u32 len);
-	
-	bool mRawMode;
-	bool mImEnable;
+	u32 getIndex(FbShell *shell, bool forward, bool stepfirst);
+	bool setActive(FbShell *shell);
+
+	#define NR_SHELLS 10
+	FbShell *mShellList[NR_SHELLS], *mActiveShell;
+	u32 mShellCount, mCurShell;
+	bool mVcCurrent;
 };
 
 #endif

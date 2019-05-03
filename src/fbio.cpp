@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -25,9 +26,11 @@
 #include <langinfo.h>
 #include <sys/epoll.h>
 #include "fbio.h"
-#include "fbterm.h"
 
-#define MAX_EPOLL_FDS 10
+#define NR_EPOLL_FDS 10
+#define NR_FDS 32
+
+static IoPipe *ioPipeMap[NR_FDS];
 
 IoDispatcher *IoDispatcher::createInstance()
 {
@@ -36,45 +39,49 @@ IoDispatcher *IoDispatcher::createInstance()
 
 FbIoDispatcher::FbIoDispatcher()
 {
-	mpIoSources = new HashTable<IoPipe*>(MAX_EPOLL_FDS, true);
-	mEpollFd = epoll_create(MAX_EPOLL_FDS);
+	mEpollFd = epoll_create(NR_EPOLL_FDS);
 	fcntl(mEpollFd, F_SETFD, fcntl(mEpollFd, F_GETFD) | FD_CLOEXEC);
 }
 
 FbIoDispatcher::~FbIoDispatcher()
 {
-	delete mpIoSources;
+	for (u32 i = NR_FDS; i--;) {
+		if (ioPipeMap[i]) delete ioPipeMap[i];
+	}
+
 	close(mEpollFd);
 }
 
 void FbIoDispatcher::addIoSource(IoPipe *src, bool isread)
 {
+	if (src->fd() >= NR_FDS) return;
+	ioPipeMap[src->fd()] = src;
+
 	epoll_event ev;
 	ev.data.fd = src->fd();
 	ev.events = (isread ? EPOLLIN : EPOLLOUT);
 	epoll_ctl(mEpollFd, EPOLL_CTL_ADD, src->fd(), &ev);
-
-	mpIoSources->add(src->fd(), src);
 }
 
 void FbIoDispatcher::removeIoSource(IoPipe *src, bool isread)
 {
+	if (src->fd() >= NR_FDS) return;
+	ioPipeMap[src->fd()] = 0;
+
 	epoll_event ev;
 	ev.data.fd = src->fd();
 	ev.events = (isread ? EPOLLIN : EPOLLOUT);
 	epoll_ctl(mEpollFd, EPOLL_CTL_DEL, src->fd(), &ev);
 
-	mpIoSources->remove(src->fd());
 }
 
 void FbIoDispatcher::poll()
 {
-	epoll_event evs[MAX_EPOLL_FDS];
-	s32 nfds = epoll_wait(mEpollFd, evs, MAX_EPOLL_FDS, -1);
+	epoll_event evs[NR_EPOLL_FDS];
+	s32 nfds = epoll_wait(mEpollFd, evs, NR_EPOLL_FDS, -1);
 
-	IoPipe *src;
 	for (s32 i = 0; i < nfds; i++) {
-		mpIoSources->find(evs[i].data.fd, &src);
+		IoPipe *src = ioPipeMap[evs[i].data.fd];
 		if (!src) continue;
 
 		if (evs[i].events & EPOLLIN) {

@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -22,84 +23,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <sys/stat.h>
+#include "config.h"
 #include "fbconfig.h"
 
 #define MAX_CONFIG_FILE_SIZE 10240
-
-static void check_config_file(const s8 *name)
-{
-	static const s8 config10[] =
-		"# Configuration for fbterm\n"
-		"\n"
-		"# Lines starting with '#' are ignored.\n"
-		"# Note that end-of-line comments are NOT supported, comments must be on a line of their own.\n"
-		"\n\n"
-		"# font family/pixelsize used by fbterm, multiple font families must be seperated by ','\n"
-		"font_family=mono\n"
-		"font_size=12\n"
-		"\n"
-		"# default color of foreground/background text\n"
-		"# available colors: 0 = black, 1 = red, 2 = green, 3 = brown, 4 = blue, 5 = magenta, 6 = cyan, 7 = white\n"
-		"color_foreground=7\n"
-		"color_background=0\n";
-		
-	static const s8 config11[] =
-		"\n"
-		"# max scroll-back history lines of every window, value must be [0 - 65535], 0 means disable it\n"
-		"history_lines=1000\n"
-		"\n"
-		"# up to 5 additional text encodings, multiple encodings must be seperated by ','\n"
-		"# run 'iconv --list' to get available encodings.\n"
-		"text_encoding=\n";
-		
-	static const s8 config12[] =
-		"\n"
-		"# cursor shape: 0 = underline, 1 = block\n"
-		"# cursor flash interval in milliseconds, 0 means disable flashing\n"
-		"cursor_shape=0\n"
-		"cursor_interval=500\n"
-		"\n"
-		"# additional ascii chars considered as part of a word while auto-selecting text, except ' ', 0-9, a-z, A-Z\n"
-		"word_chars=._-\n";
-		
-	static const s8 *default_config[] = { config10, config11, config12, 0 };
-	
-	u32 index = 0;
-
-	struct stat cstat;
-	if (stat(name, &cstat) != -1) { 
-		if (cstat.st_size > MAX_CONFIG_FILE_SIZE) return;
-
-		s8 buf[cstat.st_size + 1];
-		buf[cstat.st_size] = 0;
-		
-		s32 fd = open(name, O_RDONLY);
-		if (fd == -1) return;
-		
-		s32 ret = read(fd, buf, cstat.st_size);
-		close(fd);
-		
-		for (; default_config[index]; index++) {
-			s8 str[32];
-			str[sizeof(str) - 1] = 0;
-			memcpy(str, default_config[index], sizeof(str) - 1);
-			
-			if (!strstr(buf, str)) break;
-		}
-
-		if (!default_config[index]) return;
-	}
-	
-	s32 fd = open(name, O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
-	if (fd == -1) return;
-	
-	for (; default_config[index]; index++) {
-		s32 ret = write(fd, default_config[index], strlen(default_config[index]));
-	}
-	
-	close(fd);
-}
 
 DEFINE_INSTANCE_DEFAULT(Config)
 
@@ -111,7 +40,7 @@ Config::Config()
 	s8 name[64];
 	snprintf(name, sizeof(name), "%s/%s", getenv("HOME"), ".fbtermrc");
 
-	check_config_file(name);
+	checkConfigFile(name);
 
 	struct stat cstat;
 	if (stat(name, &cstat) == -1) return;
@@ -194,6 +123,15 @@ Config::OptionEntry *Config::getEntry(const s8 *key)
 	return entry;
 }
 
+void Config::addEntry(const s8 *key, const s8 *val)
+{
+	OptionEntry *entry = new OptionEntry;
+	entry->key = key;
+	entry->val = val;
+	entry->next = mConfigEntrys;
+	mConfigEntrys = entry;
+}
+
 void Config::parseOption(s8 *str)
 {
 	s8 *cur = str, *end = str + strlen(str) - 1;
@@ -212,9 +150,121 @@ void Config::parseOption(s8 *str)
 	if (cur < val) return;
 	*(cur + 1) = 0;
 
-	OptionEntry *entry = new OptionEntry;
-	entry->key = key;
-	entry->val = val;
-	entry->next = mConfigEntrys;
-	mConfigEntrys = entry;
+	addEntry(key, val);
+}
+
+void Config::checkConfigFile(const s8 *name)
+{
+	static const s8 defaultConfig[] =
+		"# Configuration for FbTerm\n"
+		"\n"
+		"# Lines starting with '#' are ignored.\n"
+		"# Note that end-of-line comments are NOT supported, comments must be on a line of their own.\n"
+		"\n\n"
+		"# font family names/pixelsize used by fbterm, multiple font family names must be seperated by ','\n"
+		"# and using a fixed width font as the first is strongly recommended\n"
+		"font-names=mono\n"
+		"font-size=12\n"
+		"\n"
+		"# default color of foreground/background text\n"
+		"# available colors: 0 = black, 1 = red, 2 = green, 3 = brown, 4 = blue, 5 = magenta, 6 = cyan, 7 = white\n"
+		"color-foreground=7\n"
+		"color-background=0\n"
+		"\n"
+		"# max scroll-back history lines of every window, value must be [0 - 65535], 0 means disable it\n"
+		"history-lines=1000\n"
+		"\n"
+		"# up to 5 additional text encodings, multiple encodings must be seperated by ','\n"
+		"# run 'iconv --list' to get available encodings.\n"
+		"text-encodings=\n"
+		"\n"
+		"# cursor shape: 0 = underline, 1 = block\n"
+		"# cursor flash interval in milliseconds, 0 means disable flashing\n"
+		"cursor-shape=0\n"
+		"cursor-interval=500\n"
+		"\n"
+		"# additional ascii chars considered as part of a word while auto-selecting text, except ' ', 0-9, a-z, A-Z\n"
+		"word-chars=._-\n"
+		"\n"
+		"# change the clockwise orientation angle of screen display\n"
+		"# available values: 0 = 0 degree, 1 = 90 degrees, 2 = 180 degrees, 3 = 270 degrees\n"
+		"screen-rotate=0\n"
+		"\n"
+		"# specify the favorite input method program to run\n"
+		"input-method=\n"
+		;
+
+	struct stat cstat;
+	if (stat(name, &cstat) != -1) return;
+
+	s32 fd = open(name, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+	if (fd == -1) return;
+
+	s32 ret = write(fd, defaultConfig, sizeof(defaultConfig) - 1);
+	close(fd);
+}
+
+bool Config::parseArgs(s32 argc, s8 **argv)
+{
+	static const option options[] = {
+		{ "version", no_argument, 0, 'V' },
+		{ "help", no_argument, 0, 'h' },
+		{ "font-names", required_argument, 0, 'n' },
+		{ "font-size", required_argument, 0, 's' },
+		{ "color-foreground", required_argument, 0, 'f' },
+		{ "color-background", required_argument, 0, 'b' },
+		{ "text-encodings", required_argument, 0, 'e' },
+		{ "screen-rotate", required_argument, 0, 'r' },
+		{ "input-method", required_argument, 0, 'i' },
+		{ "cursor-shape", required_argument, 0, 0 },
+		{ "cursor-interval", required_argument, 0, 1 },
+		{ 0, 0, 0, 0 }
+	};
+
+	s32 index;
+	while ((index = getopt_long(argc, argv, "Vhn:s:f:b:e:r:i:", options, 0)) != -1) {
+		switch (index) {
+		case 'V':
+			printf("FbTerm version " VERSION "\n");
+			return false;
+
+		case 'h':
+		case '?':
+			printf(
+				"Usage: fbterm [option]\n"
+				"A fast framebuffer based terminal emulator for linux\n"
+				"\n"
+				"  -V, --version                   display FbTerm version and exit\n"
+				"  -h, --help                      display this help and exit\n"
+				"  -n, --font-names=TEXT           specify font family names\n"
+				"  -s, --font-size=NUM             specify font pixel size\n"
+				"  -f, --color-foreground=NUM      specify foreground color\n"
+				"  -b, --color-background=NUM      specify background color\n"
+				"  -e, --text-encodings=TEXT       specify additional text endcodings\n"
+				"  -r, --screen-rotate=NUM         specify orientation of screen display\n"
+				"  -i, --input-method=TEXT         sepcify input method program\n"
+				"      --cursor-shape=NUM          specify default cursor shape\n"
+				"      --cursor-interval=NUM       specify cursor flash interval\n"
+				"\n"
+				"See comments in ~/.fbtermrc for details of these options.\n"
+			);
+			return false;
+			
+		default:
+			for (const option *opt = options; opt->name; opt++) {
+				if (opt->val != index) continue;
+
+				OptionEntry *entry = getEntry(opt->name);
+				if (entry) {
+					entry->val = optarg;
+				} else {
+					addEntry(opt->name, optarg);
+				}
+				break;
+			}
+			break;
+		}
+	}
+
+	return true;
 }

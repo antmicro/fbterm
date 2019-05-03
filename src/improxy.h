@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -17,40 +18,28 @@
  *
  */
 
-#ifndef HASH_H
-#define HASH_H
+#ifndef IM_PROXY_H
+#define IM_PROXY_H
 
 #include "type.h"
+#include "instance.h"
 
-template<class T>
-class HashTable {
+class ImProxy {
+	DECLARE_INSTANCE(ImProxy)
 public:
-	HashTable(u32 seed, bool autodel);
-	~HashTable();
-
-	void add(u32 key, T &val);
-	void remove(u32 key);
-	bool find(u32 key, T *pval);
-	void values(T *pval, u32 &len);
-	u32 size() {
-		return mSize;
-	}
+	bool actived();
+	void toggleActive(u32 shell);
+	void sendKey(s8 *buf, u32 len);
+	void changeCursorPos(u16 col, u16 row);
+	void changeTermMode(bool crlf, bool appkey, bool curo);
 
 private:
-	template<class T1> struct HashNode {
-		HashNode(u32 _key ,T1 &_val) : key(_key), val(_val), next(0) {
-		}
-	
-		u32 key;
-		T1 val;
-		HashNode *next;
-	};
+	friend class ImSocket;
+	void createImProcess();
+	void socketEnd();
 
-	typedef HashNode<T> Node;
-
-	Node **mTable;
-	u32 mSeed, mSize;
-	bool mAutoDelete, mDestructing;
+	s32 mPid;
+	class ImSocket *mSocket;
 };
 
 #endif

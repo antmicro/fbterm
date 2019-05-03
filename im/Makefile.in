@@ -30,7 +30,8 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-subdir = src/lib
+noinst_PROGRAMS = imexample$(EXEEXT)
+subdir = im
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = 
@@ -39,29 +40,28 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-LIBRARIES = $(noinst_LIBRARIES)
-AR = ar
-ARFLAGS = cru
-libshell_a_AR = $(AR) $(ARFLAGS)
-libshell_a_LIBADD =
-am_libshell_a_OBJECTS = libshell_a-io.$(OBJEXT) \
-	libshell_a-shell.$(OBJEXT) libshell_a-vterm_action.$(OBJEXT) \
-	libshell_a-vterm.$(OBJEXT) libshell_a-vterm_states.$(OBJEXT)
-libshell_a_OBJECTS = $(am_libshell_a_OBJECTS)
+PROGRAMS = $(noinst_PROGRAMS)
+am_imexample_OBJECTS = imapi.$(OBJEXT) keycode.$(OBJEXT) \
+	imexample-example.$(OBJEXT) imexample-font.$(OBJEXT) \
+	imexample-screen.$(OBJEXT)
+imexample_OBJECTS = $(am_imexample_OBJECTS)
+imexample_DEPENDENCIES =
+imexample_LINK = $(CXXLD) $(imexample_CXXFLAGS) $(CXXFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+CCLD = $(CC)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
 CXXLD = $(CXX)
 CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
-COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
-CCLD = $(CC)
-LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(libshell_a_SOURCES)
-DIST_SOURCES = $(libshell_a_SOURCES)
+SOURCES = $(imexample_SOURCES) $(EXTRA_imexample_SOURCES)
+DIST_SOURCES = $(imexample_SOURCES) $(EXTRA_imexample_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -163,13 +163,17 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-noinst_LIBRARIES = libshell.a
-libshell_a_SOURCES = io.cpp io.h shell.cpp shell.h vterm_action.cpp vterm.cpp vterm_states.cpp vterm.h type.h instance.h
-libshell_a_CXXFLAGS = -fno-exceptions -fno-rtti
+imexample_SOURCES = immessage.h imapi.h imapi.c keycode.h keycode.c example.cpp \
+	instance.h font.h font.cpp screen.h screen.cpp
+
+EXTRA_imexample_SOURCES = screen_render.cpp
+imexample_CXXFLAGS = -fno-exceptions -fno-rtti @IMEXAMPLE_INCLUDES@
+imexample_LDADD = @IMEXAMPLE_LIBS@
+EXTRA_DIST = inputmethod.txt
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .cpp .o .obj
+.SUFFIXES: .c .cpp .o .obj
 $(srcdir)/Makefile.in: 
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -179,9 +183,9 @@ $(srcdir)/Makefile.in:
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  src/lib/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  im/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  src/lib/Makefile
+	  $(AUTOMAKE) --gnu  im/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -200,12 +204,11 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 
-clean-noinstLIBRARIES:
-	-test -z "$(noinst_LIBRARIES)" || rm -f $(noinst_LIBRARIES)
-libshell.a: $(libshell_a_OBJECTS) $(libshell_a_DEPENDENCIES) 
-	-rm -f libshell.a
-	$(libshell_a_AR) libshell.a $(libshell_a_OBJECTS) $(libshell_a_LIBADD)
-	$(RANLIB) libshell.a
+clean-noinstPROGRAMS:
+	-test -z "$(noinst_PROGRAMS)" || rm -f $(noinst_PROGRAMS)
+imexample$(EXEEXT): $(imexample_OBJECTS) $(imexample_DEPENDENCIES) 
+	@rm -f imexample$(EXEEXT)
+	$(imexample_LINK) $(imexample_OBJECTS) $(imexample_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -213,11 +216,26 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libshell_a-io.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libshell_a-shell.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libshell_a-vterm.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libshell_a-vterm_action.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libshell_a-vterm_states.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imapi.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imexample-example.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imexample-font.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imexample-screen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imexample-screen_render.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/keycode.Po@am__quote@
+
+.c.o:
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(COMPILE) -c $<
+
+.c.obj:
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -233,75 +251,61 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
-libshell_a-io.o: io.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-io.o -MD -MP -MF $(DEPDIR)/libshell_a-io.Tpo -c -o libshell_a-io.o `test -f 'io.cpp' || echo '$(srcdir)/'`io.cpp
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-io.Tpo $(DEPDIR)/libshell_a-io.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='io.cpp' object='libshell_a-io.o' libtool=no @AMDEPBACKSLASH@
+imexample-example.o: example.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -MT imexample-example.o -MD -MP -MF $(DEPDIR)/imexample-example.Tpo -c -o imexample-example.o `test -f 'example.cpp' || echo '$(srcdir)/'`example.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/imexample-example.Tpo $(DEPDIR)/imexample-example.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='example.cpp' object='imexample-example.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-io.o `test -f 'io.cpp' || echo '$(srcdir)/'`io.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -c -o imexample-example.o `test -f 'example.cpp' || echo '$(srcdir)/'`example.cpp
 
-libshell_a-io.obj: io.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-io.obj -MD -MP -MF $(DEPDIR)/libshell_a-io.Tpo -c -o libshell_a-io.obj `if test -f 'io.cpp'; then $(CYGPATH_W) 'io.cpp'; else $(CYGPATH_W) '$(srcdir)/io.cpp'; fi`
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-io.Tpo $(DEPDIR)/libshell_a-io.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='io.cpp' object='libshell_a-io.obj' libtool=no @AMDEPBACKSLASH@
+imexample-example.obj: example.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -MT imexample-example.obj -MD -MP -MF $(DEPDIR)/imexample-example.Tpo -c -o imexample-example.obj `if test -f 'example.cpp'; then $(CYGPATH_W) 'example.cpp'; else $(CYGPATH_W) '$(srcdir)/example.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/imexample-example.Tpo $(DEPDIR)/imexample-example.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='example.cpp' object='imexample-example.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-io.obj `if test -f 'io.cpp'; then $(CYGPATH_W) 'io.cpp'; else $(CYGPATH_W) '$(srcdir)/io.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -c -o imexample-example.obj `if test -f 'example.cpp'; then $(CYGPATH_W) 'example.cpp'; else $(CYGPATH_W) '$(srcdir)/example.cpp'; fi`
 
-libshell_a-shell.o: shell.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-shell.o -MD -MP -MF $(DEPDIR)/libshell_a-shell.Tpo -c -o libshell_a-shell.o `test -f 'shell.cpp' || echo '$(srcdir)/'`shell.cpp
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-shell.Tpo $(DEPDIR)/libshell_a-shell.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='shell.cpp' object='libshell_a-shell.o' libtool=no @AMDEPBACKSLASH@
+imexample-font.o: font.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -MT imexample-font.o -MD -MP -MF $(DEPDIR)/imexample-font.Tpo -c -o imexample-font.o `test -f 'font.cpp' || echo '$(srcdir)/'`font.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/imexample-font.Tpo $(DEPDIR)/imexample-font.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='font.cpp' object='imexample-font.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-shell.o `test -f 'shell.cpp' || echo '$(srcdir)/'`shell.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -c -o imexample-font.o `test -f 'font.cpp' || echo '$(srcdir)/'`font.cpp
 
-libshell_a-shell.obj: shell.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-shell.obj -MD -MP -MF $(DEPDIR)/libshell_a-shell.Tpo -c -o libshell_a-shell.obj `if test -f 'shell.cpp'; then $(CYGPATH_W) 'shell.cpp'; else $(CYGPATH_W) '$(srcdir)/shell.cpp'; fi`
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-shell.Tpo $(DEPDIR)/libshell_a-shell.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='shell.cpp' object='libshell_a-shell.obj' libtool=no @AMDEPBACKSLASH@
+imexample-font.obj: font.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -MT imexample-font.obj -MD -MP -MF $(DEPDIR)/imexample-font.Tpo -c -o imexample-font.obj `if test -f 'font.cpp'; then $(CYGPATH_W) 'font.cpp'; else $(CYGPATH_W) '$(srcdir)/font.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/imexample-font.Tpo $(DEPDIR)/imexample-font.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='font.cpp' object='imexample-font.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-shell.obj `if test -f 'shell.cpp'; then $(CYGPATH_W) 'shell.cpp'; else $(CYGPATH_W) '$(srcdir)/shell.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -c -o imexample-font.obj `if test -f 'font.cpp'; then $(CYGPATH_W) 'font.cpp'; else $(CYGPATH_W) '$(srcdir)/font.cpp'; fi`
 
-libshell_a-vterm_action.o: vterm_action.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-vterm_action.o -MD -MP -MF $(DEPDIR)/libshell_a-vterm_action.Tpo -c -o libshell_a-vterm_action.o `test -f 'vterm_action.cpp' || echo '$(srcdir)/'`vterm_action.cpp
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-vterm_action.Tpo $(DEPDIR)/libshell_a-vterm_action.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='vterm_action.cpp' object='libshell_a-vterm_action.o' libtool=no @AMDEPBACKSLASH@
+imexample-screen.o: screen.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -MT imexample-screen.o -MD -MP -MF $(DEPDIR)/imexample-screen.Tpo -c -o imexample-screen.o `test -f 'screen.cpp' || echo '$(srcdir)/'`screen.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/imexample-screen.Tpo $(DEPDIR)/imexample-screen.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen.cpp' object='imexample-screen.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-vterm_action.o `test -f 'vterm_action.cpp' || echo '$(srcdir)/'`vterm_action.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -c -o imexample-screen.o `test -f 'screen.cpp' || echo '$(srcdir)/'`screen.cpp
 
-libshell_a-vterm_action.obj: vterm_action.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-vterm_action.obj -MD -MP -MF $(DEPDIR)/libshell_a-vterm_action.Tpo -c -o libshell_a-vterm_action.obj `if test -f 'vterm_action.cpp'; then $(CYGPATH_W) 'vterm_action.cpp'; else $(CYGPATH_W) '$(srcdir)/vterm_action.cpp'; fi`
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-vterm_action.Tpo $(DEPDIR)/libshell_a-vterm_action.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='vterm_action.cpp' object='libshell_a-vterm_action.obj' libtool=no @AMDEPBACKSLASH@
+imexample-screen.obj: screen.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -MT imexample-screen.obj -MD -MP -MF $(DEPDIR)/imexample-screen.Tpo -c -o imexample-screen.obj `if test -f 'screen.cpp'; then $(CYGPATH_W) 'screen.cpp'; else $(CYGPATH_W) '$(srcdir)/screen.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/imexample-screen.Tpo $(DEPDIR)/imexample-screen.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen.cpp' object='imexample-screen.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-vterm_action.obj `if test -f 'vterm_action.cpp'; then $(CYGPATH_W) 'vterm_action.cpp'; else $(CYGPATH_W) '$(srcdir)/vterm_action.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -c -o imexample-screen.obj `if test -f 'screen.cpp'; then $(CYGPATH_W) 'screen.cpp'; else $(CYGPATH_W) '$(srcdir)/screen.cpp'; fi`
 
-libshell_a-vterm.o: vterm.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-vterm.o -MD -MP -MF $(DEPDIR)/libshell_a-vterm.Tpo -c -o libshell_a-vterm.o `test -f 'vterm.cpp' || echo '$(srcdir)/'`vterm.cpp
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-vterm.Tpo $(DEPDIR)/libshell_a-vterm.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='vterm.cpp' object='libshell_a-vterm.o' libtool=no @AMDEPBACKSLASH@
+imexample-screen_render.o: screen_render.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -MT imexample-screen_render.o -MD -MP -MF $(DEPDIR)/imexample-screen_render.Tpo -c -o imexample-screen_render.o `test -f 'screen_render.cpp' || echo '$(srcdir)/'`screen_render.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/imexample-screen_render.Tpo $(DEPDIR)/imexample-screen_render.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen_render.cpp' object='imexample-screen_render.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-vterm.o `test -f 'vterm.cpp' || echo '$(srcdir)/'`vterm.cpp
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -c -o imexample-screen_render.o `test -f 'screen_render.cpp' || echo '$(srcdir)/'`screen_render.cpp
 
-libshell_a-vterm.obj: vterm.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-vterm.obj -MD -MP -MF $(DEPDIR)/libshell_a-vterm.Tpo -c -o libshell_a-vterm.obj `if test -f 'vterm.cpp'; then $(CYGPATH_W) 'vterm.cpp'; else $(CYGPATH_W) '$(srcdir)/vterm.cpp'; fi`
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-vterm.Tpo $(DEPDIR)/libshell_a-vterm.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='vterm.cpp' object='libshell_a-vterm.obj' libtool=no @AMDEPBACKSLASH@
+imexample-screen_render.obj: screen_render.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -MT imexample-screen_render.obj -MD -MP -MF $(DEPDIR)/imexample-screen_render.Tpo -c -o imexample-screen_render.obj `if test -f 'screen_render.cpp'; then $(CYGPATH_W) 'screen_render.cpp'; else $(CYGPATH_W) '$(srcdir)/screen_render.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/imexample-screen_render.Tpo $(DEPDIR)/imexample-screen_render.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen_render.cpp' object='imexample-screen_render.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-vterm.obj `if test -f 'vterm.cpp'; then $(CYGPATH_W) 'vterm.cpp'; else $(CYGPATH_W) '$(srcdir)/vterm.cpp'; fi`
-
-libshell_a-vterm_states.o: vterm_states.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-vterm_states.o -MD -MP -MF $(DEPDIR)/libshell_a-vterm_states.Tpo -c -o libshell_a-vterm_states.o `test -f 'vterm_states.cpp' || echo '$(srcdir)/'`vterm_states.cpp
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-vterm_states.Tpo $(DEPDIR)/libshell_a-vterm_states.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='vterm_states.cpp' object='libshell_a-vterm_states.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-vterm_states.o `test -f 'vterm_states.cpp' || echo '$(srcdir)/'`vterm_states.cpp
-
-libshell_a-vterm_states.obj: vterm_states.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -MT libshell_a-vterm_states.obj -MD -MP -MF $(DEPDIR)/libshell_a-vterm_states.Tpo -c -o libshell_a-vterm_states.obj `if test -f 'vterm_states.cpp'; then $(CYGPATH_W) 'vterm_states.cpp'; else $(CYGPATH_W) '$(srcdir)/vterm_states.cpp'; fi`
-@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/libshell_a-vterm_states.Tpo $(DEPDIR)/libshell_a-vterm_states.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='vterm_states.cpp' object='libshell_a-vterm_states.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshell_a_CXXFLAGS) $(CXXFLAGS) -c -o libshell_a-vterm_states.obj `if test -f 'vterm_states.cpp'; then $(CYGPATH_W) 'vterm_states.cpp'; else $(CYGPATH_W) '$(srcdir)/vterm_states.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(imexample_CXXFLAGS) $(CXXFLAGS) -c -o imexample-screen_render.obj `if test -f 'screen_render.cpp'; then $(CYGPATH_W) 'screen_render.cpp'; else $(CYGPATH_W) '$(srcdir)/screen_render.cpp'; fi`
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
@@ -378,7 +382,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LIBRARIES)
+all-am: Makefile $(PROGRAMS)
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -406,7 +410,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-noinstLIBRARIES mostlyclean-am
+clean-am: clean-generic clean-noinstPROGRAMS mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -464,7 +468,7 @@ uninstall-am:
 .MAKE: install-am install-strip
 
 .PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
-	clean-noinstLIBRARIES ctags distclean distclean-compile \
+	clean-noinstPROGRAMS ctags distclean distclean-compile \
 	distclean-generic distclean-tags distdir dvi dvi-am html \
 	html-am info info-am install install-am install-data \
 	install-data-am install-dvi install-dvi-am install-exec \

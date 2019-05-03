@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -20,25 +21,23 @@
 #ifndef FONT_H
 #define FONT_H
 
-#include "hash.h"
+#include "type.h"
 #include "instance.h"
+
+#define W(col) (Font::instance()->width() * (col))
+#define H(row) (Font::instance()->height() * (row))
 
 class Font {
 	DECLARE_INSTANCE(Font)
 public:
-	class Glyph {
-	public:
-		Glyph(void *_glyph, s16 _baseline) {
-			glyph = _glyph;
-			baseline = _baseline;
-		}
-		~Glyph();
-
-		void *glyph;
-		s16 baseline;
+	struct Glyph {
+		s16 pitch, width, height;
+		s16 left, top, advance;
+		bool isbitmap;
+		u8 pixmap[0];
 	};
 
-	void *getGlyph(u32 unicode);
+	Glyph *getGlyph(u32 unicode);
 	u32 width() {
 		return mWidth;
 	}
@@ -50,20 +49,19 @@ public:
 	}
 
 private:
-	typedef struct {
+	struct FontRec {
 		void *pattern;
 		void *face;
-		s32 load_flags;
-	} FontRec;
+		int load_flags;
+	};
 
 	Font(FontRec *fonts, u32 num, void *unicover);
 	void openFont(u32 index);
-	s32 fontIndex(u32 unicode);
+	int fontIndex(u32 unicode);
 
 	void *mpUniCover;
 	FontRec *mpFontList;
 	u32 mFontNum;
-	HashTable<Glyph*> *mpFontCache;
 	u32 mWidth, mHeight;
 	bool mMonospace;
 };

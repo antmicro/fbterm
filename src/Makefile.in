@@ -43,12 +43,15 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
-am_fbterm_OBJECTS = fbconfig.$(OBJEXT) fbio.$(OBJEXT) \
-	fbshell.$(OBJEXT) fbterm.$(OBJEXT) font.$(OBJEXT) \
-	input.$(OBJEXT) mouse.$(OBJEXT) screen.$(OBJEXT) \
-	hash.$(OBJEXT)
+am_fbterm_OBJECTS = fbterm-fbconfig.$(OBJEXT) fbterm-fbio.$(OBJEXT) \
+	fbterm-fbshell.$(OBJEXT) fbterm-fbshellman.$(OBJEXT) \
+	fbterm-fbterm.$(OBJEXT) fbterm-font.$(OBJEXT) \
+	fbterm-input.$(OBJEXT) fbterm-mouse.$(OBJEXT) \
+	fbterm-screen.$(OBJEXT) fbterm-improxy.$(OBJEXT)
 fbterm_OBJECTS = $(am_fbterm_OBJECTS)
 fbterm_DEPENDENCIES = lib/libshell.a
+fbterm_LINK = $(CXXLD) $(fbterm_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -61,8 +64,8 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(fbterm_SOURCES)
-DIST_SOURCES = $(fbterm_SOURCES)
+SOURCES = $(fbterm_SOURCES) $(EXTRA_fbterm_SOURCES)
+DIST_SOURCES = $(fbterm_SOURCES) $(EXTRA_fbterm_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -98,7 +101,11 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FBTERM_INCLUDES = @FBTERM_INCLUDES@
+FBTERM_LIBS = @FBTERM_LIBS@
 GREP = @GREP@
+IMEXAMPLE_INCLUDES = @IMEXAMPLE_INCLUDES@
+IMEXAMPLE_LIBS = @IMEXAMPLE_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -171,10 +178,12 @@ target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = lib
-fbterm_LDADD = lib/libshell.a
-fbterm_SOURCES = fbconfig.cpp fbconfig.h fbio.cpp fbio.h fbshell.cpp fbshell.h fbterm.cpp fbterm.h \
-	font.cpp font.h input.cpp input.h input_key.h mouse.cpp mouse.h screen.cpp screen.h hash.cpp hash.h
+fbterm_SOURCES = fbconfig.cpp fbconfig.h fbio.cpp fbio.h fbshell.cpp fbshell.h fbshellman.cpp fbshellman.h fbterm.cpp \
+	fbterm.h font.cpp font.h input.cpp input.h input_key.h mouse.cpp mouse.h screen.cpp screen.h improxy.cpp improxy.h
 
+EXTRA_fbterm_SOURCES = screen_render.cpp screen_clip.cpp signalfd.h
+fbterm_CXXFLAGS = -fno-exceptions -fno-rtti -Ilib -I../im @FBTERM_INCLUDES@
+fbterm_LDADD = lib/libshell.a @FBTERM_LIBS@
 all: all-recursive
 
 .SUFFIXES:
@@ -233,7 +242,7 @@ clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 fbterm$(EXEEXT): $(fbterm_OBJECTS) $(fbterm_DEPENDENCIES) 
 	@rm -f fbterm$(EXEEXT)
-	$(CXXLINK) $(fbterm_OBJECTS) $(fbterm_LDADD) $(LIBS)
+	$(fbterm_LINK) $(fbterm_OBJECTS) $(fbterm_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -241,15 +250,18 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbconfig.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbio.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbshell.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/font.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/input.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mouse.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/screen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-fbconfig.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-fbio.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-fbshell.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-fbshellman.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-fbterm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-font.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-improxy.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-input.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-mouse.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-screen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-screen_clip.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbterm-screen_render.Po@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -264,6 +276,174 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+fbterm-fbconfig.o: fbconfig.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbconfig.o -MD -MP -MF $(DEPDIR)/fbterm-fbconfig.Tpo -c -o fbterm-fbconfig.o `test -f 'fbconfig.cpp' || echo '$(srcdir)/'`fbconfig.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbconfig.Tpo $(DEPDIR)/fbterm-fbconfig.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbconfig.cpp' object='fbterm-fbconfig.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbconfig.o `test -f 'fbconfig.cpp' || echo '$(srcdir)/'`fbconfig.cpp
+
+fbterm-fbconfig.obj: fbconfig.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbconfig.obj -MD -MP -MF $(DEPDIR)/fbterm-fbconfig.Tpo -c -o fbterm-fbconfig.obj `if test -f 'fbconfig.cpp'; then $(CYGPATH_W) 'fbconfig.cpp'; else $(CYGPATH_W) '$(srcdir)/fbconfig.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbconfig.Tpo $(DEPDIR)/fbterm-fbconfig.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbconfig.cpp' object='fbterm-fbconfig.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbconfig.obj `if test -f 'fbconfig.cpp'; then $(CYGPATH_W) 'fbconfig.cpp'; else $(CYGPATH_W) '$(srcdir)/fbconfig.cpp'; fi`
+
+fbterm-fbio.o: fbio.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbio.o -MD -MP -MF $(DEPDIR)/fbterm-fbio.Tpo -c -o fbterm-fbio.o `test -f 'fbio.cpp' || echo '$(srcdir)/'`fbio.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbio.Tpo $(DEPDIR)/fbterm-fbio.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbio.cpp' object='fbterm-fbio.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbio.o `test -f 'fbio.cpp' || echo '$(srcdir)/'`fbio.cpp
+
+fbterm-fbio.obj: fbio.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbio.obj -MD -MP -MF $(DEPDIR)/fbterm-fbio.Tpo -c -o fbterm-fbio.obj `if test -f 'fbio.cpp'; then $(CYGPATH_W) 'fbio.cpp'; else $(CYGPATH_W) '$(srcdir)/fbio.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbio.Tpo $(DEPDIR)/fbterm-fbio.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbio.cpp' object='fbterm-fbio.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbio.obj `if test -f 'fbio.cpp'; then $(CYGPATH_W) 'fbio.cpp'; else $(CYGPATH_W) '$(srcdir)/fbio.cpp'; fi`
+
+fbterm-fbshell.o: fbshell.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbshell.o -MD -MP -MF $(DEPDIR)/fbterm-fbshell.Tpo -c -o fbterm-fbshell.o `test -f 'fbshell.cpp' || echo '$(srcdir)/'`fbshell.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbshell.Tpo $(DEPDIR)/fbterm-fbshell.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbshell.cpp' object='fbterm-fbshell.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbshell.o `test -f 'fbshell.cpp' || echo '$(srcdir)/'`fbshell.cpp
+
+fbterm-fbshell.obj: fbshell.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbshell.obj -MD -MP -MF $(DEPDIR)/fbterm-fbshell.Tpo -c -o fbterm-fbshell.obj `if test -f 'fbshell.cpp'; then $(CYGPATH_W) 'fbshell.cpp'; else $(CYGPATH_W) '$(srcdir)/fbshell.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbshell.Tpo $(DEPDIR)/fbterm-fbshell.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbshell.cpp' object='fbterm-fbshell.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbshell.obj `if test -f 'fbshell.cpp'; then $(CYGPATH_W) 'fbshell.cpp'; else $(CYGPATH_W) '$(srcdir)/fbshell.cpp'; fi`
+
+fbterm-fbshellman.o: fbshellman.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbshellman.o -MD -MP -MF $(DEPDIR)/fbterm-fbshellman.Tpo -c -o fbterm-fbshellman.o `test -f 'fbshellman.cpp' || echo '$(srcdir)/'`fbshellman.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbshellman.Tpo $(DEPDIR)/fbterm-fbshellman.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbshellman.cpp' object='fbterm-fbshellman.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbshellman.o `test -f 'fbshellman.cpp' || echo '$(srcdir)/'`fbshellman.cpp
+
+fbterm-fbshellman.obj: fbshellman.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbshellman.obj -MD -MP -MF $(DEPDIR)/fbterm-fbshellman.Tpo -c -o fbterm-fbshellman.obj `if test -f 'fbshellman.cpp'; then $(CYGPATH_W) 'fbshellman.cpp'; else $(CYGPATH_W) '$(srcdir)/fbshellman.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbshellman.Tpo $(DEPDIR)/fbterm-fbshellman.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbshellman.cpp' object='fbterm-fbshellman.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbshellman.obj `if test -f 'fbshellman.cpp'; then $(CYGPATH_W) 'fbshellman.cpp'; else $(CYGPATH_W) '$(srcdir)/fbshellman.cpp'; fi`
+
+fbterm-fbterm.o: fbterm.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbterm.o -MD -MP -MF $(DEPDIR)/fbterm-fbterm.Tpo -c -o fbterm-fbterm.o `test -f 'fbterm.cpp' || echo '$(srcdir)/'`fbterm.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbterm.Tpo $(DEPDIR)/fbterm-fbterm.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbterm.cpp' object='fbterm-fbterm.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbterm.o `test -f 'fbterm.cpp' || echo '$(srcdir)/'`fbterm.cpp
+
+fbterm-fbterm.obj: fbterm.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-fbterm.obj -MD -MP -MF $(DEPDIR)/fbterm-fbterm.Tpo -c -o fbterm-fbterm.obj `if test -f 'fbterm.cpp'; then $(CYGPATH_W) 'fbterm.cpp'; else $(CYGPATH_W) '$(srcdir)/fbterm.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-fbterm.Tpo $(DEPDIR)/fbterm-fbterm.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='fbterm.cpp' object='fbterm-fbterm.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-fbterm.obj `if test -f 'fbterm.cpp'; then $(CYGPATH_W) 'fbterm.cpp'; else $(CYGPATH_W) '$(srcdir)/fbterm.cpp'; fi`
+
+fbterm-font.o: font.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-font.o -MD -MP -MF $(DEPDIR)/fbterm-font.Tpo -c -o fbterm-font.o `test -f 'font.cpp' || echo '$(srcdir)/'`font.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-font.Tpo $(DEPDIR)/fbterm-font.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='font.cpp' object='fbterm-font.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-font.o `test -f 'font.cpp' || echo '$(srcdir)/'`font.cpp
+
+fbterm-font.obj: font.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-font.obj -MD -MP -MF $(DEPDIR)/fbterm-font.Tpo -c -o fbterm-font.obj `if test -f 'font.cpp'; then $(CYGPATH_W) 'font.cpp'; else $(CYGPATH_W) '$(srcdir)/font.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-font.Tpo $(DEPDIR)/fbterm-font.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='font.cpp' object='fbterm-font.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-font.obj `if test -f 'font.cpp'; then $(CYGPATH_W) 'font.cpp'; else $(CYGPATH_W) '$(srcdir)/font.cpp'; fi`
+
+fbterm-input.o: input.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-input.o -MD -MP -MF $(DEPDIR)/fbterm-input.Tpo -c -o fbterm-input.o `test -f 'input.cpp' || echo '$(srcdir)/'`input.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-input.Tpo $(DEPDIR)/fbterm-input.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='input.cpp' object='fbterm-input.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-input.o `test -f 'input.cpp' || echo '$(srcdir)/'`input.cpp
+
+fbterm-input.obj: input.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-input.obj -MD -MP -MF $(DEPDIR)/fbterm-input.Tpo -c -o fbterm-input.obj `if test -f 'input.cpp'; then $(CYGPATH_W) 'input.cpp'; else $(CYGPATH_W) '$(srcdir)/input.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-input.Tpo $(DEPDIR)/fbterm-input.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='input.cpp' object='fbterm-input.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-input.obj `if test -f 'input.cpp'; then $(CYGPATH_W) 'input.cpp'; else $(CYGPATH_W) '$(srcdir)/input.cpp'; fi`
+
+fbterm-mouse.o: mouse.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-mouse.o -MD -MP -MF $(DEPDIR)/fbterm-mouse.Tpo -c -o fbterm-mouse.o `test -f 'mouse.cpp' || echo '$(srcdir)/'`mouse.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-mouse.Tpo $(DEPDIR)/fbterm-mouse.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='mouse.cpp' object='fbterm-mouse.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-mouse.o `test -f 'mouse.cpp' || echo '$(srcdir)/'`mouse.cpp
+
+fbterm-mouse.obj: mouse.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-mouse.obj -MD -MP -MF $(DEPDIR)/fbterm-mouse.Tpo -c -o fbterm-mouse.obj `if test -f 'mouse.cpp'; then $(CYGPATH_W) 'mouse.cpp'; else $(CYGPATH_W) '$(srcdir)/mouse.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-mouse.Tpo $(DEPDIR)/fbterm-mouse.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='mouse.cpp' object='fbterm-mouse.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-mouse.obj `if test -f 'mouse.cpp'; then $(CYGPATH_W) 'mouse.cpp'; else $(CYGPATH_W) '$(srcdir)/mouse.cpp'; fi`
+
+fbterm-screen.o: screen.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-screen.o -MD -MP -MF $(DEPDIR)/fbterm-screen.Tpo -c -o fbterm-screen.o `test -f 'screen.cpp' || echo '$(srcdir)/'`screen.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-screen.Tpo $(DEPDIR)/fbterm-screen.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen.cpp' object='fbterm-screen.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-screen.o `test -f 'screen.cpp' || echo '$(srcdir)/'`screen.cpp
+
+fbterm-screen.obj: screen.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-screen.obj -MD -MP -MF $(DEPDIR)/fbterm-screen.Tpo -c -o fbterm-screen.obj `if test -f 'screen.cpp'; then $(CYGPATH_W) 'screen.cpp'; else $(CYGPATH_W) '$(srcdir)/screen.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-screen.Tpo $(DEPDIR)/fbterm-screen.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen.cpp' object='fbterm-screen.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-screen.obj `if test -f 'screen.cpp'; then $(CYGPATH_W) 'screen.cpp'; else $(CYGPATH_W) '$(srcdir)/screen.cpp'; fi`
+
+fbterm-improxy.o: improxy.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-improxy.o -MD -MP -MF $(DEPDIR)/fbterm-improxy.Tpo -c -o fbterm-improxy.o `test -f 'improxy.cpp' || echo '$(srcdir)/'`improxy.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-improxy.Tpo $(DEPDIR)/fbterm-improxy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='improxy.cpp' object='fbterm-improxy.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-improxy.o `test -f 'improxy.cpp' || echo '$(srcdir)/'`improxy.cpp
+
+fbterm-improxy.obj: improxy.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-improxy.obj -MD -MP -MF $(DEPDIR)/fbterm-improxy.Tpo -c -o fbterm-improxy.obj `if test -f 'improxy.cpp'; then $(CYGPATH_W) 'improxy.cpp'; else $(CYGPATH_W) '$(srcdir)/improxy.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-improxy.Tpo $(DEPDIR)/fbterm-improxy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='improxy.cpp' object='fbterm-improxy.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-improxy.obj `if test -f 'improxy.cpp'; then $(CYGPATH_W) 'improxy.cpp'; else $(CYGPATH_W) '$(srcdir)/improxy.cpp'; fi`
+
+fbterm-screen_render.o: screen_render.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-screen_render.o -MD -MP -MF $(DEPDIR)/fbterm-screen_render.Tpo -c -o fbterm-screen_render.o `test -f 'screen_render.cpp' || echo '$(srcdir)/'`screen_render.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-screen_render.Tpo $(DEPDIR)/fbterm-screen_render.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen_render.cpp' object='fbterm-screen_render.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-screen_render.o `test -f 'screen_render.cpp' || echo '$(srcdir)/'`screen_render.cpp
+
+fbterm-screen_render.obj: screen_render.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-screen_render.obj -MD -MP -MF $(DEPDIR)/fbterm-screen_render.Tpo -c -o fbterm-screen_render.obj `if test -f 'screen_render.cpp'; then $(CYGPATH_W) 'screen_render.cpp'; else $(CYGPATH_W) '$(srcdir)/screen_render.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-screen_render.Tpo $(DEPDIR)/fbterm-screen_render.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen_render.cpp' object='fbterm-screen_render.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-screen_render.obj `if test -f 'screen_render.cpp'; then $(CYGPATH_W) 'screen_render.cpp'; else $(CYGPATH_W) '$(srcdir)/screen_render.cpp'; fi`
+
+fbterm-screen_clip.o: screen_clip.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-screen_clip.o -MD -MP -MF $(DEPDIR)/fbterm-screen_clip.Tpo -c -o fbterm-screen_clip.o `test -f 'screen_clip.cpp' || echo '$(srcdir)/'`screen_clip.cpp
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-screen_clip.Tpo $(DEPDIR)/fbterm-screen_clip.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen_clip.cpp' object='fbterm-screen_clip.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-screen_clip.o `test -f 'screen_clip.cpp' || echo '$(srcdir)/'`screen_clip.cpp
+
+fbterm-screen_clip.obj: screen_clip.cpp
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -MT fbterm-screen_clip.obj -MD -MP -MF $(DEPDIR)/fbterm-screen_clip.Tpo -c -o fbterm-screen_clip.obj `if test -f 'screen_clip.cpp'; then $(CYGPATH_W) 'screen_clip.cpp'; else $(CYGPATH_W) '$(srcdir)/screen_clip.cpp'; fi`
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/fbterm-screen_clip.Tpo $(DEPDIR)/fbterm-screen_clip.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='screen_clip.cpp' object='fbterm-screen_clip.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbterm_CXXFLAGS) $(CXXFLAGS) -c -o fbterm-screen_clip.obj `if test -f 'screen_clip.cpp'; then $(CYGPATH_W) 'screen_clip.cpp'; else $(CYGPATH_W) '$(srcdir)/screen_clip.cpp'; fi`
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run `make' without going through this Makefile.
@@ -549,7 +729,8 @@ uninstall-am: uninstall-binPROGRAMS
 
 
 install-exec-hook:
-	chmod u+s $(DESTDIR)$(bindir)/fbterm$(EXEEXT)
+@HAVE_FS_CAPABILITY_TRUE@	setcap 'cap_sys_tty_config+ep' $(DESTDIR)$(bindir)/fbterm$(EXEEXT)
+@HAVE_FS_CAPABILITY_FALSE@	chmod u+s $(DESTDIR)$(bindir)/fbterm$(EXEEXT)
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

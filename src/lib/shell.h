@@ -1,5 +1,6 @@
 /*
  *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -23,14 +24,16 @@
 #include "io.h"
 #include "vterm.h"
 
-enum MouseType { Press = 0, Release, DblClick, Move };
+enum MouseType { Press = 0, Release, DblClick, Move, Wheel };
 
 enum ButtonState {
 	NoButton	= 0x0000,
 	LeftButton	= 0x0001,
 	RightButton	= 0x0002,
 	MidButton	= 0x0004,
-	MouseButtonMask = 0x0007,
+	WheelDown	= 0x0008,
+	WheelUp		= 0x0010,
+	MouseButtonMask = 0x00ff,
 
 	ShiftButton	= 0x0100,
 	ControlButton	= 0x0200,
@@ -50,15 +53,12 @@ protected:
 	void resize(u16 w, u16 h);
 	void createChildProcess();
 	virtual void initChildProcess() {}
-	virtual void adjustCharAttr(CharAttr &attr);
-	virtual void switchVt(bool enter);
-	u8 defaultColor(bool foreground) { return foreground ? default_fcolor : default_bcolor; }
+	virtual void readyRead(s8 *buf, u32 len);
 
 private:
-	virtual void readyRead(s8 *buf, u32 len);
+	static void initWordChars(s8 *buf, u32 len);
 	virtual void sendBack(const s8 *data);
 
-	void changeTextColor(u32 start, u32 end, bool inverse);
 	void textSelect(u16 x, u16 y, s32 type, s32 buttons);
 	void startTextSelect(u16 x, u16 y);
 	void middleTextSelect(u16 x, u16 y);
@@ -66,17 +66,9 @@ private:
 	void resetTextSelect();
 	void autoTextSelect(u16 x, u16 y);
 	void putSelectedText();
-
-	void drawMousePointer(u16 x, u16 y);
-	void clearMousePointer();
-
-	static u8 initDefaultColor(bool foreground);
-	static void initWordChars(s8 *buf, u32 len);
-
-	static u8 default_fcolor, default_bcolor;
+	void inverseTextColor(u32 start, u32 end);
 
 	s32 mPid;
-	bool mInverseText;
 
 	static struct SelectedText {
 		SelectedText() {
@@ -99,18 +91,8 @@ private:
 		}
 		u32 start, end;
 		bool selecting;
-		bool positive_direction;
 		bool color_inversed;
 	} mSelState;
-
-	struct MousePointer {
-		MousePointer() {
-			drawed = false;
-		}
-		u32 pos;
-		bool color_inversed;
-		bool drawed;
-	} mMousePointer;
 };
 
 #endif
