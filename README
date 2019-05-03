@@ -52,10 +52,22 @@ click with right button:         paste selected text
 Sometimes above actions will not work, please try to redo them with shift key holding down.
 
 
-NOTATION
+PERFORMANCE
 
-For VESA framebuffer device, accelerated scrolling is disabled defaultly, FbTerm will run slowly while scrolling text.
-you may modify GRUB/LILO configure file to enable it. A GRUB example is showed below:
+  According test result, FbTerm spends more than 95% time on painting screen. Speedup painting will significantly 
+increase performance. Here are some suggestions:
+
+  * Enable fast scrolling on frame buffer device. The visible screen will be just a window of the video memory,
+    when scrolling, FbTerm only change the start of window, no need to repaint the whole screen.
+    
+  * On Intel P6 family processors the Memory Type Range Registers (MTRRs) may be used to control processor access to 
+    memory ranges. If you have video card on a PCI or AGP bus, enabling write-combining allows bus write transfers 
+    to be combined into a larger transfer before bursting over the PCI/AGP bus. This can increase performance of 
+    FbTerm's paint operations.
+
+  Maybe you need to enable them manually for your video card. For example, defaultly fast scrolling and write-combining 
+are all disabled on general VESA frame buffer device, GRUB/LILO configure file should be modified to enable them.
+A GRUB example is showed below:
 
 --Before--
 title Ubuntu
@@ -66,6 +78,5 @@ title Ubuntu
 --After--
 title Ubuntu
     root (hd0,0)
-    kernel /boot/vmlinuz ro root=LABEL=UBUNTU splash vga=0x317 video=vesafb:ypan
+    kernel /boot/vmlinuz ro root=LABEL=UBUNTU splash vga=0x317 video=vesafb:ywrap,mtrr:3
     initrd /boot/initrd.img
-

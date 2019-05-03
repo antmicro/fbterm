@@ -29,25 +29,6 @@
 #include "font.h"
 #include "screen.h"
 
-const Screen::Color Screen::mColorTable[] = {
-	{ 0,		0,		0 },
-	{ 0,		0,		0xaa },
-	{ 0, 		0xaa,	0 },
-	{ 0,		0x55,	0xaa },
-	{ 0xaa,	0,		0 },
-	{ 0xaa,	0,		0xaa },
-	{ 0xaa,	0xaa,	0 },
-	{ 0xaa,	0xaa,	0xaa },
-	{ 0x55,	0x55,	0x55 },
-	{ 0x55,	0x55,	0xff },
-	{ 0x55,	0xff,	0x55 },
-	{ 0x55,	0xff,	0xff },
-	{ 0xff,	0x55,	0x55 },
-	{ 0xff,	0x55,	0xff },
-	{ 0xff,	0xff,	0x55 },
-	{ 0xff,	0xff,	0xff },
-};
-
 #define fb_readb(addr) (*(volatile u8 *) (addr))
 #define fb_readw(addr) (*(volatile u16 *) (addr))
 #define fb_readl(addr) (*(volatile u32 *) (addr))
@@ -70,7 +51,9 @@ static const s8 clear_screen[] = "\033[2J\033[H";
 
 static fb_fix_screeninfo finfo;
 static fb_var_screeninfo vinfo;
-static u32 colors[16];
+
+static Color palette[NR_COLORS];
+static u32 colors[NR_COLORS];
 
 DEFINE_INSTANCE(Screen)
 
@@ -98,33 +81,19 @@ Screen *Screen::createInstance()
 		return 0;
 	}
 
-	switch (vinfo.bits_per_pixel) {
-	case 8:
-		for (u32 i = 0; i < 16; i++) {
-			colors[i] = (i << 24) | (i << 16) | (i << 8) | i;
-		}
-		break;
+	if (vinfo.bits_per_pixel == 15) vinfo.bits_per_pixel = 16;
 
-	case 15:
-		vinfo.bits_per_pixel = 16;
-	case 16:
-	case 32:
-		for (u32 i = 0; i < 16; i++) {
-			colors[i] = (mColorTable[i].red >> (8 - vinfo.red.length) << vinfo.red.offset)
-						| ((mColorTable[i].green >> (8 - vinfo.green.length)) << vinfo.green.offset)
-						| ((mColorTable[i].blue >> (8 - vinfo.blue.length)) << vinfo.blue.offset);
-			if (vinfo.bits_per_pixel == 16) {
-				colors[i] |= colors[i] << 16;
-			}
-		}
-		break;
-
-	default:
+	if (vinfo.bits_per_pixel != 8 && vinfo.bits_per_pixel != 16 && vinfo.bits_per_pixel != 32) {
 		printf("only support framebuffer device with 8/15/16/32 color depth!\n");
 		return 0;
 	}
 
 	if (!font) return 0;
+	
+	if (vinfo.xres / W(1) == 0 || vinfo.yres / H(1) == 0) {
+		printf("font size is too huge!\n");
+		return 0;
+	}
 
 	return new Screen(devFd);
 }
@@ -147,14 +116,13 @@ Screen::Screen(s32 fd)
 
 	mScrollAccel = ((ypan || ywrap) && !ioctl(mFd, FBIOPAN_DISPLAY, &vinfo)) ? (ywrap ? 2 : 1) : 0;
 
-	write(STDIN_FILENO, hide_cursor, sizeof(hide_cursor) - 1);
-	write(STDIN_FILENO, disable_blank, sizeof(disable_blank) - 1);
-	enterLeaveVc(true);	
+	s32 ret = write(STDIN_FILENO, hide_cursor, sizeof(hide_cursor) - 1);
+	ret = write(STDIN_FILENO, disable_blank, sizeof(disable_blank) - 1);	
 }
 
 Screen::~Screen()
 {
-	setupPalette(true);
+	setupSysPalette(true);
 	munmap(mpMemStart, finfo.smem_len);
 	close(mFd);
 
@@ -163,25 +131,69 @@ Screen::~Screen()
 		ioctl(STDIN_FILENO, KDSETMODE, KD_TEXT);
 	}
 
-	write(STDIN_FILENO, show_cursor, sizeof(show_cursor) - 1);
-	write(STDIN_FILENO, enable_blank, sizeof(enable_blank) - 1);	
-	write(STDIN_FILENO, clear_screen, sizeof(clear_screen) - 1);
+	s32 ret = write(STDIN_FILENO, show_cursor, sizeof(show_cursor) - 1);
+	ret = write(STDIN_FILENO, enable_blank, sizeof(enable_blank) - 1);	
+	ret = write(STDIN_FILENO, clear_screen, sizeof(clear_screen) - 1);
 	
 	Font::uninstance();
 }
 
-void Screen::setupPalette(bool restore)
+void Screen::setPalette(const Color *_palette)
+{
+	memcpy(palette, _palette, sizeof(palette));
+
+	switch (vinfo.bits_per_pixel) {
+	case 8:
+		for (u32 i = 0; i < NR_COLORS; i++) {
+			colors[i] = (i << 24) | (i << 16) | (i << 8) | i;
+		}
+		break;
+		
+	case 16:
+	case 32:
+		for (u32 i = 0; i < NR_COLORS; i++) {
+			colors[i] = (palette[i].red >> (8 - vinfo.red.length) << vinfo.red.offset)
+						| ((palette[i].green >> (8 - vinfo.green.length)) << vinfo.green.offset)
+						| ((palette[i].blue >> (8 - vinfo.blue.length)) << vinfo.blue.offset);
+			if (vinfo.bits_per_pixel == 16) {
+				colors[i] |= colors[i] << 16;
+			}
+		}
+		break;
+	
+	default:
+		break;
+	}
+
+	setupSysPalette(false);
+	eraseMargin(true, mRows);
+}
+
+void Screen::switchVc(bool enter)
+{
+	if (enter) {
+		ioctl(mFd, FBIOGET_VSCREENINFO, &vinfo);
+		ioctl(mFd, FBIOPAN_DISPLAY, &vinfo);
+		
+		setupSysPalette(false);
+		eraseMargin(true, mRows);
+	} else {
+		setupSysPalette(true);
+	}
+}
+
+void Screen::setupSysPalette(bool restore)
 {
 	if (vinfo.bits_per_pixel != 8) return;
 
 	static bool palette_saved = false;
-	static u16 saved_red[16], saved_green[16], saved_blue[16];
+	static u16 saved_red[NR_COLORS], saved_green[NR_COLORS], saved_blue[NR_COLORS];
 	fb_cmap cmap;
 
 	#define INIT_CMAP(_red, _green, _blue) \
 	do { \
 		cmap.start = 0; \
-		cmap.len = 16; \
+		cmap.len = NR_COLORS; \
 		cmap.red = _red; \
 		cmap.green = _green; \
 		cmap.blue = _blue; \
@@ -201,12 +213,12 @@ void Screen::setupPalette(bool restore)
 			ioctl(mFd, FBIOGETCMAP, &cmap);
 		}
 
-		u16 red[16], green[16], blue[16];
+		u16 red[NR_COLORS], green[NR_COLORS], blue[NR_COLORS];
 
-		for (u32 i = 0; i < 16; i++) {
-			red[i] = mColorTable[i].red << 8 | mColorTable[i].red;
-			green[i] = mColorTable[i].green << 8 | mColorTable[i].green;
-			blue[i] = mColorTable[i].blue << 8 | mColorTable[i].blue;
+		for (u32 i = 0; i < NR_COLORS; i++) {
+			red[i] = palette[i].red << 8 | palette[i].red;
+			green[i] = palette[i].green << 8 | palette[i].green;
+			blue[i] = palette[i].blue << 8 | palette[i].blue;
 		}
 
 		INIT_CMAP(red, green, blue);
@@ -223,17 +235,6 @@ void Screen::eraseMargin(bool top, u16 h)
 	if (vinfo.yres % H(1)) {
 		fillRect(0, H(mRows), vinfo.xres, vinfo.yres % H(1), 0);
 	}
-}
-
-void Screen::enterLeaveVc(bool enter)
-{
-	if (!enter) return;
-
-	ioctl(mFd, FBIOGET_VSCREENINFO, &vinfo);
-	ioctl(mFd, FBIOPAN_DISPLAY, &vinfo);
-
-	setupPalette(false);
-	eraseMargin(true, mRows);
 }
 
 bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
@@ -267,14 +268,16 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 	vinfo.yoffset = yoffset;
 	ioctl(mFd, FBIOPAN_DISPLAY, &vinfo);
 
+	#define redraw(args...) (FbShellManager::instance()->redraw(args))
+
 	if (redraw_all) {
-		FbShell::redraw(0, 0, mCols, mRows);
+		redraw(0, 0, mCols, mRows);
 		eraseMargin(true, mRows);
 	} else {
-		if (top) FbShell::redraw(0, 0, mCols, top);
-		if (bot < mRows) FbShell::redraw(0, bot, mCols, mRows - bot);
-		if (left > 0) FbShell::redraw(0, top, left, bot - top - 1);
-		if (right < mCols) FbShell::redraw(right, top, mCols - right, bot - top - 1);
+		if (top) redraw(0, 0, mCols, top);
+		if (bot < mRows) redraw(0, bot, mCols, mRows - bot);
+		if (left > 0) redraw(0, top, left, bot - top - 1);
+		if (right < mCols) redraw(right, top, mCols - right, bot - top - 1);
 		eraseMargin(drow > srow, drow > srow ? (drow - srow) : (srow - drow));
 	}
 
@@ -444,13 +447,13 @@ u32 Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool fillbg
 					color = colors[isfg ? fc : bc];
 				} else {
 					isfg = pixmap[j];
-					red = mColorTable[bc].red + ((mColorTable[fc].red - mColorTable[bc].red) * pixmap[j]) / 255;
-					green = mColorTable[bc].green + ((mColorTable[fc].green - mColorTable[bc].green) * pixmap[j]) / 255;
-					blue = mColorTable[bc].blue + ((mColorTable[fc].blue - mColorTable[bc].blue) * pixmap[j]) / 255;
+					red = palette[bc].red + ((palette[fc].red - palette[bc].red) * pixmap[j]) / 255;
+					green = palette[bc].green + ((palette[fc].green - palette[bc].green) * pixmap[j]) / 255;
+					blue = palette[bc].blue + ((palette[fc].blue - palette[bc].blue) * pixmap[j]) / 255;
 
 					color = (red >> (8 - vinfo.red.length) << vinfo.red.offset)
-							| ((green >> (8 - vinfo.green.length)) << vinfo.green.offset)
-							| ((blue >> (8 - vinfo.blue.length)) << vinfo.blue.offset);
+							| (green >> (8 - vinfo.green.length) << vinfo.green.offset)
+							| (blue >> (8 - vinfo.blue.length) << vinfo.blue.offset);
 				}
 			}
 

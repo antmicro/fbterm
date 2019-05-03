@@ -33,7 +33,7 @@ enum ButtonState {
 	MouseButtonMask = 0x0007,
 
 	ShiftButton	= 0x0100,
-	ControlButton   = 0x0200,
+	ControlButton	= 0x0200,
 	AltButton	= 0x0400,
 	ModifyButtonMask	= 0x0700
 };
@@ -48,24 +48,15 @@ protected:
 	~Shell();
 
 	void resize(u16 w, u16 h);
-	virtual void modeChange(ModeType type);
-
 	void createChildProcess();
 	virtual void initChildProcess() {}
-	
-	virtual void enableCursor(bool enable) = 0;
-	virtual void drawCursor(u16 x, u16 y, u8 color) = 0;
-	void updateCursor();
-
 	virtual void adjustCharAttr(CharAttr &attr);
-	virtual void enterLeave(bool enter, Shell *pair);
+	virtual void switchVt(bool enter);
 	u8 defaultColor(bool foreground) { return foreground ? default_fcolor : default_bcolor; }
 
 private:
 	virtual void readyRead(s8 *buf, u32 len);
-
 	virtual void sendBack(const s8 *data);
-	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c);
 
 	void changeTextColor(u32 start, u32 end, bool inverse);
 	void textSelect(u16 x, u16 y, s32 type, s32 buttons);
@@ -79,7 +70,8 @@ private:
 	void drawMousePointer(u16 x, u16 y);
 	void clearMousePointer();
 
-	static void initDefaultColor();
+	static u8 initDefaultColor(bool foreground);
+	static void initWordChars(s8 *buf, u32 len);
 
 	static u8 default_fcolor, default_bcolor;
 
@@ -110,16 +102,6 @@ private:
 		bool positive_direction;
 		bool color_inversed;
 	} mSelState;
-
-	struct Cursor {
-		Cursor() {
-			x = y = (u16)-1;
-			showed = false;
-		}
-		bool showed;
-		u16 x, y;
-		CharAttr attr;
-	} mCursor;
 
 	struct MousePointer {
 		MousePointer() {

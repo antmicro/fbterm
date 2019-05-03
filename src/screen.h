@@ -34,20 +34,17 @@ public :
 	void clear(u16 col, u16 row, u16 w, u16 h, u8 color);
 	void drawText(u16 col, u16 row, u8 fc, u8 bc, u16 num, u16 *text, bool *dw);
 	bool move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h);
-	void enterLeaveVc(bool enter);
+	void setPalette(const Color *palette);
+	void switchVc(bool enter);
 
 private:
 	Screen(s32 fd);
-	void setupPalette(bool restore);
+	void setupSysPalette(bool restore);
 	void eraseMargin(bool top, u16 h);
 
 	void fillRect(u32 x, u32 y, u32 w, u32 h, u8 color);
 	void drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw);
 	u32 drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool fillbg);
-
-	static const struct Color {
-		u8 blue, green, red;
-	} mColorTable[];
 
 	u16 mCols, mRows;
 	s8 mScrollAccel; // 0 = none, 1 = ypan, 2 = ywrap

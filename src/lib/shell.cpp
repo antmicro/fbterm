@@ -39,7 +39,8 @@ Shell::Shell()
 	static bool inited = false;
 	if (!inited) {
 		inited = true;
-		initDefaultColor();
+		default_fcolor = initDefaultColor(true);
+		default_bcolor = initDefaultColor(false);
 	}
 	
 	mInverseText = false;
@@ -116,16 +117,15 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 
 	s32 btn = buttons & MouseButtonMask;
 	s32 modifies = buttons & ModifyButtonMask;
-
-	if (type == Move && btn == NoButton) {
+	u16 rtype = mode(MouseReport);
+	
+	bool selecting = (rtype == MouseNone || (modifies & ShiftButton));
+	
+	if (type == Move && (!selecting || btn == NoButton)) {
 		drawMousePointer(x, y);
-		return;
 	}
 
-	bool x10mouse = mode(X10MouseReport);
-	bool x11mouse = mode(X11MouseReport);
-
-	if ((!x11mouse && !x10mouse) || (modifies & ShiftButton)) {
+	if (selecting) {
 		textSelect(x, y, type, btn);
 		return;
 	}
@@ -140,13 +140,13 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 		else if (btn & RightButton) val = 2;
 		break;
 	case Release:
-		if (x11mouse) val = 3;
+		if (rtype == MouseX11) val = 3;
 		break;
 	default:
 		break;
 	}
 
-	if (x11mouse && val != -1) {
+	if (rtype == MouseX11 && val != -1) {
 		if (modifies & ShiftButton)	val |= 4;
 		if (modifies & AltButton) val |= 8;
 		if (modifies & ControlButton) val |= 16;
@@ -161,13 +161,10 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 
 void Shell::textSelect(u16 x, u16 y, s32 type, s32 btn)
 {
-	if (!mSelState.selecting) {
-		resetTextSelect();
-	}
-
 	if (btn == LeftButton) {
 		switch (type) {
 		case Press:
+			resetTextSelect();
 			mSelState.selecting = true;
 			startTextSelect(x, y);
 			break;
@@ -175,6 +172,7 @@ void Shell::textSelect(u16 x, u16 y, s32 type, s32 btn)
 			if (mSelState.selecting) {
 				middleTextSelect(x, y);
 			} else {
+				resetTextSelect();
 				mSelState.selecting = true;
 				startTextSelect(x, y);
 			}
@@ -184,13 +182,15 @@ void Shell::textSelect(u16 x, u16 y, s32 type, s32 btn)
 			endTextSelect();
 			break;
 		case DblClick:
+			resetTextSelect();
 			autoTextSelect(x, y);
 			break;
 		default:
 			break;
 		}
 	} else if (btn == RightButton) {
-		if (type == Press) {
+		if (type == Press || type == DblClick) {
+			resetTextSelect();
 			putSelectedText();
 		}
 	}
@@ -199,72 +199,43 @@ void Shell::textSelect(u16 x, u16 y, s32 type, s32 btn)
 void Shell::startTextSelect(u16 x, u16 y)
 {
 	mSelState.start = mSelState.end = y * w() + x;
-	if (charAttr(x, y).type == CharAttr::DoubleLeft) mSelState.end++;
-	else if (charAttr(x, y).type == CharAttr::DoubleRight) mSelState.start--;
 
 	changeTextColor(mSelState.start, mSelState.end, true);
 	mSelState.color_inversed = true;
-	mSelState.positive_direction = true;
 }
 
 void Shell::middleTextSelect(u16 x, u16 y)
 {
-	u32 pos, pos_as_end;
-	pos = pos_as_end = y * w() + x;
-	if (charAttr(x, y).type == CharAttr::DoubleLeft) pos_as_end++;
-	else if (charAttr(x, y).type == CharAttr::DoubleRight) pos--;
-
-	x = mSelState.start % w();
-	y = mSelState.start / w();
-
-	u32 start, start_as_end;
-	start = start_as_end = y * w() + x;
-	if (charAttr(x, y).type == CharAttr::DoubleLeft) start_as_end++;
-	else if (charAttr(x, y).type == CharAttr::DoubleRight) start--;
-
-	x = mSelState.end % w();
-	y = mSelState.end / w();
-
-	u32 end, end_as_end;
-	end = end_as_end = y * w() + x;
-	if (charAttr(x, y).type == CharAttr::DoubleLeft) end_as_end++;
-	else if (charAttr(x, y).type == CharAttr::DoubleRight) end--;
-
-
-	if (mSelState.positive_direction) {
-		if (pos < start) {
-			changeTextColor(start, end_as_end, false);
-			changeTextColor(pos, start_as_end, true);
-
-			mSelState.start = pos;
-			mSelState.end = start_as_end;
-			mSelState.positive_direction = false;
+	u32 start = mSelState.start, end = mSelState.end;
+	u32 new_end = y * w() + x;
+	
+	bool dir_sel = (end >= start);
+	bool dir_new_sel = (new_end >= start);
+	
+	mSelState.end = new_end;
+	
+	if (dir_sel == dir_new_sel) {
+		bool dir_change = (new_end > end);
+		
+		u32 &pos = (dir_sel == dir_change) ? end : new_end;
+		CharAttr attr = charAttr(pos % w(), pos / w());
+		
+		if (dir_sel) {
+			if (attr.type == CharAttr::DoubleLeft) pos++;
+			pos++;
 		} else {
-			if (pos_as_end > end_as_end) {
-				changeTextColor(end_as_end + 1, pos_as_end, true);
-			} else if (pos_as_end < end) {
-				changeTextColor(pos_as_end + 1, end_as_end, false);
-			}
-
-			mSelState.end = pos_as_end;
+			if (attr.type == CharAttr::DoubleRight) pos--;
+			pos--;
+		}
+		
+		bool dir_new_change = (new_end == end) ? dir_change : (new_end > end);
+		
+		if (dir_change == dir_new_change) {
+			changeTextColor(end, new_end, dir_sel == dir_change);
 		}
 	} else {
-		if (pos_as_end >= end_as_end) {
-			changeTextColor(start, end_as_end, false);
-			changeTextColor(end, pos_as_end, true);
-
-			mSelState.start = end;
-			mSelState.end = pos_as_end;
-			mSelState.positive_direction = true;
-		} else {
-			if (pos < start) {
-				changeTextColor(pos, start - 1, true);
-			} else if (pos > start_as_end) {
-				changeTextColor(start, pos - 1, false);
-			}
-
-			mSelState.start = pos;
-		}
+		changeTextColor(start, end, false);
+		changeTextColor(start, new_end, true);
 	}
 }
 
@@ -289,17 +260,28 @@ static void utf16_to_utf8(u16 *buf16, u32 num, s8 *buf8)
 	buf8[index] = 0;
 }
 
+#define SWAP(a, b) do \
+	if (a > b) { \
+		u32 tmp = a; \
+		a = b; \
+		b = tmp; \
+	} \
+while (0)
+
 void Shell::endTextSelect()
 {
 	mMousePointer.drawed = false;
 
-	u32 len = mSelState.end - mSelState.start + 1;
+	u32 start = mSelState.start, end = mSelState.end;
+	SWAP(start, end);
+	
+	u32 len = end - start + 1;
 	u16 buf[len];
 	s8 *text = new s8[len * 3];
 
 	u16 startx, starty, endx, endy;
-	startx = mSelState.start % w(), starty = mSelState.start / w();
-	endx = mSelState.end % w(), endy = mSelState.end / w();
+	startx = start % w(), starty = start / w();
+	endx = end % w(), endy = end / w();
 
 	u32 index = 0;
 	for (u16 y = starty; y <= endy; y++) {
@@ -326,20 +308,31 @@ void Shell::resetTextSelect()
 
 void Shell::autoTextSelect(u16 x, u16 y)
 {
-	mSelState.selecting = true;
-
-	static const u32 inwordLut[8] = {
-		0x00000000, /* control chars     */
-		0x03FF6000, /* digits and '-' and '.' */
-		0x87FFFFFE, /* uppercase and '_' */
-		0x07FFFFFE, /* lowercase         */
+	static u32 inwordLut[8] = {
+		0x00000000,
+		0x03FF0000, /* digits */
+		0x07FFFFFE, /* uppercase */
+		0x07FFFFFE, /* lowercase */
 		0x00000000,
 		0x00000000,
 		0xFF7FFFFF, /* latin-1 accented letters, not multiplication sign */
 		0xFF7FFFFF  /* latin-1 accented letters, not division sign */
 	};
+	
+	static bool inited = false;
+	if (!inited) {
+		inited = true;
+		
+		u8 chrs[32];
+		initWordChars((s8*)chrs, sizeof(chrs));
+		
+		for (u32 i = 0; chrs[i]; i++) {
+			if (chrs[i] > 0x7f || chrs[i] <= ' ') continue;
+			inwordLut[chrs[i] >> 5] |= 1 << (chrs[i] & 0x1f);
+		}
+	}
 
-	#define inword(c) ((c) > 0xff || (( inwordLut[(c) >> 5] >> ((c) & 0x1F) ) & 1))
+	#define inword(c) ((c) > 0xff || (( inwordLut[(c) >> 5] >> ((c) & 0x1f) ) & 1))
 	#define isspace(c)	((c) == ' ')
 
 	u16 code = charCode(x, y);
@@ -347,41 +340,29 @@ void Shell::autoTextSelect(u16 x, u16 y)
 
 	u16 startx = x;
 	while (1) {
-		if ((spc && !isspace(code)) || (!spc && !inword(code))) {
-			startx++;
-			break;
-		}
-
-		if (!startx) break;
-
+		if (!startx || (spc && !isspace(code)) || (!spc && !inword(code))) break;
 		startx--;
 		code = charCode(startx, y);
 	}
 
+	if (startx < x) startx++;
 
 	code = charCode(x, y);
 	spc = isspace(code);
 
 	u16 endx = x;
 	while (1) {
-		if ((spc && !isspace(code)) || (!spc && !inword(code))) {
-			endx--;
-			break;
-		}
-
-		if (endx == w() - 1) break;
-
+		if (endx == w() -1 || (spc && !isspace(code)) || (!spc && !inword(code))) break;
 		endx++;
 		code = charCode(endx, y);
 	}
 
-	if (charAttr(startx, y).type == CharAttr::DoubleRight) startx--;
-	if (charAttr(endx, y).type == CharAttr::DoubleLeft) endx++;
+	if (endx > x) endx--;
 
 	mSelState.start = y * w() + startx;
 	mSelState.end = y * w() + endx;
-	mSelState.color_inversed = true;
 	changeTextColor(mSelState.start, mSelState.end, true);
+	mSelState.color_inversed = true;
 }
 
 void Shell::putSelectedText()
@@ -393,6 +374,8 @@ void Shell::putSelectedText()
 
 void Shell::changeTextColor(u32 start, u32 end, bool inverse)
 {
+	SWAP(start, end);
+
 	u16 startx, starty, endx, endy;
 	startx = start % w(), starty = start / w();
 	endx = end % w(), endy = end / w();
@@ -412,34 +395,6 @@ void Shell::changeTextColor(u32 start, u32 end, bool inverse)
 	}
 
 	mInverseText = false;
-}
-
-void Shell::drawCursor(CharAttr attr, u16 x, u16 y, u16 c)
-{
-	adjustCharAttr(attr);
-	mCursor.attr = attr;
-	mCursor.x = x;
-	mCursor.y = y;
-	mCursor.showed = false;
-
-	updateCursor();
-}
-
-void Shell::updateCursor()
-{
-	if (mCursor.x >= w() || mCursor.y >= h()) return;
-
-	mCursor.showed ^= true;
-	drawCursor(mCursor.x, mCursor.y, mCursor.showed ? mCursor.attr.fcolor : mCursor.attr.bcolor);
-}
-
-void Shell::modeChange(ModeType type)
-{
-	bool val = mode(type);
-	
-	if (type == CursorVisible) {
-		enableCursor(val);
-	}
 }
 
 void Shell::adjustCharAttr(CharAttr &attr)
@@ -463,10 +418,8 @@ void Shell::adjustCharAttr(CharAttr &attr)
 	}
 }
 
-void Shell::enterLeave(bool enter, Shell *pair)
+void Shell::switchVt(bool enter)
 {
-    enableCursor(enter ? mode(CursorVisible) : false);
-
 	if (!enter) {
 		clearMousePointer();
 		resetTextSelect();
@@ -499,7 +452,12 @@ void Shell::drawMousePointer(u16 x, u16 y)
 
 	mMousePointer.drawed = true;
 	mMousePointer.pos = pos;
-	mMousePointer.color_inversed = !(mSelState.color_inversed && pos >= mSelState.start && pos <= mSelState.end);
+	
+	u32 start = mSelState.start, end = mSelState.end;
+	SWAP(start, end);
+	if (charAttr(start % w(), start / w()).type == CharAttr::DoubleRight) start--;
+	
+	mMousePointer.color_inversed = !(mSelState.color_inversed && pos >= start && pos <= end);
 
 	changeTextColor(pos, pos, mMousePointer.color_inversed);
 #endif

@@ -25,6 +25,7 @@
 #define ADDSAME(len) ((len) << 8)
 
 const VTerm::StateOption VTerm::control_state[] = {
+    { 0,	0,	KEEP },
 	{ 7,	&VTerm::bell,	KEEP },
 	{ 8,	&VTerm::bs,		KEEP },
 	{ 9,	&VTerm::tab,	KEEP },
@@ -92,7 +93,7 @@ const VTerm::StateOption VTerm::square_state[] = {
 	{ 'l', &VTerm::clear_mode,	NORMAL },
 	{ 'm', &VTerm::set_display_attr,	NORMAL },
 	{ 'n', &VTerm::status_report,	NORMAL },
-	{ 'q', 0, NORMAL }, //set_led
+	{ 'q', &VTerm::set_led, NORMAL },
 	{ 'r', &VTerm::set_margins,	NORMAL },
 	{ 's', &VTerm::save_cursor,	NORMAL },
 	{ 'u', &VTerm::restore_cursor,	NORMAL },
@@ -105,8 +106,8 @@ const VTerm::StateOption VTerm::nonstd_state[] = {
 	{ '0' | ADDSAME(9), &VTerm::param_digit,	KEEP },
 	{ 'A' | ADDSAME(5), &VTerm::param_digit,	KEEP },
 	{ 'a' | ADDSAME(5), &VTerm::param_digit,	KEEP },
-	{ 'P', 0, NORMAL }, //reset palette
-	{ 'R', 0, NORMAL }, //setup palette
+	{ 'P', &VTerm::set_palette, KEEP },
+	{ 'R', &VTerm::reset_palette, NORMAL },
 	{ -1 }
 };
 

@@ -42,7 +42,7 @@ void VTerm::bs()
 
 void VTerm::bell()
 {
-	requestBell();
+	request(Bell);
 }
 
 void VTerm::tab()
@@ -79,12 +79,25 @@ void VTerm::clear_tab()
 
 void VTerm::param_digit()
 {
-	param[npar] = param[npar] * 10 + cur_char - '0';
+	if (palette_mode) {
+		param[npar++] = cur_char >= 'a' ? (cur_char - 'a' + 10) : (cur_char >= 'A' ? (cur_char - 'A' + 10) : (cur_char - '0'));
+
+		if (npar == 7) {
+			u32 val = 0;
+			for (u32 i = 0; i < 7; i++) {
+				val <<= 4;
+				val |= param[i];
+			}
+			request(PaletteSet, val);
+			normal_state = true; 
+		}
+	} else
+		param[npar] = param[npar] * 10 + cur_char - '0';
 }
 
 void VTerm::next_param()
 {
-	npar++;
+	if (npar < NPAR - 1) npar++;
 }
 
 void VTerm::clear_param()
@@ -92,6 +105,7 @@ void VTerm::clear_param()
 	npar = 0;
 	bzero(param, sizeof(param));
 	q_mode = 0;
+	palette_mode = false;
 }
 
 void VTerm::save_cursor()
@@ -379,14 +393,14 @@ void VTerm::status_report()
 
 void VTerm::keypad_numeric()
 {
-	mode_flags.numeric_keypad = true;
-	modeChange(NumericKeypad);
+	mode_flags.applic_keypad = false;
+	modeChanged(ApplicKeypad);
 }
 
 void VTerm::keypad_application()
 {
-	mode_flags.numeric_keypad = false;
-	modeChange(NumericKeypad);
+	mode_flags.applic_keypad = true;
+	modeChanged(ApplicKeypad);
 }
 
 void VTerm::enable_mode(bool enable)
@@ -402,8 +416,8 @@ void VTerm::enable_mode(bool enable)
 		mode_flags.crlf = enable;
 		break;
 	case 1001 :
-		mode_flags.cursorkey_esc0 = enable;
-		modeChange(CursorKeyEsc0);
+		mode_flags.cursorkey_esco = enable;
+		modeChanged(CursorKeyEscO);
 		break;
 	case 1003 :
 		mode_flags.col_132 = enable;
@@ -422,20 +436,20 @@ void VTerm::enable_mode(bool enable)
 		break;
 	case 1008 :
 		mode_flags.autorepeat_key = enable;
-		modeChange(AutoRepeatKey);
+		modeChanged(AutoRepeatKey);
 		break;
 	case 1009 :
-		mode_flags.x10_mouse_report = enable;
-		modeChange(X10MouseReport);
+		mode_flags.mouse_report = (enable ? MouseX10 : MouseNone);
+		modeChanged(MouseReport);
 		break;
 	case 1025 :
 		mode_flags.cursor_visible = enable;
-		modeChange(CursorVisible);
+		modeChanged(CursorVisible);
 		move_cursor(cursor_x, cursor_y);
 		break;
 	case 2000 :
-		mode_flags.x11_mouse_report = enable;
-		modeChange(X11MouseReport);
+		mode_flags.mouse_report = (enable ? MouseX11 : MouseNone);
+		modeChanged(MouseReport);
 		break;
 	default:
 		break;
@@ -535,7 +549,10 @@ void VTerm::set_q_mode()
 
 void VTerm::set_cursor_type()
 {
-	if (q_mode) { // set cursor type
+	if (q_mode) {
+		mode_flags.cursor_shape = param[0];
+		modeChanged(CursorShape);
+		move_cursor(cursor_x, cursor_y);
 	} else if (!param[0]) { 
 		respond_id();
 	}
@@ -543,12 +560,12 @@ void VTerm::set_cursor_type()
 
 void VTerm::set_utf8()
 {
-	utf8 = true;
+//	utf8 = true;
 }
 
 void VTerm::clear_utf8()
 {
-	utf8 = false;
+//	utf8 = false;
 }
 
 void VTerm::set_charset()
@@ -602,7 +619,40 @@ void VTerm::linux_specific()
 		default_fcolor = char_attr.fcolor;
 		default_bcolor = char_attr.bcolor;
 		break;
+	case 9:
+		request(Blank, param[1]);
+		break;
+	case 10:
+		request(BellFrequencySet, param[1]);
+		break;
+	case 11:
+		request(BellDurationSet,  param[1]);
+		break;
+	case 12:
+		request(VcSwitch, param[1]);
+		break;
+	case 13:
+		request(Unblank);
+		break;
+	case 14:
+		request(VesaPowerIntervalSet,  param[1]);
+		break;
 	default:
 		break;
 	}
+}
+
+void VTerm::set_palette()
+{
+	palette_mode = true;
+}
+
+void VTerm::reset_palette()
+{
+	request(PaletteClear);
+}
+
+void VTerm::set_led()
+{
+	request(param[0] ? LedSet : LedClear,  param[0]);
 }

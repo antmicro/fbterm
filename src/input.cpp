@@ -24,6 +24,7 @@
 #include <sys/ioctl.h>
 #include <sys/vt.h>
 #include <linux/kd.h>
+#include <linux/input.h>
 #include "input.h"
 #include "input_key.h"
 #include "fbshell.h"
@@ -52,21 +53,17 @@ TtyInput *TtyInput::createInstance()
 
 TtyInput::TtyInput()
 {
-	setupSysKey(false);
-
 	ioctl(STDIN_FILENO, KDGKBMODE, &oldKbMode);
-	ioctl(STDIN_FILENO, KDSKBMODE, K_UNICODE);
+	switchVc(true);
 
 	tcgetattr(STDIN_FILENO, &oldTm);
 
 	termios tm = oldTm;
-	tm.c_lflag &= ~(ECHO | IEXTEN | ISIG | NOFLSH | ICANON);
-	tm.c_iflag &= ~(IXON | ISTRIP | ICRNL);
-	tm.c_oflag &= ~OPOST;
-	tm.c_cflag &= ~(CSIZE | PARENB);
-	tm.c_cflag |= CS8;
+	
+	cfmakeraw(&tm);
 	tm.c_cc[VMIN] = 1;
 	tm.c_cc[VTIME] = 0;	
+
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &tm);
 
 	setFd(dup(STDIN_FILENO));
@@ -75,12 +72,12 @@ TtyInput::TtyInput()
 TtyInput::~TtyInput()
 {
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTm);
-	ioctl(STDIN_FILENO, KDSKBMODE, oldKbMode);
-	setupSysKey(true);
+	switchVc(false);
 }
 
-void TtyInput::enterLeaveVc(bool enter)
+void TtyInput::switchVc(bool enter)
 {
+	ioctl(STDIN_FILENO, KDSKBMODE, enter ? K_UNICODE : oldKbMode);
 	setupSysKey(!enter);
 }
 
@@ -96,29 +93,29 @@ void TtyInput::setupSysKey(bool restore)
 		u16 new_val;
 		u16 old_val;
 	} sysKeyTable[] = {
-		{T_SHIFT, 104,	SHIFT_PAGEUP},
-		{T_SHIFT, 109,	SHIFT_PAGEDOWN},
-		{T_SHIFT, 105,	SHIFT_LEFT},
-		{T_SHIFT, 106,	SHIFT_RIGHT},
-		{T_CTRL_ALT, 2, CTRL_ALT_1},
-		{T_CTRL_ALT, 3, CTRL_ALT_2},
-		{T_CTRL_ALT, 4, CTRL_ALT_3},
-		{T_CTRL_ALT, 5, CTRL_ALT_4},
-		{T_CTRL_ALT, 6, CTRL_ALT_5},
-		{T_CTRL_ALT, 7, CTRL_ALT_6},
-		{T_CTRL_ALT, 8, CTRL_ALT_7},
-		{T_CTRL_ALT, 9,	CTRL_ALT_8},
-		{T_CTRL_ALT, 10, CTRL_ALT_9},
-		{T_CTRL_ALT, 11, CTRL_ALT_0},
-		{T_CTRL_ALT, 46, CTRL_ALT_C},
-		{T_CTRL_ALT, 32, CTRL_ALT_D},
-		{T_CTRL_ALT, 18, CTRL_ALT_E},
-		{T_CTRL_ALT, 59, CTRL_ALT_F1},
-		{T_CTRL_ALT, 60, CTRL_ALT_F2},
-		{T_CTRL_ALT, 61, CTRL_ALT_F3},
-		{T_CTRL_ALT, 62, CTRL_ALT_F4},
-		{T_CTRL_ALT, 63, CTRL_ALT_F5},
-		{T_CTRL_ALT, 64, CTRL_ALT_F6},
+		{T_SHIFT, KEY_PAGEUP,	SHIFT_PAGEUP},
+		{T_SHIFT, KEY_PAGEDOWN,	SHIFT_PAGEDOWN},
+		{T_SHIFT, KEY_LEFT,		SHIFT_LEFT},
+		{T_SHIFT, KEY_RIGHT,	SHIFT_RIGHT},
+		{T_CTRL_ALT, KEY_1, CTRL_ALT_1},
+		{T_CTRL_ALT, KEY_2, CTRL_ALT_2},
+		{T_CTRL_ALT, KEY_3, CTRL_ALT_3},
+		{T_CTRL_ALT, KEY_4, CTRL_ALT_4},
+		{T_CTRL_ALT, KEY_5, CTRL_ALT_5},
+		{T_CTRL_ALT, KEY_6, CTRL_ALT_6},
+		{T_CTRL_ALT, KEY_7, CTRL_ALT_7},
+		{T_CTRL_ALT, KEY_8,	CTRL_ALT_8},
+		{T_CTRL_ALT, KEY_9, CTRL_ALT_9},
+		{T_CTRL_ALT, KEY_0, CTRL_ALT_0},
+		{T_CTRL_ALT, KEY_C, CTRL_ALT_C},
+		{T_CTRL_ALT, KEY_D, CTRL_ALT_D},
+		{T_CTRL_ALT, KEY_E, CTRL_ALT_E},
+		{T_CTRL_ALT, KEY_F1, CTRL_ALT_F1},
+		{T_CTRL_ALT, KEY_F2, CTRL_ALT_F2},
+		{T_CTRL_ALT, KEY_F3, CTRL_ALT_F3},
+		{T_CTRL_ALT, KEY_F4, CTRL_ALT_F4},
+		{T_CTRL_ALT, KEY_F5, CTRL_ALT_F5},
+		{T_CTRL_ALT, KEY_F6, CTRL_ALT_F6},
 	};
 
 	extern s32 effective_uid;
@@ -147,7 +144,7 @@ void TtyInput::readyRead(s8 *buf, u32 len)
 {
 	static const u8 sys_utf8_start = 0xc0 | (AC_START >> 6);
 
-	FbShell *shell = FbShell::activeShell();
+	FbShell *shell = FbShellManager::instance()->activeShell();
 	u32 i, start = 0;
 	for (i = 0; i < len; i++) {
 		u32 orig = i;

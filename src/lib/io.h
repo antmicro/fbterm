@@ -41,6 +41,7 @@ protected:
 	void write(s8 *buf, u32 len);
 
 	virtual void readyRead(s8 *buf, u32 len) = 0;
+	virtual void ioEnd() {}
 
 private:
 	void translate(bool isread, s8 *buf, u32 len);

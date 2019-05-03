@@ -20,38 +20,75 @@
 #ifndef FBSHELL_H
 #define FBSHELL_H
 
+#include "instance.h"
 #include "shell.h"
 
+#define NR_COLORS 16
+
+struct Color {
+	u8 blue, green, red;
+};
+	
 class FbShell : public Shell {
 public:
-	static FbShell *activeShell() {
-		return mShellList[mCurShell];
-	}
-	static FbShell *createShell();
-	static void deleteShell();
-	static void switchShell(u8 num);
-	static void nextShell();
-	static void prevShell();
-	static void enterLeaveVc(bool enter);
-	static void drawCursor();
-	static void redraw(u16 x, u16 y, u16 w, u16 h);
 	void switchCodec(u8 index);
 
 private:
+	friend class FbShellManager;
 	FbShell();
 	~FbShell();
 
 	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 num, u16 *chars, bool *dws);
 	virtual bool moveChars(u16 sx, u16 sy, u16 dx, u16 dy, u16 w, u16 h);
+	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c);
+	virtual void modeChanged(ModeType type);
+	virtual void request(RequestType type, u32 val = 0);
 
 	virtual void initChildProcess();
-	virtual void enableCursor(bool enable);
-	virtual void drawCursor(u16 x, u16 y, u8 color);
-	static void setActive(FbShell *shell);
+	virtual void switchVt(bool enter);
 
-	static bool mVcCurrent;
-	static u8 mShellCount, mCurShell;
-	static FbShell *mShellList[], *mActiveShell;
+	void enableCursor(bool enable);
+	void updateCursor();
+
+	struct Cursor {
+		Cursor() {
+			x = y = (u16)-1;
+			showed = false;
+		}
+		bool showed;
+		u16 x, y;
+		u16 code;
+		CharAttr attr;
+	} mCursor;
+
+	bool mPaletteChanged;
+	Color mPalette[NR_COLORS];
 };
 
+class FbShellManager {
+	DECLARE_INSTANCE(FbShellManager)
+public:
+	FbShell *activeShell() {
+		return mActiveShell;
+	}
+	void createShell();
+	void deleteShell();
+	void shellExited(FbShell *shell);
+	void switchShell(u32 num);
+	void nextShell();
+	void prevShell();
+	void drawCursor();
+	void historyScroll(bool down);
+	void redraw(u16 x, u16 y, u16 w, u16 h);
+	void switchVc(bool enter);
+
+private:
+	u32 getIndex(FbShell *shell, bool forward, bool stepfirst);
+	void setActive(FbShell *shell);
+
+	#define NR_SHELLS 10
+	FbShell *mShellList[NR_SHELLS], *mActiveShell;
+	u32 mShellCount, mCurShell;
+	bool mVcCurrent;
+};
 #endif

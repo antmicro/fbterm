@@ -39,7 +39,7 @@ Font *Font::createInstance()
 
 	FcPattern *pat = FcNameParse((FcChar8*)buf);
 
-	s32 pixel_size = 12;
+	u32 pixel_size = 12;
 	Config::instance()->getOption("font_size", pixel_size);
 	FcPatternAddDouble(pat, FC_PIXEL_SIZE, (double)pixel_size);
 
@@ -52,7 +52,7 @@ Font *Font::createInstance()
 	FcCharSet *cs;
 	FcFontSet *fs = FcFontSort(NULL, pat, FcTrue, &cs, &result);
 
-	FontRec *fonts;
+	FontRec *fonts = 0;
 	u32 index = 0;
 	if (fs) {
 		fonts = new FontRec[fs->nfont];
@@ -70,7 +70,7 @@ Font *Font::createInstance()
 	if (fs) FcFontSetDestroy(fs);
 
 	if (!index) {
-		if (fs) {
+		if (cs) {
 			FcCharSetDestroy(cs);
 			delete[] fonts;
 		}

@@ -27,12 +27,11 @@ class Config {
 	DECLARE_INSTANCE(Config)
 public:
 	void getOption(const s8 *key, s8 *val, u32 len);
-	void getOption(const s8 *key, s32 &val);
+	void getOption(const s8 *key, u32 &val);
 	void getOption(const s8 *key, bool &val);
 
 private:
 	void parseOption(s8 *str);
-	void create_config_file(const s8 *file);
 
 	struct OptionEntry {
 		s8 *key;

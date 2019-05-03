@@ -26,7 +26,7 @@
 class TtyInput : public IoPipe {
 	DECLARE_INSTANCE(TtyInput)
 public:
-	void enterLeaveVc(bool enter);
+	void switchVc(bool enter);
 
 private:
 	virtual void readyRead(s8 *buf, u32 len);
