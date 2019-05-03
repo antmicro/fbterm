@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -34,11 +34,18 @@ DEFINE_INSTANCE_DEFAULT(Config)
 
 Config::Config()
 {
+	mShellCommand = 0;
 	mConfigBuf = 0;
 	mConfigEntrys = 0;
 
+	const s8 *home = getenv("HOME");
+	if (!home) {
+		if (getuid()) return;
+		home = "/root";
+	}
+
 	s8 name[64];
-	snprintf(name, sizeof(name), "%s/%s", getenv("HOME"), ".fbtermrc");
+	snprintf(name, sizeof(name), "%s/%s", home, ".fbtermrc");
 
 	checkConfigFile(name);
 
@@ -211,8 +218,9 @@ void Config::checkConfigFile(const s8 *name)
 bool Config::parseArgs(s32 argc, s8 **argv)
 {
 	static const option options[] = {
-		{ "version", no_argument, 0, 'V' },
 		{ "help", no_argument, 0, 'h' },
+		{ "version", no_argument, 0, 'V' },
+		{ "verbose", no_argument, 0, 'v' },
 		{ "font-names", required_argument, 0, 'n' },
 		{ "font-size", required_argument, 0, 's' },
 		{ "color-foreground", required_argument, 0, 'f' },
@@ -227,7 +235,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 	};
 
 	s32 index;
-	while ((index = getopt_long(argc, argv, "Vhn:s:f:b:e:r:i:", options, 0)) != -1) {
+	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:", options, 0)) != -1) {
 		switch (index) {
 		case 'V':
 			printf("FbTerm version " VERSION "\n");
@@ -236,11 +244,12 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		case 'h':
 		case '?':
 			printf(
-				"Usage: fbterm [option]\n"
+				"Usage: fbterm [options] [--] [command [arguments]]\n"
 				"A fast framebuffer based terminal emulator for linux\n"
 				"\n"
-				"  -V, --version                   display FbTerm version and exit\n"
 				"  -h, --help                      display this help and exit\n"
+				"  -V, --version                   display FbTerm version and exit\n"
+				"  -v, --verbose                   display extra information\n"
 				"  -n, --font-names=TEXT           specify font family names\n"
 				"  -s, --font-size=NUM             specify font pixel size\n"
 				"      --font-width=NUM            force font width\n"
@@ -260,17 +269,18 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 			for (const option *opt = options; opt->name; opt++) {
 				if (opt->val != index) continue;
 
+				const s8 *val  = (opt->has_arg ? optarg : "yes");
 				OptionEntry *entry = getEntry(opt->name);
-				if (entry) {
-					entry->val = optarg;
-				} else {
-					addEntry(opt->name, optarg);
-				}
+
+				if (entry) entry->val = val;
+				else addEntry(opt->name, val);
+
 				break;
 			}
 			break;
 		}
 	}
 
+	if (argv[optind]) mShellCommand = argv + optind;
 	return true;
 }

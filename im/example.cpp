@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -28,6 +28,7 @@
 
 static char raw_mode = 1;
 static char first_show = 1;
+static unsigned short cursorx, cursory;
 
 static void im_active()
 {
@@ -72,14 +73,14 @@ static void process_key(char *keys, unsigned short len)
 	}
 }
 
-static void cursor_pos_changed(unsigned x, unsigned y)
+static void im_show()
 {
 	static const char str[] = "a IM example";
 	#define NSTR (sizeof(str) - 1)
 
 	ImWin wins[] = {
-		{ x + 10, y + 10, 40, 20 },
-		{ x + 10, y + 40, FW(NSTR) + 10, FH(1) + 10 }
+		{ cursorx + 10, cursory + 10, 40, 20 },
+		{ cursorx + 10, cursory + 40, FW(NSTR) + 10, FH(1) + 10 }
 	};
 	set_im_windows(wins, 2);
 
@@ -105,6 +106,19 @@ static void cursor_pos_changed(unsigned x, unsigned y)
 	Screen::instance()->drawText(wins[1].x + 5, wins[1].y + 5, Black, White, NSTR, unistr, dws);
 }
 
+static void im_hide()
+{
+	first_show = 1;
+	set_im_windows(0, 0);
+}
+
+static void cursor_pos_changed(unsigned x, unsigned y)
+{
+	cursorx = x;
+	cursory = y;
+	im_show();
+}
+
 static void update_fbterm_info(Info *info)
 {
 	Font::setFontInfo(info->fontName, info->fontSize, info->fontHeight, info->fontWidth);
@@ -117,6 +131,8 @@ static void update_fbterm_info(Info *info)
 static ImCallbacks cbs = {
 	im_active, // .active
 	im_deactive, // .deactive
+	im_show,	 // .show_ui
+	im_hide, // .hide_ui
 	process_key, // .send_key
 	cursor_pos_changed, // .cursor_position
 	update_fbterm_info, // .fbterm_info

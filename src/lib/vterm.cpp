@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *   based on GTerm by Timothy Miller <tim@techsource.com>
  *
@@ -64,25 +64,26 @@ VTerm::ModeFlag::ModeFlag()
 }
 
 u16 VTerm::history_lines;
-const VTerm::StateOption *VTerm::hash_control_state[256];
-const VTerm::StateOption *VTerm::hash_esc_state[128];
-const VTerm::StateOption *VTerm::hash_square_state[128];
+u8 VTerm::control_map[MAX_CONTROL_CODE], VTerm::escape_map[NR_STATES][MAX_ESCAPE_CODE];
 
 void VTerm::init_state()
 {
-	#define INIT_STATE_TABLE(a) \
-	do { \
-		memset(hash_##a, 0, sizeof(hash_##a)); \
-		for (u32 i = 0; a[i].key != (u16)-1; i++) { \
-			for (u32 j = 0; j <= (u32)(a[i].key >> 8); j++) { \
-				hash_##a[(u32)(a[i].key & 0xff) + j] = a + i; \
-			} \
-		} \
-	} while (0)
+	for (u8 i = 1; control_sequences[i].code != (u16)-1; i++) {
+		control_map[control_sequences[i].code] = i;
+	}
 
-	INIT_STATE_TABLE(control_state);
-	INIT_STATE_TABLE(esc_state);
-	INIT_STATE_TABLE(square_state);
+	u8 state = ESnormal;
+	for (u8 i = 1; ; i++) {
+		if (escape_sequences[i].code == (u16)-1) {
+			state++;
+			if (state == NR_STATES) break;
+		} else {
+			u8 start = escape_sequences[i].code & 0xff;
+			for (u8 j = 0; j <= escape_sequences[i].code >> 8; j++) {
+				escape_map[state][start + j] = i;
+			}
+		}
+	}
 }
 
 VTerm::VTerm(u16 w, u16 h)
@@ -131,7 +132,7 @@ void VTerm::reset()
 	utf8 = true;
 	utf8_count = 0;
 //	g0_is_active = true;
-	normal_state = true;
+	esc_state = ESnormal;
 
 	pending_scroll = 0;
 	scroll_top = 0;
@@ -295,7 +296,7 @@ void VTerm::input(const u8 *buf, u32 count)
 		rescan = 0;
 
 		/* Do no translation at all in control states */
-		if (!normal_state) {
+		if (esc_state != ESnormal) {
 			tc = c;
 		} else { // if (utf8 && !mode_flags.display_ctrl) {
 			rescan_last_byte:
@@ -390,7 +391,7 @@ void VTerm::input(const u8 *buf, u32 count)
 					&& (c != 127 || mode_flags.display_ctrl)
 					&& (c != 128+27);
 
-		if (normal_state && ok) {
+		if ((esc_state == ESnormal) && ok) {
 			if (c == 0xfeff || (c >= 0x200b && c <= 0x200f)) { // zero width
 				continue;
 			}
@@ -502,44 +503,15 @@ void VTerm::do_normal_char()
 
 void VTerm::do_control_char()
 {
-	const StateOption *so = 0;
+	u8 index = (cur_char < MAX_CONTROL_CODE ? control_map[cur_char] : 0);
+	const Sequence *seq = control_sequences + index;
 
-	#define DO_ACTION() \
-	do { \
-		if (so->action) { \
-			(this->*(so->action))(); \
-		} \
-		 \
-		if (so->next_state == (StateOption*)-1) { \
-			normal_state = true; \
-		} else if (so->next_state) { \
-			normal_state = false; \
-			current_state = so->next_state; \
-		} \
-	} while (0)
-
-	if (cur_char < 256) so = hash_control_state[cur_char];
-	if (so) DO_ACTION();
-
-	if (so || normal_state) return;
-
-	if (current_state == esc_state || current_state == square_state) {
-		if (cur_char < 128) {
-			so = ((current_state == esc_state) ? hash_esc_state : hash_square_state)[cur_char];
-		}
-	} else {
-		for (const StateOption *cur = current_state; cur->key != (u16)-1; cur++) {
-			u32 key = cur->key & 0xff;
-			u32 same = cur->key >> 8;
-			if (cur_char >= key && cur_char <= (key + same)) {
-				so = cur;
-				break;
-			}
-		}
+	if (!index && esc_state != ESnormal && cur_char) {
+		seq = escape_sequences + (cur_char < MAX_ESCAPE_CODE ? escape_map[esc_state][cur_char] : 0);
 	}
 
-	if (so) DO_ACTION();
-	else normal_state = true;
+	if (seq->action) (this->*(seq->action))();
+	if (seq->next != ESkeep) esc_state = seq->next;
 }
 
 void VTerm::update()

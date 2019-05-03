@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -25,6 +25,7 @@
 #include <linux/kd.h>
 #include <linux/keyboard.h>
 #include <linux/input.h>
+#include "input_key.h"
 
 static char key_down[NR_KEYS];
 static unsigned char shift_down[NR_SHIFT];
@@ -104,7 +105,7 @@ unsigned short keycode_to_keysym(unsigned short keycode, char down)
 				ioctl(STDIN_FILENO, KDSKBLED, lock_state);
 			}
 		}
-		
+
 		if (down) shift_down[value]++;
 		else if (shift_down[value]) shift_down[value]--;
 
@@ -120,7 +121,7 @@ unsigned short keycode_to_keysym(unsigned short keycode, char down)
 	case KT_CONS:
 	case KT_CUR:
 	case KT_META:
-	case KT_ASCII:	
+	case KT_ASCII:
 		break;
 
 	default:
@@ -134,7 +135,7 @@ unsigned short keycode_to_keysym(unsigned short keycode, char down)
 unsigned short keypad_keysym_redirect(unsigned short keysym)
 {
 	if (applic_keypad || KTYP(keysym) != KT_PAD || KVAL(keysym) >= NR_PAD) return keysym;
-	
+
 	#define KL(val) K(KT_LATIN, val)
 	static const unsigned short num_map[] = {
 		KL('0'), KL('1'), KL('2'), KL('3'), KL('4'),
@@ -151,7 +152,7 @@ unsigned short keypad_keysym_redirect(unsigned short keysym)
 		K_REMOVE, K_REMOVE, KL('?'), KL('('), KL(')'),
 		KL('#')
 	};
-	
+
 	if (lock_state & K_NUMLOCK) return num_map[keysym - K_P0];
 	return fn_map[keysym - K_P0];
 }
@@ -203,7 +204,7 @@ char *keysym_to_term_string(unsigned short keysym, char down)
 	switch (KTYP(keysym)) {
 	case KT_LATIN:
 	case KT_LETTER:
-		index = to_utf8(value, buf);
+		if (value < KVAL(AC_START) || value > KVAL(AC_END)) index = to_utf8(value, buf);
 		break;
 
 	case KT_FN:
@@ -268,7 +269,7 @@ char *keysym_to_term_string(unsigned short keysym, char down)
 			npadch = -1;
 		}
 		break;
-	
+
 	case KT_ASCII:
 		if (value < NR_ASCII) {
 			int base = 10;
@@ -277,7 +278,7 @@ char *keysym_to_term_string(unsigned short keysym, char down)
 				base = 16;
 				value -= KVAL(K_HEX0);
 			}
-			
+
 			if (npadch == -1) npadch = value;
 			else npadch = npadch * base + value;
 		}

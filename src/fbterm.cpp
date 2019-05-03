@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -22,8 +22,10 @@
 #include <stdio.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <linux/vt.h>
+#include <linux/kdev_t.h>
 #include "config.h"
 #include "fbterm.h"
 #include "fbshell.h"
@@ -34,13 +36,12 @@
 #include "input.h"
 #include "input_key.h"
 #include "mouse.h"
-#include "improxy.h"
 
 #ifdef HAVE_SIGNALFD
 // <sys/signalfd.h> offered by some systems has bug with g++
 #include "signalfd.h"
 
-sigset_t oldSigmask;
+static sigset_t oldSigmask;
 
 class SignalIo : public IoPipe {
 public:
@@ -104,7 +105,6 @@ FbTerm::~FbTerm()
 {
 	IoDispatcher::uninstance();
 	FbShellManager::uninstance();
-	ImProxy::uninstance();
 	Screen::uninstance();
 }
 
@@ -156,6 +156,17 @@ void FbTerm::init()
 void FbTerm::run()
 {
 	if (!mInit) return;
+
+	struct vt_stat vtstat;
+	ioctl(STDIN_FILENO, VT_GETSTATE, &vtstat);
+
+	struct stat ttystat;
+	fstat(STDIN_FILENO, &ttystat);
+
+	if (vtstat.v_active == MINOR(ttystat.st_rdev)) {
+		processSignal(SIGUSR2);
+	}
+
 	FbShellManager::instance()->createShell();
 
 	mRun = true;
@@ -198,8 +209,7 @@ void FbTerm::processSignal(u32 signo)
 		if (mRun) {
 			s32 pid = waitpid(WAIT_ANY, 0, WNOHANG);
 			if (pid > 0) {
-				FbShellManager::instance()->checkShellProcessExited(pid);
-				ImProxy::instance()->checkImProcessExited(pid);
+				FbShellManager::instance()->childProcessExited(pid);
 			}
 		}
 		break;
@@ -251,7 +261,9 @@ void FbTerm::processSysKey(u32 key)
 		break;
 
 	case CTRL_SPACE:
-		manager->toggleIm();
+		if (manager->activeShell()) {
+			manager->activeShell()->toggleIm();
+		}
 		break;
 
 	default:

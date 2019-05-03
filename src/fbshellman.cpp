@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -26,14 +26,13 @@
 #include "improxy.h"
 
 #define screen (Screen::instance())
-#define improxy (ImProxy::instance())
 #define SHELL_ANY ((FbShell *)-1)
 
 DEFINE_INSTANCE_DEFAULT(FbShellManager)
 
 FbShellManager::FbShellManager()
 {
-	mVcCurrent = true;
+	mVcCurrent = false;
 	mShellCount = 0;
 	mCurShell = 0;
 	mActiveShell = 0;
@@ -143,10 +142,6 @@ bool FbShellManager::setActive(FbShell *shell)
 {
 	if (mActiveShell == shell) return false;
 
-	if (improxy->actived()) {
-		toggleIm();
-	}
-
 	if (mActiveShell) {
 		mActiveShell->switchVt(false, shell);
 	}
@@ -170,28 +165,9 @@ void FbShellManager::redraw(u16 x, u16 y, u16 w, u16 h)
 	}
 }
 
-void FbShellManager::toggleIm()
-{
-	if (!mActiveShell) return;
-
-	improxy->toggleActive(mCurShell);
-	mActiveShell->reportCursor();
-	mActiveShell->reportMode();
-}
-
-void FbShellManager::imInput(u32 shell, s8 *text, u32 len)
-{
-	if (shell < NR_SHELLS && mShellList[shell]) {
-		mShellList[shell]->keyInput(text, len);
-	}
-}
-
-void FbShellManager::checkShellProcessExited(s32 pid)
+void FbShellManager::childProcessExited(s32 pid)
 {
 	for (u32 i = 0; i < NR_SHELLS; i++) {
-		if (mShellList[i] && mShellList[i]->childProcessId() == pid) {
-			delete mShellList[i];
-			break;
-		}
+		if (mShellList[i] && mShellList[i]->childProcessExited(pid)) break;
 	}
 }

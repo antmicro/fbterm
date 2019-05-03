@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -35,6 +35,7 @@
 
 static termios oldTm;
 static long oldKbMode;
+static bool keymapFailure = false;
 
 DEFINE_INSTANCE(TtyInput)
 
@@ -65,7 +66,7 @@ TtyInput::TtyInput()
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &tm);
 
 	ioctl(STDIN_FILENO, KDGKBMODE, &oldKbMode);
-	switchIm(false, false);
+	setRawMode(false, true);
 
 	setFd(dup(STDIN_FILENO));
 }
@@ -75,6 +76,13 @@ TtyInput::~TtyInput()
 	setupSysKey(true);
 	ioctl(STDIN_FILENO, KDSKBMODE, oldKbMode);
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &oldTm);
+}
+
+void TtyInput::showInfo(bool verbose)
+{
+	if (keymapFailure) {
+		printf("[input] can't change kernel keymap table, all shortcuts will NOT work! see SECURITY NOTES section of man page for solution.\n");
+	}
 }
 
 void TtyInput::switchVc(bool enter)
@@ -137,7 +145,8 @@ void TtyInput::setupSysKey(bool restore)
 		}
 
 		entry.kb_value = (restore ? sysKeyTable[i].old_val : sysKeyTable[i].new_val);
-		ioctl(STDIN_FILENO, KDSKBENT, &entry); //should have perm CAP_SYS_TTY_CONFIG
+		s32 ret = ioctl(STDIN_FILENO, KDSKBENT, &entry); //should have perm CAP_SYS_TTY_CONFIG
+		if (!keymapFailure && ret == -1) keymapFailure = true;
 	}
 
 	if (!syskey_saved && !restore) syskey_saved = true;
@@ -152,17 +161,7 @@ void TtyInput::readyRead(s8 *buf, u32 len)
 		return;
 	}
 
-	#define PUT_KEYS(buf, len) \
-	do { \
-		if (mImEnable) { \
-			ImProxy::instance()->sendKey(buf, len); \
-		} else { \
-			FbShell *shell = FbShellManager::instance()->activeShell(); \
-			if (shell) { \
-				shell->keyInput(buf, len); \
-			} \
-		} \
-	} while (0)
+	FbShell *shell = FbShellManager::instance()->activeShell();
 
 	u32 start = 0;
 	for (u32 i = 0; i < len; i++) {
@@ -173,39 +172,60 @@ void TtyInput::readyRead(s8 *buf, u32 len)
 			c = ((c & 0x1f) << 6) | (buf[i] & 0x3f);
 			if (c < AC_START || c > AC_END) continue;
 
-			if (orig > start) PUT_KEYS(buf + start, orig - start);
+			if (shell && orig > start) shell->keyInput(buf + start, orig - start);
 			start = i + 1;
 
 			FbTerm::instance()->processSysKey(c);
 		}
 	}
 
-	if (len > start) PUT_KEYS(buf + start, len - start);
+	if (shell && len > start) shell->keyInput(buf + start, len - start);
 }
 
-typedef enum {
-	ALT_L = 1 << 0, ALT_R = 1 << 1,
-	CTRL_L = 1 << 2, CTRL_R = 1 << 3,
-	SHIFT_L = 1 << 4, SHIFT_R = 1 << 5,
-} ModifierType;
+static u16 down_num;
+static bool key_down[NR_KEYS];
+static u8 shift_down[NR_SHIFT];
+static u16 shift_state;
 
-static u16 modState;
-
-void TtyInput::switchIm(bool enter, bool raw)
+void TtyInput::setRawMode(bool raw, bool force)
 {
-	modState = 0;
-	mImEnable = enter;
-	mRawMode = (enter && raw);
+	if (!force && raw == mRawMode) return;
 
+	mRawMode = raw;
 	ioctl(STDIN_FILENO, KDSKBMODE, mRawMode ? K_MEDIUMRAW : K_UNICODE);
-	setupSysKey(mRawMode);
+
+	if (mRawMode) {
+		down_num = 0;
+		shift_state = 0;
+		memset(key_down, 0, sizeof(bool) * NR_KEYS);
+		memset(shift_down, 0, sizeof(char) * NR_SHIFT);
+	} else {
+		if (!down_num) return;
+
+		FbShell *shell = FbShellManager::instance()->activeShell();
+		if (!shell) return;
+
+		u32 num = down_num;
+		for (u32 i = 0; i < NR_KEYS; i++) {
+			if (!key_down[i]) continue;
+
+			s8 code = i | 0x80;
+			shell->keyInput(&code, 1);
+
+			if (!--num) break;
+		}
+	}
 }
 
 void TtyInput::processRawKeys(s8 *buf, u32 len)
 {
+	FbShell *shell = FbShellManager::instance()->activeShell();
+	u32 start = 0;
+
 	for (u32 i = 0; i < len; i++) {
 		bool down = !(buf[i] & 0x80);
 		u16 code = buf[i] & 0x7f;
+		u32 orig = i;
 
 		if (!code) {
 			if (i + 2 >= len) break;
@@ -215,47 +235,64 @@ void TtyInput::processRawKeys(s8 *buf, u32 len)
 			if (!(buf[i] & 0x80) || !(buf[i - 1] & 0x80)) continue;
 		}
 
-		u16 mod = 0;
-		switch (code) {
-		case KEY_LEFTALT:
-			mod = ALT_L;
+		if (code >= NR_KEYS) continue;
+
+		if (down ^ key_down[code]) {
+			if (down) down_num++;
+			else down_num--;
+		} else if (!down) {
+			if (shell && orig > start) shell->keyInput(buf + start, orig - start);
+			start = i + 1;
+		}
+
+		bool rep = (down && key_down[code]);
+		key_down[code] = down;
+
+		struct kbentry ke;
+		ke.kb_table = shift_state;
+		ke.kb_index = code;
+
+		if (ioctl(STDIN_FILENO, KDGKBENT, &ke) == -1) continue;
+
+		u16 value = KVAL(ke.kb_value);
+		u16 syskey = 0, switchvc = 0;
+
+		switch (KTYP(ke.kb_value)) {
+		case KT_LATIN:
+			if (value >= AC_START && value <= AC_END) syskey = value;
 			break;
 
-		case KEY_RIGHTALT:
-			mod = ALT_R;
+		case KT_CONS:
+			switchvc = value + 1;
 			break;
 
-		case KEY_LEFTCTRL:
-			mod = CTRL_L;
-			break;
+		case KT_SHIFT:
+			if (rep || value >= NR_SHIFT) break;
+			if (value == KVAL(K_CAPSSHIFT)) value = KVAL(K_SHIFT);
 
-		case KEY_RIGHTCTRL:
-			mod = CTRL_R;
-			break;
+			if (down) shift_down[value]++;
+			else if (shift_down[value]) shift_down[value]--;
 
-		case KEY_LEFTSHIFT:
-			mod = SHIFT_L;
-			break;
+			if (shift_down[value]) shift_state |= (1 << value);
+			else shift_state &= ~(1 << value);
 
-		case KEY_RIGHTSHIFT:
-			mod = SHIFT_R;
 			break;
 
 		default:
 			break;
 		}
 
-		if (mod) {
-			if (down) modState |= mod;
-			else modState &= ~mod;
-		} else if (down) {
-			u16 ctrl = (CTRL_L | CTRL_R);
-			if ((modState & ctrl) && !(modState & ~ctrl) && code == KEY_SPACE) {
-				FbTerm::instance()->processSysKey(CTRL_SPACE);
-				return;
+		if (down && (syskey || switchvc)) {
+			if (shell && i >= start) shell->keyInput(buf + start, i - start + 1);
+			start = i + 1;
+
+			if (syskey) {
+				FbTerm::instance()->processSysKey(syskey);
+			} else {
+				ioctl(STDIN_FILENO, VT_ACTIVATE, switchvc);
 			}
 		}
 	}
 
-	ImProxy::instance()->sendKey(buf, len);
+	if (shell && len > start) shell->keyInput(buf + start, len - start);
 }

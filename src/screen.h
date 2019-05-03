@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -55,9 +55,9 @@ public :
 	void setPalette(const Color *palette);
 	void switchVc(bool enter);
 	void setClipRects(Rectangle *rects, u32 num);
+	void showInfo(bool verbose);
 
 private:
-	Screen(s32 fd);
 	void setupSysPalette(bool restore);
 	void eraseMargin(bool top, u16 h);
 
@@ -66,9 +66,6 @@ private:
 	void drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip);
 
 	u16 mCols, mRows;
-	u8 mScrollAccel; // 0 = none, 1 = ypan, 2 = ywrap
-	s32 mFd;
-	u8 *mpMemStart;
 };
 
 #endif

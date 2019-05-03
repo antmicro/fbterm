@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -51,10 +51,10 @@ protected:
 	~Shell();
 
 	void resize(u16 w, u16 h);
-	void createChildProcess();
-	s32 childProcessId() { return mPid; }
+	void createShellProcess(s8 **command);
+	s32 shellProcessId() { return mPid; }
 
-	virtual void initChildProcess() {}
+	virtual void initShellProcess() {}
 	virtual void readyRead(s8 *buf, u32 len);
 
 private:

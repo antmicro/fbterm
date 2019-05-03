@@ -1,5 +1,5 @@
 /*
- *   Copyright © 2008 dragchan <zgchan317@gmail.com>
+ *   Copyright Â© 2008-2009 dragchan <zgchan317@gmail.com>
  *   This file is part of FbTerm.
  *
  *   This program is free software; you can redistribute it and/or
@@ -29,6 +29,18 @@
 #define SUBS(a, b) ((a) > (b) ? (a) - (b) : (b) - (a))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+static FcCharSet *unicodeMap;
+static FcFontSet *fontList;
+ 
+static FT_Library ftlib;
+static FT_Face *fontFaces;
+static u32 *fontFlags;
+
+static Font::Glyph **glyphCache;
+static bool *glyphCacheInited;
+
+static void openFont(u32 index);
+
 DEFINE_INSTANCE(Font)
 
 Font *Font::createInstance()
@@ -50,49 +62,55 @@ Font *Font::createInstance()
 	FcDefaultSubstitute(pat);
 
 	FcResult result;
-	FcCharSet *cs;
-	FcFontSet *fs = FcFontSort(NULL, pat, FcTrue, &cs, &result);
+	FcFontSet *fs = FcFontSort(NULL, pat, FcTrue, &unicodeMap, &result);
 
-	FontRec *fonts = 0;
-	u32 index = 0;
 	if (fs) {
-		fonts = new FontRec[fs->nfont];
+		fontList = FcFontSetCreate();
 
-		for (s32 i = 0; i < fs->nfont; i++) {
+		FcObjectSet *family = FcObjectSetCreate();
+		FcObjectSetAdd(family, FC_FAMILY);
+
+		for (u32 i = 0; i < fs->nfont; i++) {
 			FcPattern *font = FcFontRenderPrepare(NULL, pat, fs->fonts[i]);
-			if (font) {
-				fonts[index].face = 0;
-				fonts[index++].pattern = font;
+			if (!font) continue;
+
+			bool same = false;
+			for (u32 j = 0; j < fontList->nfont; j++) {
+				if (FcPatternEqualSubset(fontList->fonts[j], font, family)) {
+					same = true;
+					break;
+				}
+			}
+
+			if (same) {
+				FcPatternDestroy(font);
+			} else {
+				FcFontSetAdd(fontList, font);
 			}
 		}
+
+		FcObjectSetDestroy(family);
 	}
 
 	FcPatternDestroy(pat);
 	if (fs) FcFontSetDestroy(fs);
 
-	if (!index) {
-		if (cs) {
-			FcCharSetDestroy(cs);
-			delete[] fonts;
-		}
+	if (fontList && fontList->nfont) return new Font();
 
-		FcFini();
-		return 0;
-	}
-
-	return new Font(fonts, index, cs);
+	if (unicodeMap) FcCharSetDestroy(unicodeMap);
+	if (fontList) FcFontSetDestroy(fontList);
+	FcFini();
+	return 0;
 }
 
-static FT_Library ftlib = 0;
-static Font::Glyph **glyphCache;
-static bool *glyphCacheInited;
-
-Font::Font(FontRec *fonts, u32 num, void *unicover)
+Font::Font()
 {
-	mpFontList = fonts;
-	mFontNum = num;
-	mpUniCover = unicover;
 	mHeight = mWidth = 0;
+
+	fontFaces = new FT_Face[fontList->nfont];
+	fontFlags = new u32[fontList->nfont];
+	memset(fontFaces, 0, sizeof(FT_Face) * fontList->nfont);
+
 	glyphCache = new Glyph *[256 * 256];
 	glyphCacheInited = new bool[256];
 	memset(glyphCacheInited, 0, sizeof(bool) * 256);
@@ -100,7 +118,7 @@ Font::Font(FontRec *fonts, u32 num, void *unicover)
 	FT_Init_FreeType(&ftlib);
 	openFont(0);
 
-	FT_Face face = (FT_Face)mpFontList[0].face;
+	FT_Face face = fontFaces[0];
 	if (face == (FT_Face)-1) return;
 
 	if (face->face_flags & FT_FACE_FLAG_SCALABLE) {
@@ -108,7 +126,7 @@ Font::Font(FontRec *fonts, u32 num, void *unicover)
 		mWidth = face->size->metrics.max_advance >> 6;
 	} else if (face->num_fixed_sizes) {
 		double dsize;
-		FcPatternGetDouble((FcPattern *)mpFontList[0].pattern, FC_PIXEL_SIZE, 0, &dsize);
+		FcPatternGetDouble(fontList->fonts[0], FC_PIXEL_SIZE, 0, &dsize);
 
 		FT_Bitmap_Size *sizes = face->available_sizes;
 		u32 index = 0, diffmin = (u32)-1;
@@ -140,22 +158,6 @@ Font::Font(FontRec *fonts, u32 num, void *unicover)
 
 Font::~Font()
 {
-	FcCharSetDestroy((FcCharSet*)mpUniCover);
-
-	for (u32 i = 0; i < mFontNum; i++) {
-		FcPatternDestroy((FcPattern*)mpFontList[i].pattern);
-
-		FT_Face face = (FT_Face)mpFontList[i].face;
-		if (face > 0) {
-			FT_Done_Face(face);
-		}
-	}
-
-	FT_Done_FreeType(ftlib);
-	FcFini();
-
-	delete[] mpFontList;
-
 	for (u32 i = 0; i < 256; i++) {
 		if (!glyphCacheInited[i]) continue;
 
@@ -168,13 +170,44 @@ Font::~Font()
 
 	delete[] glyphCache;
 	delete[] glyphCacheInited;
+
+	for (u32 i = 0; i < fontList->nfont; i++) {
+		if (fontFaces[i] && fontFaces[i] != (FT_Face)-1) {
+			FT_Done_Face(fontFaces[i]);
+		}
+	}
+
+	delete[] fontFaces;
+	delete[] fontFlags;
+
+	FT_Done_FreeType(ftlib);
+	FcCharSetDestroy(unicodeMap);
+	FcFontSetDestroy(fontList);
+	FcFini();
 }
 
-void Font::openFont(u32 index)
+void Font::showInfo(bool verbose)
 {
-	if (index >= mFontNum) return;
+	if (!verbose) return;
 
-	FcPattern *pattern = (FcPattern *)mpFontList[index].pattern;
+	printf("[font] width: %dpx, height: %dpx, ordered list: ", mWidth, mHeight);
+
+	u32 index;
+	FcChar8 *family;
+	for (index = 0; index < fontList->nfont - 1; index++) {
+		FcPatternGetString(fontList->fonts[index], FC_FAMILY, 0, &family);
+		printf("%s, ", family);
+	}
+
+	FcPatternGetString(fontList->fonts[index], FC_FAMILY, 0, &family);
+	printf("%s\n", family);
+}
+
+static void openFont(u32 index)
+{
+	if (index >= fontList->nfont) return;
+
+	FcPattern *pattern = fontList->fonts[index];
 
 	FcChar8 *name = (FcChar8 *)"";
 	FcPatternGetString(pattern, FC_FILE, 0, &name);
@@ -184,7 +217,7 @@ void Font::openFont(u32 index)
 
 	FT_Face face;
 	if (FT_New_Face(ftlib, (const char *)name, id, &face)) {
-		mpFontList[index].face = (void *)-1;
+		fontFaces[index] = (FT_Face)-1;
 		return;
 	}
 
@@ -215,17 +248,17 @@ void Font::openFont(u32 index)
 		load_flags |= FT_LOAD_TARGET_MONO;
 	}
 
-	mpFontList[index].face = face;
-	mpFontList[index].load_flags = load_flags;
+	fontFaces[index] = face;
+	fontFlags[index] = load_flags;
 }
 
-int Font::fontIndex(u32 unicode)
+static int fontIndex(u32 unicode)
 {
-	if (!FcCharSetHasChar((FcCharSet *)mpUniCover, (FcChar32)unicode)) return -1;
+	if (!FcCharSetHasChar(unicodeMap, unicode)) return -1;
 
 	FcCharSet *charset;
-	for (u32 i = 0; i < mFontNum; i++) {
-		FcPatternGetCharSet((FcPattern *)mpFontList[i].pattern, FC_CHARSET, 0, &charset);
+	for (u32 i = 0; i < fontList->nfont; i++) {
+		FcPatternGetCharSet(fontList->fonts[i], FC_CHARSET, 0, &charset);
 		if (FcCharSetHasChar(charset, unicode)) return i;
 	}
 
@@ -246,14 +279,14 @@ Font::Glyph *Font::getGlyph(u32 unicode)
 	int i = fontIndex(unicode);
 	if (i == -1) return 0;
 
-	if (!mpFontList[i].face) openFont(i);
-	if (mpFontList[i].face == (void *)-1) return 0;
+	if (!fontFaces[i]) openFont(i);
+	if (fontFaces[i] == (FT_Face)-1) return 0;
 
-	FT_Face face = (FT_Face)mpFontList[i].face;
+	FT_Face face = fontFaces[i];
 	FT_UInt index = FT_Get_Char_Index(face, (FT_ULong)unicode);
 	if (!index) return 0;
 
-	FT_Load_Glyph(face, index, FT_LOAD_RENDER | mpFontList[i].load_flags);
+	FT_Load_Glyph(face, index, FT_LOAD_RENDER | fontFlags[i]);
 	FT_Bitmap &bitmap = face->glyph->bitmap;
 
 	u32 x, y, w, h, nx, ny, nw, nh;
