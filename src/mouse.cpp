@@ -55,7 +55,7 @@ static s32 open_gpm(Gpm_Connect *conn)
 	if (gpm_fd == -1) return -1;
 
 	struct sockaddr_un addr;
-	bzero((s8 *)&addr, sizeof(addr));
+	memset((s8 *)&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, GPM_NODE_CTL, sizeof(addr.sun_path) - 1);
 
@@ -69,7 +69,7 @@ static s32 open_gpm(Gpm_Connect *conn)
 		return -1;
 	}
 
-   	return gpm_fd;
+	return gpm_fd;
 }
 
 Mouse *Mouse::createInstance()
@@ -109,7 +109,7 @@ void Mouse::readyRead(s8 *buf, u32 len)
 
 	len /= sizeof(Gpm_Event);
 	Gpm_Event *ev = (Gpm_Event *)buf;
-	
+
 	for (; len--; ev++) {
 		s32 type = -1, buttons = 0;
 
@@ -134,7 +134,7 @@ void Mouse::readyRead(s8 *buf, u32 len)
 		if (newx >= maxx) newx = maxx - 1;
 		if (newy >= maxy) newy = maxy - 1;
 		if (newx == x && newy == y && !(buttons & MouseButtonMask)) continue;
-	
+
 		shell->mouseInput(newx, newy, type, buttons);
 		x = newx;
 		y = newy;

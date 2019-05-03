@@ -44,9 +44,9 @@ static fb_fix_screeninfo finfo;
 static fb_var_screeninfo vinfo;
 static u32 bytes_per_pixel;
 
-RotateType Screen::mRotate;
-u32 Screen::mScreenw;
-u32 Screen::mScreenh;
+static RotateType rtype;
+static u32 screenw;
+static u32 screenh;
 
 #include "screen_clip.cpp"
 #include "screen_render.cpp"
@@ -60,7 +60,7 @@ Screen *Screen::createInstance()
 	for (u32 i = 0; i < FB_MAX; i++) {
 		snprintf(devname, sizeof(devname), "/dev/fb%d", i);
 		devFd = open(devname, O_RDWR);
-        if (devFd >= 0) break;
+		if (devFd >= 0) break;
 	}
 
 	if (devFd < 0) {
@@ -99,30 +99,33 @@ Screen *Screen::createInstance()
 		return 0;
 	}
 
-	u32 rtype = 0;
-	Config::instance()->getOption("screen-rotate", rtype);
-	if (rtype > 3) rtype = 0;
-	mRotate = (RotateType)rtype;
+	u32 type = Rotate0;
+	Config::instance()->getOption("screen-rotate", type);
+	if (type > Rotate270) type = Rotate0;
+	rtype = (RotateType)type;
 
-	if (mRotate == Rotate0 || mRotate == Rotate180) {
-		mScreenw = vinfo.xres;
-		mScreenh = vinfo.yres;
+	if (rtype == Rotate0 || rtype == Rotate180) {
+		screenw = vinfo.xres;
+		screenh = vinfo.yres;
 	} else {
-		mScreenw = vinfo.yres;
-		mScreenh = vinfo.xres;
+		screenw = vinfo.yres;
+		screenh = vinfo.xres;
 	}
-	
-	if (!Font::instance()) return 0;
 
-	if (mScreenw / W(1) == 0 || mScreenh / H(1) == 0) {
+	if (!Font::instance() || FW(1) == 0 || FH(1) == 0) {
+		fprintf(stderr, "init font error!\n");
+		return 0;
+	}
+
+	if (screenw / FW(1) == 0 || screenh / FH(1) == 0) {
 		fprintf(stderr, "font size is too huge!\n");
 		return 0;
 	}
-	
+
 	if (vinfo.bits_per_pixel == 15) bytes_per_pixel = 2;
 	else bytes_per_pixel = (vinfo.bits_per_pixel >> 3);
 
-	initFillDraw();	
+	initFillDraw();
 	return new Screen(devFd);
 }
 
@@ -131,13 +134,13 @@ Screen::Screen(s32 fd)
 	mFd = fd;
 	mpMemStart = (u8 *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, mFd, 0);
 
-	mCols = mScreenw / W(1);
-	mRows = mScreenh / H(1);
+	mCols = screenw / FW(1);
+	mRows = screenh / FH(1);
 	mScrollAccel = 0;
 
-	if (mRotate == Rotate0 || mRotate == Rotate180) {
-		bool ypan = (vinfo.yres_virtual > vinfo.yres && finfo.ypanstep && !(H(1) % finfo.ypanstep));
-		bool ywrap = (finfo.ywrapstep && !(H(1) % finfo.ywrapstep));
+	if (rtype == Rotate0 || rtype == Rotate180) {
+		bool ypan = (vinfo.yres_virtual > vinfo.yres && finfo.ypanstep && !(FH(1) % finfo.ypanstep));
+		bool ywrap = (finfo.ywrapstep && !(FH(1) % finfo.ywrapstep));
 		if (ywrap && !(vinfo.vmode & FB_VMODE_YWRAP)) {
 			vinfo.vmode |= FB_VMODE_YWRAP;
 			ioctl(mFd, FBIOPUT_VSCREENINFO, &vinfo);
@@ -163,9 +166,9 @@ Screen::~Screen()
 	}
 
 	s32 ret = write(STDIN_FILENO, show_cursor, sizeof(show_cursor) - 1);
-	ret = write(STDIN_FILENO, enable_blank, sizeof(enable_blank) - 1);	
+	ret = write(STDIN_FILENO, enable_blank, sizeof(enable_blank) - 1);
 	ret = write(STDIN_FILENO, clear_screen, sizeof(clear_screen) - 1);
-	
+
 	Font::uninstance();
 }
 
@@ -174,7 +177,7 @@ void Screen::switchVc(bool enter)
 	if (enter) {
 		ioctl(mFd, FBIOGET_VSCREENINFO, &vinfo);
 		ioctl(mFd, FBIOPAN_DISPLAY, &vinfo);
-		
+
 		setupSysPalette(false);
 		eraseMargin(true, mRows);
 	} else {
@@ -196,9 +199,9 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 
 	s32 yoffset = vinfo.yoffset;
 
-	if (mRotate == Rotate0) yoffset += H((s32)srow - drow);
-	else yoffset -= H((s32)srow - drow);
-	
+	if (rtype == Rotate0) yoffset += FH((s32)srow - drow);
+	else yoffset -= FH((s32)srow - drow);
+
 	bool redraw_all = false;
 	if (mScrollAccel == 1) {
 		u32 ytotal = vinfo.yres_virtual - vinfo.yres;
@@ -214,7 +217,7 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 
 	vinfo.yoffset = yoffset;
 	ioctl(mFd, FBIOPAN_DISPLAY, &vinfo);
-	
+
 	if (top) redraw(0, 0, mCols, top);
 	if (bot < mRows) redraw(0, bot, mCols, mRows - bot);
 	if (left > 0) redraw(0, top, left, bot - top - 1);
@@ -231,30 +234,30 @@ bool Screen::move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h)
 
 void Screen::eraseMargin(bool top, u16 h)
 {
-	if (mScreenw % W(1)) {
-		fillRect(W(mCols), top ? 0 : H(mRows - h), mScreenw % W(1), H(h), 0);
+	if (screenw % FW(1)) {
+		fillRect(FW(mCols), top ? 0 : FH(mRows - h), screenw % FW(1), FH(h), 0);
 	}
 
-	if (mScreenh % H(1)) {
-		fillRect(0, H(mRows), mScreenw, mScreenh % H(1), 0);
+	if (screenh % FH(1)) {
+		fillRect(0, FH(mRows), screenw, screenh % FH(1), 0);
 	}
 }
 
 void Screen::drawUnderline(u16 col, u16 row, u8 color)
 {
-	fillRect(W(col), H(row + 1) - 1, W(1),  1, color);
+	fillRect(FW(col), FH(row + 1) - 1, FW(1),  1, color);
 }
 
 void Screen::clear(u16 col, u16 row, u16 w, u16 h, u8 color)
 {
-	fillRect(W(col), H(row), W(w), H(h), color);
+	fillRect(FW(col), FH(row), FW(w), FH(h), color);
 }
 
 void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
 {
-	u32 startx, x = W(col), y = H(row), fw = W(1);
+	u32 startx, x = FW(col), y = FH(row), fw = FW(1);
 
-	Rectangle rect = { x, y, x + W(w), y + H(1) };
+	Rectangle rect = { x, y, x + FW(w), y + FH(1) };
 	u32 state = intersectWithClipRects(rect);
 
 	if (state == InSide) return;
@@ -267,9 +270,9 @@ void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text,
 		if (*text == 0x20) {
 			if (draw_text) {
 				draw_text = false;
-			
+
 				if (clip) {
-					Rectangle rect = { startx, y, x, y + H(1) };
+					Rectangle rect = { startx, y, x, y + FH(1) };
 					state = intersectWithClipRects(rect);
 				}
 
@@ -285,7 +288,7 @@ void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text,
 		} else {
 			if (draw_space) {
 				draw_space = false;
-				fillRect(startx, y, x - startx, H(1), bc, clip);
+				fillRect(startx, y, x - startx, FH(1), bc, clip);
 			}
 
 			if (!draw_text) {
@@ -302,7 +305,7 @@ void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text,
 
 	if (draw_text) {
 		if (clip) {
-			Rectangle rect = { startx, y, x, y + H(1) };
+			Rectangle rect = { startx, y, x, y + FH(1) };
 			state = intersectWithClipRects(rect);
 		}
 
@@ -310,50 +313,171 @@ void Screen::drawText(u16 col, u16 row, u16 w, u8 fc, u8 bc, u16 num, u16 *text,
 			drawGlyphs(startx, y, x - startx, fc, bc, startnum - num, starttext, startdw, state == Intersect);
 		}
 	} else if (draw_space) {
-		fillRect(startx, y, x - startx, H(1), bc, clip);
+		fillRect(startx, y, x - startx, FH(1), bc, clip);
 	}
 }
 
 void Screen::drawGlyphs(u32 x, u32 y, u32 w, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool clip)
 {
-	if (Font::instance()->isMonospace()) {
-		if (clip) {
-			Rectangle rect = { x, y, x, y + H(1) };
+	if (clip) {
+		Rectangle rect = { x, y, x, y + FH(1) };
 
-			for (; num--; text++, dw++) {
-				rect.sx = rect.ex;
-				rect.ex += *dw ? W(2) : W(1);
-				
-				u32 state = intersectWithClipRects(rect);
-				if (state != InSide) {
-					drawGlyph(rect.sx, y, fc, bc, *text, *dw, true, state == Intersect);
-				}
-			}
-		} else {
-			for (; num--; text++, dw++) {
-				drawGlyph(x, y, fc, bc, *text, *dw, true, clip);
-				x += *dw ? W(2) : W(1);
+		for (; num--; text++, dw++) {
+			rect.sx = rect.ex;
+			rect.ex += *dw ? FW(2) : FW(1);
+
+			u32 state = intersectWithClipRects(rect);
+			if (state != InSide) {
+				drawGlyph(rect.sx, y, fc, bc, *text, *dw, state == Intersect);
 			}
 		}
 	} else {
-		fillRect(x, y, w, H(1), bc, clip);
-
 		for (; num--; text++, dw++) {
-			x += drawGlyph(x, y, fc, bc, *text, *dw, false, clip);
+			drawGlyph(x, y, fc, bc, *text, *dw, clip);
+			x += *dw ? FW(2) : FW(1);
 		}
 	}
+}
+
+static inline u32 offsetY(u32 y)
+{
+	y += vinfo.yoffset;
+	if (y >= vinfo.yres_virtual) y -= vinfo.yres_virtual;
+	return y;
+}
+
+void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color, bool clip)
+{
+	if (x >= screenw || y >= screenh || !w || !h) return;
+	if (x + w > screenw) w = screenw - x;
+	if (y + h > screenh) h = screenh - y;
+
+	rotateRect(x, y, w, h);
+
+	Rectangle rect = { x, y, x + w, y + h }, *rects = &rect;
+	u32 num = 1;
+	bool isalloc = false;
+
+	if (clip) {
+		isalloc = subtractWithRotatedClipRects(rect, rects, num);
+	}
+
+	for (; num--;) {
+		u32 h = rects[num].ey - rects[num].sy;
+		u32 w = rects[num].ex - rects[num].sx;
+		if (!h || !w) continue;
+
+		u8 *dst8 = mpMemStart + rects[num].sx * bytes_per_pixel;
+		for(; h--;)
+		{
+			u8 *dst = dst8 + offsetY(rects[num].sy++) * finfo.line_length;
+			fill(dst, w, color);
+		}
+	}
+
+	if (isalloc) delete[] rects;
+}
+
+void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip)
+{
+	if (x >= screenw || y >= screenh) return;
+
+	s32 w = (dw ? FW(2) : FW(1)), h = FH(1);
+	if (x + w > screenw) w = screenw - x;
+	if (y + h > screenh) h = screenh - y;
+
+	Font::Glyph *glyph = (Font::Glyph *)Font::instance()->getGlyph(code);
+	if (!glyph) {
+		fillRect(x, y, w, h, bc, clip);
+		return;
+	}
+
+	s32 top = glyph->top;
+	if (top < 0) top = 0;
+
+	s32 left = glyph->left;
+	if ((s32)x + left < 0) left = -x;
+
+	s32 width = glyph->width;
+	if (width > w - left) width = w - left;
+	if ((s32)x + left + width > (s32)screenw) width = screenw - ((s32)x + left);
+	if (width < 0) width = 0;
+
+	s32 height = glyph->height;
+	if (height > h - top) height = h - top;
+	if (y + top + height > screenh) height = screenh - (y + top);
+	if (height < 0) height = 0;
+
+	if (top) fillRect(x, y, w, top, bc, clip);
+	if (left > 0) fillRect(x, y + top, left, height, bc, clip);
+
+	s32 right = width + left;
+	if (w > right) fillRect((s32)x + right, y + top, w - right, height, bc, clip);
+
+	s32 bot = top + height;
+	if (h > bot) fillRect(x, y + bot, w, h - bot, bc, clip);
+
+	x += left;
+	y += top;
+	if (x >= screenw || y >= screenh || !width || !height) return;
+
+	u32 nwidth = width, nheight = height;
+	rotateRect(x, y, nwidth, nheight);
+
+	u8 *pixmap = glyph->pixmap;
+	u32 wdiff = glyph->width - width, hdiff = glyph->height - height;
+
+	if (wdiff) {
+		if (rtype == Rotate180) pixmap += wdiff;
+		else if (rtype == Rotate270) pixmap += wdiff * glyph->pitch;
+	}
+
+	if (hdiff) {
+		if (rtype == Rotate90) pixmap += hdiff;
+		else if (rtype == Rotate180) pixmap += hdiff * glyph->pitch;
+	}
+
+	Rectangle rect = { x, y, x + nwidth, y + nheight }, *rects = &rect;
+	u32 num = 1;
+	bool isalloc = false;
+
+	if (clip) {
+		isalloc = subtractWithRotatedClipRects(rect, rects, num);
+	}
+
+	for (; num--;) {
+		u32 w = rects[num].ex - rects[num].sx;
+		u32 h = rects[num].ey - rects[num].sy;
+		if (!w || !h) continue;
+
+		u8 *pm = pixmap + (rects[num].sy - y) * glyph->pitch + (rects[num].sx - x);
+		u8 *dst, *dst_line = mpMemStart + rects[num].sx * bytes_per_pixel;
+
+		for (; h--; pm += glyph->pitch) {
+			dst = dst_line + offsetY(rects[num].sy++) * finfo.line_length;
+			draw(dst, pm, w, fc, bc);
+		}
+	}
+
+	if (isalloc) delete[] rects;
+	return;
+}
+
+RotateType Screen::rotateType()
+{
+	return rtype;
 }
 
 void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 {
 	u32 tmp;
-	switch (mRotate) {
+	switch (rtype) {
 	case Rotate0:
 		break;
 
 	case Rotate90:
 		tmp = x;
-		x = mScreenh - y - h;
+		x = screenh - y - h;
 		y = tmp;
 
 		tmp = w;
@@ -362,13 +486,13 @@ void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 		break;
 
 	case Rotate180:
-		x = mScreenw - x - w;
-		y = mScreenh - y - h;
+		x = screenw - x - w;
+		y = screenh - y - h;
 		break;
 
 	case Rotate270:
 		tmp = y;
-		y = mScreenw - x - w;
+		y = screenw - x - w;
 		x = tmp;
 
 		tmp = w;
@@ -381,7 +505,7 @@ void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
 void Screen::rotatePoint(u32 W, u32 H, u32 &x, u32 &y)
 {
 	u32 tmp;
-	switch (mRotate) {
+	switch (rtype) {
 	case Rotate0:
 		break;
 
@@ -402,130 +526,4 @@ void Screen::rotatePoint(u32 W, u32 H, u32 &x, u32 &y)
 		x = tmp;
 		break;
 	}
-}
-
-static inline u32 offsetY(u32 y)
-{
-	y += vinfo.yoffset;
-	if (y >= vinfo.yres_virtual) y -= vinfo.yres_virtual;
-	return y;
-}
-
-void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color, bool clip)
-{
-	if (x >= mScreenw || y >= mScreenh || !w || !h) return;
-	if (x + w > mScreenw) w = mScreenw - x;
-	if (y + h > mScreenh) h = mScreenh - y;
-
-	rotateRect(x, y, w, h);
-
-	Rectangle rect = { x, y, x + w, y + h }, *rects = &rect;
-	u32 num = 1;
-	bool isalloc = false;
-
-	if (clip) {
-		isalloc = subtractWithRotatedClipRects(rect, rects, num);
-	}
-	
-	for (; num--;) {
-		u32 h = rects[num].ey - rects[num].sy;
-		u32 w = rects[num].ex - rects[num].sx;
-		if (!h || !w) continue;
-		
-		u8 *dst8 = mpMemStart + rects[num].sx * bytes_per_pixel;
-		for(; h--;)
-		{
-			u8 *dst = dst8 + offsetY(rects[num].sy++) * finfo.line_length;
-			fill(dst, w, color);
-		}
-	}
-
-	if (isalloc) delete[] rects;
-}
-
-s16 Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool fillbg, bool clip)
-{
-	if (x >= mScreenw || y >= mScreenh) return 0;
-
-	s32 w = (dw ? W(2) : W(1)), h = H(1);
-	if (x + w > mScreenw) w = mScreenw - x;
-	if (y + h > mScreenh) h = mScreenh - y;
-
-	Font::Glyph *glyph = (Font::Glyph *)Font::instance()->getGlyph(code);
-	if (!glyph) {
-		if (fillbg) fillRect(x, y, w, h, bc, clip);
-		return w;
-	}
-
-	s32 top = glyph->top;
-	if (top < 0) top = 0;
-
-	s32 left = glyph->left;
-	if ((s32)x + left < 0) left = -x;
-	
-	s32 width = glyph->width;
-	if (width > w - left) width = w - left;
-	if ((s32)x + left + width > (s32)mScreenw) width = mScreenw - ((s32)x + left);
-	if (width < 0) width = 0;
-
-	s32 height = glyph->height;
-	if (height > h - top) height = h - top;
-	if (y + top + height > mScreenh) height = mScreenh - (y + top);
-	if (height < 0) height = 0;
-	
-	if (fillbg) {
-		if (top) fillRect(x, y, w, top, bc, clip);
-		if (left > 0) fillRect(x, y + top, left, height, bc, clip);
-	
-		s32 right = width + left;
-		if (w > right) fillRect((s32)x + right, y + top, w - right, height, bc, clip);
-	
-		s32 bot = top + height;
-		if (h > bot) fillRect(x, y + bot, w, h - bot, bc, clip);
-	}
-
-	x += left;
-	y += top;
-	if (x >= mScreenw || y >= mScreenh || !width || !height) return glyph->advance;
-
-	u32 nwidth = width, nheight = height;
-	rotateRect(x, y, nwidth, nheight);
-
-	u8 *pixmap = glyph->pixmap;
-	u32 wdiff = glyph->width - width, hdiff = glyph->height - height;
-	
-	if (wdiff) {
-		if (mRotate == Rotate180) pixmap += wdiff;
-		else if (mRotate == Rotate270) pixmap += wdiff * glyph->pitch;
-	}
-	
-	if (hdiff) {
-		if (mRotate == Rotate90) pixmap += hdiff;
-		else if (mRotate == Rotate180) pixmap += hdiff * glyph->pitch;
-	}
-	
-	Rectangle rect = { x, y, x + nwidth, y + nheight }, *rects = &rect;
-	u32 num = 1;
-	bool isalloc = false;
-
-	if (clip) {
-		isalloc = subtractWithRotatedClipRects(rect, rects, num);
-	}
-
-	for (; num--;) {
-		u32 w = rects[num].ex - rects[num].sx;
-		u32 h = rects[num].ey - rects[num].sy;
-		if (!w || !h) continue;
-
-		u8 *pm = pixmap + (rects[num].sy - y) * glyph->pitch + (rects[num].sx - x);
-		u8 *dst, *dst_line = mpMemStart + rects[num].sx * bytes_per_pixel;
-
-		for (; h--; pm += glyph->pitch) {
-			dst = dst_line + offsetY(rects[num].sy++) * finfo.line_length;
-			draw(dst, pm, w, fillbg, fc, bc);
-		}
-	}
-	
-	if (isalloc) delete[] rects;
-	return glyph->advance;
 }

@@ -45,6 +45,7 @@ public:
 	void historyScroll(bool down);
 	void redraw(u16 x, u16 y, u16 w, u16 h);
 	void switchVc(bool enter);
+	void checkShellProcessExited(s32 pid);
 
 private:
 	u32 getIndex(FbShell *shell, bool forward, bool stepfirst);

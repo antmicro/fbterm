@@ -30,14 +30,16 @@
 DEFINE_INSTANCE(Font)
 
 static char fontName[64];
-static unsigned short fontSize;
+static unsigned short fontSize, fontHeight, fontWidth;
 
-void Font::setFontInfo(char *name, unsigned short pixelsize)
+void Font::setFontInfo(char *name, unsigned short pixelsize, unsigned short height, unsigned short width)
 {
 	if (!name || strlen(name) >= sizeof(fontName)) return;
 
 	memcpy(fontName, name, strlen(name) + 1);
 	fontSize = pixelsize;
+	fontHeight = height;
+	fontWidth = width;
 }
 
 Font *Font::createInstance()
@@ -61,7 +63,7 @@ Font *Font::createInstance()
 	unsigned index = 0;
 	if (fs) {
 		fonts = new FontRec[fs->nfont];
-	
+
 		for (int i = 0; i < fs->nfont; i++) {
 			FcPattern *font = FcFontRenderPrepare(NULL, pat, fs->fonts[i]);
 			if (font) {
@@ -93,35 +95,23 @@ static bool *glyphCacheInited;
 
 Font::Font(FontRec *fonts, unsigned num, void *unicover)
 {
+	mHeight = fontHeight;
+	mWidth = fontWidth;
 	mpFontList = fonts;
 	mFontNum = num;
 	mpUniCover = unicover;
-	mMonospace = false;
 	glyphCache = new Glyph *[256 * 256];
 	glyphCacheInited = new bool[256];
-	bzero(glyphCacheInited, sizeof(bool) * 256);
-
-	int spacing;
-	if (FcPatternGetInteger((FcPattern*)mpFontList[0].pattern, FC_SPACING, 0, &spacing) == FcResultMatch)
-		mMonospace = (spacing != FC_PROPORTIONAL);
+	memset(glyphCacheInited, 0, sizeof(bool) * 256);
 
 	FT_Init_FreeType(&ftlib);
-
-	openFont(0);
-	mHeight = ((FT_Face)mpFontList[0].face)->size->metrics.height >> 6;
-	mWidth = ((FT_Face)mpFontList[0].face)->size->metrics.max_advance >> 6;
-
-	if (!mMonospace) {
-		Glyph *glyph = getGlyph('a');
-		if (mWidth > glyph->advance * 2) mWidth /= 2;
-	}
 }
 
 Font::~Font()
 {
 	FcCharSetDestroy((FcCharSet*)mpUniCover);
 
-	for (unsigned i = 0; i < mFontNum; i++) {	
+	for (unsigned i = 0; i < mFontNum; i++) {
 		FcPatternDestroy((FcPattern*)mpFontList[i].pattern);
 
 		FT_Face face = (FT_Face)mpFontList[i].face;
@@ -133,7 +123,7 @@ Font::~Font()
 	FT_Done_FreeType(ftlib);
 	FcFini();
 
-	delete[] mpFontList;	
+	delete[] mpFontList;
 
 	for (unsigned i = 0; i < 256; i++) {
 		if (!glyphCacheInited[i]) continue;
@@ -144,7 +134,7 @@ Font::~Font()
 			}
 		}
 	}
-	
+
 	delete[] glyphCache;
 	delete[] glyphCacheInited;
 }
@@ -187,7 +177,7 @@ void Font::openFont(unsigned index)
 
 		if (!hinting || hint_style == FC_HINT_NONE) {
 			load_flags |= FT_LOAD_NO_HINTING;
-		} else { 
+		} else {
 			load_flags |= FT_LOAD_TARGET_LIGHT;
 		}
 	} else {
@@ -214,10 +204,10 @@ int Font::fontIndex(unsigned unicode)
 Font::Glyph *Font::getGlyph(unsigned unicode)
 {
 	if (unicode >= 256 * 256) return 0;
-	
+
 	if (!glyphCacheInited[unicode >> 8]) {
 		glyphCacheInited[unicode >> 8] = true;
-		bzero(&glyphCache[unicode & 0xff00], sizeof(Glyph *) * 256);
+		memset(&glyphCache[unicode & 0xff00], 0, sizeof(Glyph *) * 256);
 	}
 
 	if (glyphCache[unicode]) return glyphCache[unicode];
@@ -234,33 +224,31 @@ Font::Glyph *Font::getGlyph(unsigned unicode)
 
 	FT_Load_Glyph(face, index, FT_LOAD_RENDER | mpFontList[i].load_flags);
 	FT_Bitmap &bitmap = face->glyph->bitmap;
-	
+
 	unsigned x, y, w, h, nx, ny, nw, nh;
 	x = y = 0;
 	w = nw = bitmap.width;
 	h = nh = bitmap.rows;
-	Screen::rotateRect(x, y, nw, nh);
+	Screen::instance()->rotateRect(x, y, nw, nh);
 
 	Glyph *glyph = (Glyph *)new char[OFFSET(Glyph, pixmap) + nw * nh];
 	glyph->left = face->glyph->metrics.horiBearingX >> 6;
 	glyph->top = mHeight - 1 + (face->size->metrics.descender >> 6) - (face->glyph->metrics.horiBearingY >> 6);
-	glyph->advance = face->glyph->metrics.horiAdvance >> 6;
 	glyph->width = face->glyph->metrics.width >> 6;
 	glyph->height = face->glyph->metrics.height >> 6;
 	glyph->pitch = nw;
-	glyph->isbitmap = false;
 
 	unsigned char *buf = bitmap.buffer;
 	for (y = 0; y < h; y++, buf += bitmap.pitch) {
 		for (x = 0; x < w; x++) {
 			nx = x, ny = y;
-			Screen::rotatePoint(w, h, nx, ny);
+			Screen::instance()->rotatePoint(w, h, nx, ny);
 
-			glyph->pixmap[ny * nw + nx] = 
+			glyph->pixmap[ny * nw + nx] =
 				(bitmap.pixel_mode == FT_PIXEL_MODE_MONO) ? ((buf[(x >> 3)] & (0x80 >> (x & 7))) ? 0xff : 0) : buf[x];
 		}
 	}
-	
+
 	glyphCache[unicode]	= glyph;
 	return glyph;
 }

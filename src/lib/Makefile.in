@@ -87,11 +87,11 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
-FBTERM_INCLUDES = @FBTERM_INCLUDES@
-FBTERM_LIBS = @FBTERM_LIBS@
+FC_INC = @FC_INC@
+FC_LIB = @FC_LIB@
+FT2_INC = @FT2_INC@
+FT2_LIB = @FT2_LIB@
 GREP = @GREP@
-IMEXAMPLE_INCLUDES = @IMEXAMPLE_INCLUDES@
-IMEXAMPLE_LIBS = @IMEXAMPLE_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -170,7 +170,7 @@ all: all-am
 
 .SUFFIXES:
 .SUFFIXES: .cpp .o .obj
-$(srcdir)/Makefile.in: 
+$(srcdir)/Makefile.in: $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \

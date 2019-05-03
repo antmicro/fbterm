@@ -37,7 +37,7 @@ FbShellManager::FbShellManager()
 	mShellCount = 0;
 	mCurShell = 0;
 	mActiveShell = 0;
-	bzero(mShellList, sizeof(mShellList));
+	memset(mShellList, 0, sizeof(mShellList));
 }
 
 FbShellManager::~FbShellManager()
@@ -157,14 +157,14 @@ bool FbShellManager::setActive(FbShell *shell)
 	if (mActiveShell) {
 		mActiveShell->switchVt(true, oldActiveShell);
 	}
-	
+
 	return true;
 }
 
 void FbShellManager::redraw(u16 x, u16 y, u16 w, u16 h)
 {
 	if (mActiveShell) {
-		mActiveShell->expose(x, y, w, h);		
+		mActiveShell->expose(x, y, w, h);
 	} else {
 		screen->clear(x, y, w, h, 0);
 	}
@@ -173,8 +173,8 @@ void FbShellManager::redraw(u16 x, u16 y, u16 w, u16 h)
 void FbShellManager::toggleIm()
 {
 	if (!mActiveShell) return;
-	
-	improxy->toggleActive(mCurShell);	
+
+	improxy->toggleActive(mCurShell);
 	mActiveShell->reportCursor();
 	mActiveShell->reportMode();
 }
@@ -183,5 +183,15 @@ void FbShellManager::imInput(u32 shell, s8 *text, u32 len)
 {
 	if (shell < NR_SHELLS && mShellList[shell]) {
 		mShellList[shell]->keyInput(text, len);
+	}
+}
+
+void FbShellManager::checkShellProcessExited(s32 pid)
+{
+	for (u32 i = 0; i < NR_SHELLS; i++) {
+		if (mShellList[i] && mShellList[i]->childProcessId() == pid) {
+			delete mShellList[i];
+			break;
+		}
 	}
 }

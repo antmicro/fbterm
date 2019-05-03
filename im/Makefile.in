@@ -13,7 +13,6 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
-
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkglibdir = $(libdir)/@PACKAGE@
@@ -30,7 +29,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-noinst_PROGRAMS = imexample$(EXEEXT)
+check_PROGRAMS = imexample$(EXEEXT)
 subdir = im
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -40,7 +39,6 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-PROGRAMS = $(noinst_PROGRAMS)
 am_imexample_OBJECTS = imapi.$(OBJEXT) keycode.$(OBJEXT) \
 	imexample-example.$(OBJEXT) imexample-font.$(OBJEXT) \
 	imexample-screen.$(OBJEXT)
@@ -87,11 +85,11 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
-FBTERM_INCLUDES = @FBTERM_INCLUDES@
-FBTERM_LIBS = @FBTERM_LIBS@
+FC_INC = @FC_INC@
+FC_LIB = @FC_LIB@
+FT2_INC = @FT2_INC@
+FT2_LIB = @FT2_LIB@
 GREP = @GREP@
-IMEXAMPLE_INCLUDES = @IMEXAMPLE_INCLUDES@
-IMEXAMPLE_LIBS = @IMEXAMPLE_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -167,14 +165,13 @@ imexample_SOURCES = immessage.h imapi.h imapi.c keycode.h keycode.c example.cpp 
 	instance.h font.h font.cpp screen.h screen.cpp
 
 EXTRA_imexample_SOURCES = screen_render.cpp
-imexample_CXXFLAGS = -fno-exceptions -fno-rtti @IMEXAMPLE_INCLUDES@
-imexample_LDADD = @IMEXAMPLE_LIBS@
-EXTRA_DIST = inputmethod.txt
+imexample_CXXFLAGS = -fno-exceptions -fno-rtti @FT2_INC@ @FC_INC@
+imexample_LDADD = @FT2_LIB@ @FC_LIB@
 all: all-am
 
 .SUFFIXES:
 .SUFFIXES: .c .cpp .o .obj
-$(srcdir)/Makefile.in: 
+$(srcdir)/Makefile.in: $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -204,8 +201,8 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 
-clean-noinstPROGRAMS:
-	-test -z "$(noinst_PROGRAMS)" || rm -f $(noinst_PROGRAMS)
+clean-checkPROGRAMS:
+	-test -z "$(check_PROGRAMS)" || rm -f $(check_PROGRAMS)
 imexample$(EXEEXT): $(imexample_OBJECTS) $(imexample_DEPENDENCIES) 
 	@rm -f imexample$(EXEEXT)
 	$(imexample_LINK) $(imexample_OBJECTS) $(imexample_LDADD) $(LIBS)
@@ -381,8 +378,9 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
+	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-am
-all-am: Makefile $(PROGRAMS)
+all-am: Makefile
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -410,7 +408,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-noinstPROGRAMS mostlyclean-am
+clean-am: clean-checkPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -467,15 +465,15 @@ uninstall-am:
 
 .MAKE: install-am install-strip
 
-.PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
-	clean-noinstPROGRAMS ctags distclean distclean-compile \
-	distclean-generic distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+.PHONY: CTAGS GTAGS all all-am check check-am clean \
+	clean-checkPROGRAMS clean-generic ctags distclean \
+	distclean-compile distclean-generic distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic pdf pdf-am ps ps-am tags uninstall \
 	uninstall-am

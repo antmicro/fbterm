@@ -82,6 +82,11 @@ void ImProxy::socketEnd()
 	waitChildProcessExit(mPid);
 }
 
+void ImProxy::checkImProcessExited(s32 pid)
+{
+	if (mPid == pid && mSocket) delete mSocket;
+}
+
 void ImProxy::createImProcess()
 {
 	s8 app[128];
@@ -90,10 +95,10 @@ void ImProxy::createImProcess()
 
 	int fds[2];
 	if (socketpair(AF_LOCAL, SOCK_STREAM, 0, fds) == -1) return;
-	
+
 
 	mPid = fork();
-	
+
 	switch (mPid) {
 	case -1:
 		close(fds[0]);
@@ -115,7 +120,7 @@ void ImProxy::createImProcess()
 	}
 
 	default:
-		close(fds[1]);		
+		close(fds[1]);
 		mSocket = new ImSocket(fds[0]);
 		break;
 	}
@@ -209,8 +214,8 @@ void ImSocket::sendCursorPos(u16 col, u16 row)
 	Message msg;
 	msg.type = CursorPosition;
 	msg.len = sizeof(msg);
-	msg.cursor.x = W(col);
-	msg.cursor.y = H(row + 1);
+	msg.cursor.x = FW(col);
+	msg.cursor.y = FH(row + 1);
 
 	write((s8 *)&msg, sizeof(msg));
 }
@@ -226,7 +231,7 @@ void ImSocket::sendTermMode(bool crlf, bool appkey, bool curo)
 	msg.term.applicKeypad = appkey;
 	msg.term.cursorEscO = curo;
 
-	write((s8 *)&msg, sizeof(msg));	
+	write((s8 *)&msg, sizeof(msg));
 }
 
 void ImSocket::sendInfo()
@@ -243,10 +248,12 @@ void ImSocket::sendInfo()
 	u32 len = strlen(name) + 1;
 	char buf[OFFSET(Message, info.fontName) + len];
 
- 	MSG(buf)->type = FbTermInfo;
+	MSG(buf)->type = FbTermInfo;
 	MSG(buf)->len = sizeof(buf);
-	MSG(buf)->info.rotate = Screen::rotateType();
+	MSG(buf)->info.rotate = Screen::instance()->rotateType();
 	MSG(buf)->info.fontSize = pixel_size;
+	MSG(buf)->info.fontHeight = FH(1);
+	MSG(buf)->info.fontWidth = FW(1);
 	memcpy(MSG(buf)->info.fontName, name, len);
 
 	write(buf, MSG(buf)->len);
@@ -267,14 +274,14 @@ void ImSocket::sendDisconnect()
 	Message msg;
 	msg.type = Disconnect;
 	msg.len = sizeof(msg);
-	write((s8 *)&msg, sizeof(msg));	
+	write((s8 *)&msg, sizeof(msg));
 }
 
 void ImSocket::readyRead(s8 *buf, u32 len)
 {
 	for (s8 *end = buf + len; buf < end && MSG(buf)->len && MSG(buf)->len <= (end - buf); buf += MSG(buf)->len) {
 		if (!mConnected && MSG(buf)->type != Connect) continue;
-		
+
 		switch (MSG(buf)->type) {
 		case Connect:
 			mConnected = true;
@@ -285,13 +292,13 @@ void ImSocket::readyRead(s8 *buf, u32 len)
 
 		case PutText:
 			if (MSG(buf)->len > OFFSET(Message, texts.text)) {
-				FbShellManager::instance()->imInput(MSG(buf)->texts.shell, MSG(buf)->texts.text, 
+				FbShellManager::instance()->imInput(MSG(buf)->texts.shell, MSG(buf)->texts.text,
 					MSG(buf)->len - OFFSET(Message, texts.text));
 			}
 			break;
 
 		case SetWins:
- 			sendAck();
+			sendAck();
 
 			if (MSG(buf)->len >= OFFSET(Message, wins)) {
 				ImWin *wins = MSG(buf)->wins;

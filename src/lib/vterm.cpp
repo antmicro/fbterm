@@ -57,7 +57,7 @@ VTerm::CharAttr VTerm::erase_char_attr()
 
 VTerm::ModeFlag::ModeFlag()
 {
-	bzero(this, sizeof(ModeFlag));
+	memset(this, 0, sizeof(ModeFlag));
 	auto_wrap = true;
 	cursor_visible = true;
 	autorepeat_key = true;
@@ -72,7 +72,7 @@ void VTerm::init_state()
 {
 	#define INIT_STATE_TABLE(a) \
 	do { \
-		bzero(hash_##a, sizeof(hash_##a)); \
+		memset(hash_##a, 0, sizeof(hash_##a)); \
 		for (u32 i = 0; a[i].key != (u16)-1; i++) { \
 			for (u32 j = 0; j <= (u32)(a[i].key >> 8); j++) { \
 				hash_##a[(u32)(a[i].key & 0xff) + j] = a + i; \
@@ -147,7 +147,7 @@ void VTerm::reset()
 	cur_halfbright_color = -1;
 
 	if (text) {
-		bzero(tab_stops, max_width / 8 + 1);
+		memset(tab_stops, 0, max_width / 8 + 1);
 		clear_area(0, 0, width - 1, height - 1);
 	}
 
@@ -164,7 +164,7 @@ void VTerm::resize(u16 w, u16 h)
 
 	if (new_max_width > max_width) {
 		s8 *new_tab_stops = new s8[new_max_width / 8 + 1];
-		bzero(new_tab_stops, new_max_width / 8 + 1);
+		memset(new_tab_stops, 0, new_max_width / 8 + 1);
 
 		if (tab_stops) {
 			memcpy(new_tab_stops, tab_stops, max_width / 8 + 1);
@@ -172,7 +172,7 @@ void VTerm::resize(u16 w, u16 h)
 		}
 		tab_stops = new_tab_stops;
 	} else if (w > width) {
-		
+
 	}
 
 	if (new_max_height > max_height) {
@@ -235,7 +235,7 @@ void VTerm::resize(u16 w, u16 h)
 	}
 
 	bool h_changed = false;
-	
+
 	if (h != height) {
 		h_changed = true;
 
@@ -253,11 +253,11 @@ void VTerm::resize(u16 w, u16 h)
 
 	width = w;
 	height = h;
-	
+
 	if (h_changed) {
 		historyChanged(visual_start_line, total_history_lines());
 	}
-	
+
 	scroll_bot = height - 1;
 	if (scroll_top >= height) scroll_top = 0;
 
@@ -274,7 +274,7 @@ void VTerm::resize(u16 w, u16 h)
 void VTerm::input(const u8 *buf, u32 count)
 {
 	if (!width) return;
-	
+
 	if (visual_start_line != total_history_lines()) {
 		historyDisplay(true, total_history_lines());
 		historyChanged(visual_start_line, total_history_lines());
@@ -387,11 +387,11 @@ void VTerm::input(const u8 *buf, u32 count)
 		 * direct-to-font zone in UTF-8 mode.
 		 */
 		bool ok = tc && (c >= 32 || !(mode_flags.display_ctrl ? ((CTRL_ALWAYS >> c) & 1) : (utf8 || ((CTRL_ACTION >> c) & 1))))
-				  && (c != 127 || mode_flags.display_ctrl)
-				  && (c != 128+27);
+					&& (c != 127 || mode_flags.display_ctrl)
+					&& (c != 128+27);
 
 		if (normal_state && ok) {
-			if (c == 0xfeff || (c >= 0x200b && c <= 0x200f)) { // zero width 
+			if (c == 0xfeff || (c >= 0x200b && c <= 0x200f)) { // zero width
 				continue;
 			}
 
@@ -616,10 +616,10 @@ void VTerm::expose(u16 x, u16 y, u16 w, u16 h)
 		bool dws[width];
 		u16 codes[width], num = 0;
 		u16 cur, start = startx;
-		
+
 		for (cur = startx; cur <= endx; cur++) {
 			if (attrs[yp + cur].type == CharAttr::DoubleRight) continue;
-		
+
 			if (attrs[yp + cur] != attr) {
 				attr.reverse ^= mode_flags.inverse_screen;
 				drawChars(attr, start, y, cur - start, num, codes, dws);
@@ -644,7 +644,7 @@ void VTerm::inverse(u16 sx, u16 sy, u16 ex, u16 ey)
 	if (charAttr(sx, sy).type == CharAttr::DoubleRight) sx--;
 	if (charAttr(ex, ey).type == CharAttr::DoubleLeft) ex++;
 	if (sy == ey && sx > ex) return;
-	
+
 	for (u16 y = sy; y <= ey; y++) {
 		u32 yp = get_line(y) * max_width;
 		u16 start = (y == sy) ? sx : 0;
@@ -694,18 +694,18 @@ void VTerm::scroll_region(u16 start_y, u16 end_y, s16 num)
 
 			linenumbers[y] = temp[takey];
 
-            if (!fast_scroll || clr) {
-                dirty_startx[y] = 0;
-                dirty_endx[y] = width-1;
-            } else {
-                dirty_startx[y] = temp_sx[takey];
-                dirty_endx[y] = temp_ex[takey];
-            }
- 
-            if (clr) {
-                clear_area(0, y, width - 1, y);
-            }
- 		}
+			if (!fast_scroll || clr) {
+				dirty_startx[y] = 0;
+				dirty_endx[y] = width-1;
+			} else {
+				dirty_startx[y] = temp_sx[takey];
+				dirty_endx[y] = temp_ex[takey];
+			}
+
+			if (clr) {
+				clear_area(0, y, width - 1, y);
+			}
+		}
 	}
 }
 
@@ -853,7 +853,7 @@ void VTerm::historyDisplay(bool absolute, s32 num)
 
 	if (visual_start_line > total_history_lines()) visual_start_line = total_history_lines();
 	if (visual_start_line == bak_line) return;
-	
+
 	modeChanged(CursorVisible);
 
 	bool accel_scroll = false;
@@ -881,7 +881,7 @@ void VTerm::historyDisplay(bool absolute, s32 num)
 	if (!accel_scroll) {
 		requestUpdate(0, 0, width, height);
 	}
-	
+
 	draw_cursor();
 }
 

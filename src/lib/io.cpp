@@ -67,7 +67,7 @@ IoPipe::~IoPipe()
 	}
 
 	if (mCodecRead) {
-		 iconv_close((iconv_t)mCodecRead);
+		iconv_close((iconv_t)mCodecRead);
 	}
 
 	if (mCodecWrite) {
@@ -81,7 +81,7 @@ void IoPipe::setFd(s32 fd)
 
 	if (mFd != -1) {
 		IoDispatcher::instance()->removeIoSource(this, true);
-		close(mFd);		
+		close(mFd);
 	}
 
 	mFd = fd;
@@ -124,12 +124,11 @@ void IoPipe::ready(bool isread)
 	if (!isread) return;
 
 	s8 buf[BUF_SIZE];
-
 	s32 len = read(mFd, buf + mBufLenRead, sizeof(buf) - mBufLenRead);
-	
+
 	if (len == -1) {
-		if (errno == EBADF) {
-			ioEnd();
+		if (errno != EAGAIN && errno != EINTR) {
+			ioError(true, errno);
 		}
 	} else if (len > 0) {
 		if (mBufLenRead) {
@@ -225,11 +224,10 @@ void IoPipe::writeIo(s8 *buf, u32 len)
 				if (num--) {
 					timespec tm = { 0, 200 * 1000000UL };
 					nanosleep(&tm, 0);
-				} else 
-					break;
-			} else if (errno != EINTR) {
-				if (errno == EBADF || errno == EPIPE) {
-					ioEnd();
+				} else break;
+			} else {
+				if (errno != EINTR) {
+					ioError(false, errno);
 				}
 				break;
 			}

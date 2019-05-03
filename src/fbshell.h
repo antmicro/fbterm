@@ -64,7 +64,7 @@ private:
 		u16 code;
 		CharAttr attr;
 	} mCursor;
-	
+
 	struct MousePointer {
 		MousePointer() {
 			drawed = false;

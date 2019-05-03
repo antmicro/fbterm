@@ -32,6 +32,7 @@ public:
 	void sendKey(s8 *buf, u32 len);
 	void changeCursorPos(u16 col, u16 row);
 	void changeTermMode(bool crlf, bool appkey, bool curo);
+	void checkImProcessExited(s32 pid);
 
 private:
 	friend class ImSocket;

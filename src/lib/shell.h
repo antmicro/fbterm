@@ -52,6 +52,8 @@ protected:
 
 	void resize(u16 w, u16 h);
 	void createChildProcess();
+	s32 childProcessId() { return mPid; }
+
 	virtual void initChildProcess() {}
 	virtual void readyRead(s8 *buf, u32 len);
 
@@ -84,7 +86,7 @@ private:
 
 		s8 *text;
 	} mSelText;
-	
+
 	struct TextSelection {
 		TextSelection() {
 			selecting = color_inversed = false;

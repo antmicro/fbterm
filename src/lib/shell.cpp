@@ -41,7 +41,7 @@ void waitChildProcessExit(s32 pid)
 
 	s32 ret = waitpid(pid, 0, WNOHANG);
 	if (ret > 0 || (ret == -1 && errno == ECHILD)) return;
-	
+
 	for (u32 i = 10; i--;) {
 		timespec ts = { 0, 100 * 1000000UL };
 		nanosleep(&ts, 0);
@@ -49,7 +49,7 @@ void waitChildProcessExit(s32 pid)
 		ret = waitpid(pid, 0, WNOHANG);
 		if (ret > 0) break;
 	}
-		
+
 	if (ret <= 0) {
 		kill(pid, SIGKILL);
 		waitpid(pid, 0, 0);
@@ -59,7 +59,7 @@ void waitChildProcessExit(s32 pid)
 Shell::SelectedText Shell::mSelText;
 
 Shell::Shell()
-{	
+{
 	mPid = -1;
 }
 
@@ -77,7 +77,7 @@ void Shell::createChildProcess()
 	switch (mPid) {
 	case -1:
 		break;
-	
+
 	case 0: {  // child process
 		initChildProcess();
 		setenv("TERM", "linux", 1);
@@ -136,12 +136,12 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 	s32 btn = buttons & MouseButtonMask;
 	s32 modifies = buttons & ModifyButtonMask;
 	u16 rtype = mode(MouseReport);
-	
+
 	if (btn && rtype != Wheel && (rtype == MouseNone || (modifies & ShiftButton))) {
 		textSelect(x, y, type, btn);
 		return;
 	}
-	
+
 	if (rtype == MouseNone) return;
 
 	s32 val = -1;
@@ -228,18 +228,18 @@ void Shell::middleTextSelect(u16 x, u16 y)
 {
 	u32 start = mSelState.start, end = mSelState.end;
 	u32 new_end = y * w() + x;
-	
+
 	bool dir_sel = (end >= start);
 	bool dir_new_sel = (new_end >= start);
-	
+
 	mSelState.end = new_end;
-	
+
 	if (dir_sel == dir_new_sel) {
 		bool dir_change = (new_end > end);
-		
+
 		u32 &pos = (dir_sel == dir_change) ? end : new_end;
 		CharAttr attr = charAttr(pos % w(), pos / w());
-		
+
 		if (dir_sel) {
 			if (attr.type == CharAttr::DoubleLeft) pos++;
 			pos++;
@@ -247,9 +247,9 @@ void Shell::middleTextSelect(u16 x, u16 y)
 			if (attr.type == CharAttr::DoubleRight) pos--;
 			pos--;
 		}
-		
+
 		bool dir_new_change = (new_end == end) ? dir_change : (new_end > end);
-		
+
 		if (dir_change == dir_new_change) {
 			inverseTextColor(end, new_end);
 		}
@@ -292,7 +292,7 @@ void Shell::endTextSelect()
 {
 	u32 start = mSelState.start, end = mSelState.end;
 	SWAP(start, end);
-	
+
 	u32 len = end - start + 1;
 	u16 buf[len];
 	s8 *text = new s8[len * 3];
@@ -319,7 +319,7 @@ void Shell::resetTextSelect()
 {
 	mSelState.selecting = false;
 	if (mSelState.color_inversed) {
-		mSelState.color_inversed = false;		
+		mSelState.color_inversed = false;
 		inverseTextColor(mSelState.start, mSelState.end);
 	}
 }
@@ -336,14 +336,14 @@ void Shell::autoTextSelect(u16 x, u16 y)
 		0xFF7FFFFF, /* latin-1 accented letters, not multiplication sign */
 		0xFF7FFFFF  /* latin-1 accented letters, not division sign */
 	};
-	
+
 	static bool inited = false;
 	if (!inited) {
 		inited = true;
-		
+
 		u8 chrs[32];
 		initWordChars((s8*)chrs, sizeof(chrs));
-		
+
 		for (u32 i = 0; chrs[i]; i++) {
 			if (chrs[i] > 0x7f || chrs[i] <= ' ') continue;
 			inwordLut[chrs[i] >> 5] |= 1 << (chrs[i] & 0x1f);
@@ -397,18 +397,18 @@ void Shell::inverseTextColor(u32 start, u32 end)
 	u16 sx, sy, ex, ey;
 	sx = start % w(), sy = start / w();
 	ex = end % w(), ey = end / w();
-	
+
 	inverse(sx, sy, ex, ey);
 
 	if (charAttr(sx, sy).type == CharAttr::DoubleRight) sx--;
 	if (charAttr(ex, ey).type == CharAttr::DoubleLeft) ex++;
 
 	requestUpdate(sx, sy, (sy == ey ? (ex + 1) : w()) - sx, 1);
-	
+
 	if (ey > sy + 1) {
 		requestUpdate(0, sy + 1, w(), ey - sy - 1);
 	}
-	
+
 	if (ey > sy) {
 		requestUpdate(0, ey, ex + 1, 1);
 	}

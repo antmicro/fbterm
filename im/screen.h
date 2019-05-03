@@ -29,7 +29,7 @@ bool is_double_width(unsigned ucs);
 enum { Black = 0, Red, Green, Brown, Blue, Magenta, Cyan, White };
 
 struct Color {
-	unsigned char blue, green, red;
+	unsigned char red, green, blue;
 };
 
 typedef enum { Rotate0 = 0, Rotate90, Rotate180, Rotate270 } RotateType;
@@ -39,6 +39,9 @@ class Screen
 	DECLARE_INSTANCE(Screen)
 public :
 	static void setRotateType(RotateType type) { mRotate = type; }
+	RotateType rotateType() { return mRotate; }
+	void rotateRect(unsigned &x, unsigned &y, unsigned &w, unsigned &h);
+	void rotatePoint(unsigned w, unsigned h, unsigned &x, unsigned &y);
 
 	static unsigned width() { return mScreenw; }
 	static unsigned height() { return mScreenh; }
@@ -48,14 +51,9 @@ public :
 	void updateYOffset();
 
 private:
-	friend class Font;
-	static RotateType rotateType() { return mRotate; }
-	static void rotateRect(unsigned &x, unsigned &y, unsigned &w, unsigned &h);
-	static void rotatePoint(unsigned w, unsigned h, unsigned &x, unsigned &y);
-
 	Screen(int fd);
 	void drawGlyphs(unsigned x, unsigned y, unsigned w, unsigned fc, unsigned bc, unsigned num, unsigned short *text, bool *dw);
-	int drawGlyph(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned short code, bool dw, bool fillbg);
+	void drawGlyph(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned short code, bool dw);
 
 	int mFd;
 	char *mpMemStart;

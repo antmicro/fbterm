@@ -34,7 +34,7 @@ private:
 	virtual void readyRead(s8 *buf, u32 len);
 	void setupSysKey(bool restore);
 	void processRawKeys(s8* buf, u32 len);
-	
+
 	bool mRawMode;
 	bool mImEnable;
 };

@@ -26,7 +26,6 @@
 #include <sys/vt.h>
 #include <linux/kd.h>
 #include <linux/input.h>
-#include "config.h"
 #include "input.h"
 #include "input_key.h"
 #include "fbshell.h"
@@ -59,10 +58,10 @@ TtyInput::TtyInput()
 {
 	tcgetattr(STDIN_FILENO, &oldTm);
 
-	termios tm = oldTm;	
+	termios tm = oldTm;
 	cfmakeraw(&tm);
 	tm.c_cc[VMIN] = 1;
-	tm.c_cc[VTIME] = 0;	
+	tm.c_cc[VTIME] = 0;
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &tm);
 
 	ioctl(STDIN_FILENO, KDGKBMODE, &oldKbMode);
@@ -124,10 +123,8 @@ void TtyInput::setupSysKey(bool restore)
 
 	if (!syskey_saved && restore) return;
 
-#ifndef HAVE_FS_CAPABILITY
 	extern s32 effective_uid;
 	seteuid(effective_uid);
-#endif
 
 	for (u32 i = 0; i < sizeof(sysKeyTable) / sizeof(KeyEntry); i++) {
 		kbentry entry;
@@ -145,9 +142,7 @@ void TtyInput::setupSysKey(bool restore)
 
 	if (!syskey_saved && !restore) syskey_saved = true;
 
-#ifndef HAVE_FS_CAPABILITY
 	seteuid(getuid());
-#endif
 }
 
 void TtyInput::readyRead(s8 *buf, u32 len)
@@ -219,7 +214,7 @@ void TtyInput::processRawKeys(s8 *buf, u32 len)
 			code |= buf[++i] & 0x7f;
 			if (!(buf[i] & 0x80) || !(buf[i - 1] & 0x80)) continue;
 		}
-		
+
 		u16 mod = 0;
 		switch (code) {
 		case KEY_LEFTALT:

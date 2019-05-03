@@ -91,6 +91,6 @@ INPUT METHOD
 this work. FbTerm acts as a client, standalone IM program as a server, and they run in seperated processes.
 
   As a normal IM user, please visit FbTerm's homepage (http://code.google.com/p/fbterm/) to check current available IM 
-programs. If you want to develope a new IM program for FbTerm, im/inputmethod.txt is a guide document. There is also 
+programs. If you want to develope a new IM program for FbTerm, doc/inputmethod.txt is a guide document. There is also 
 a IM example in im/ directory, which help you to understand IM architecture and provide some base sources to simplify 
 the development.

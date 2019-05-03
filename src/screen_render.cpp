@@ -25,6 +25,9 @@
 #define fb_writew(addr, val) (*(volatile u16 *)(addr) = (val))
 #define fb_writel(addr, val) (*(volatile u32 *)(addr) = (val))
 
+typedef void (*drawFun)(u8 *dst, u8 *pixmap, u32 width, u8 fc, u8 bc);
+static drawFun draw;
+
 static u32 ppl, ppw, ppb;
 static u32 fillColors[NR_COLORS];
 static const Color *palette = 0;
@@ -45,8 +48,8 @@ void Screen::setPalette(const Color *_palette)
 			if (vinfo.bits_per_pixel == 16 || vinfo.bits_per_pixel == 15) {
 				fillColors[i] |= fillColors[i] << 16;
 			}
-        }
-    }
+		}
+	}
 
 	setupSysPalette(false);
 	eraseMargin(true, mRows);
@@ -95,7 +98,7 @@ void Screen::setupSysPalette(bool restore)
 
 		u16 red[cols], green[cols], blue[cols];
 
-	 	if (finfo.visual == FB_VISUAL_PSEUDOCOLOR) {  
+		if (finfo.visual == FB_VISUAL_PSEUDOCOLOR) {
 			for (u32 i = 0; i < NR_COLORS; i++) {
 				red[i] = (palette[i].red << 8) | palette[i].red;
 				green[i] = (palette[i].green << 8) | palette[i].green;
@@ -126,64 +129,113 @@ static inline void fill(u8* dst, u32 w, u8 color)
 
 	// get better performance if write-combining not enabled for video memory
 	for (u32 i = w / ppl; i--; dst += 4) {
- 		fb_writel(dst, c);
+		fb_writel(dst, c);
 	}
-	
+
 	if (w & ppw) {
 		fb_writew(dst, c);
 		dst += 2;
 	}
-	
+
 	if (w & ppb) {
 		fb_writeb(dst, c);
 	}
 }
 
-static inline void draw(u8 *dst, u8 *pixmap, u32 width, bool fillbg, u8 fc, u8 bc)
+static void drawFtFontBpp8(u8 *dst, u8 *pixmap, u32 width, u8 fc, u8 bc)
+{
+	bool isfg;
+
+	for (; width--; pixmap++, dst++) {
+		isfg = (*pixmap & 0x80);
+		fb_writeb(dst, fillColors[isfg ? fc : bc]);
+	}
+}
+
+static void drawFtFontBpp15(u8 *dst, u8 *pixmap, u32 width, u8 fc, u8 bc)
 {
 	u32 color;
 	u8 red, green, blue;
 	u8 pixel;
-	bool isfg;
 
-	for (; width--; pixmap++) {
+	for (; width--; pixmap++, dst += 2) {
 		pixel = *pixmap;
 
-		if (bytes_per_pixel == 1) {
-			isfg = (pixel & 0x80);
-			color = fillColors[isfg ? fc : bc];
+		if (pixel) {
+			red = palette[bc].red + (((palette[fc].red - palette[bc].red) * pixel) >> 8);
+			green = palette[bc].green + (((palette[fc].green - palette[bc].green) * pixel) >> 8);
+			blue = palette[bc].blue + (((palette[fc].blue - palette[bc].blue) * pixel) >> 8);
+
+			color = ((red >> 3 << 10) | (green >> 3 << 5) | (blue >> 3));
+			fb_writew(dst, color);
 		} else {
-			isfg = pixel;
-			red = palette[bc].red + ((palette[fc].red - palette[bc].red) * pixel) / 255;
-			green = palette[bc].green + ((palette[fc].green - palette[bc].green) * pixel) / 255;
-			blue = palette[bc].blue + ((palette[fc].blue - palette[bc].blue) * pixel) / 255;
-
-			color = (red >> (8 - vinfo.red.length) << vinfo.red.offset)
-					| (green >> (8 - vinfo.green.length) << vinfo.green.offset)
-					| (blue >> (8 - vinfo.blue.length) << vinfo.blue.offset);
+			fb_writew(dst, fillColors[bc]);
 		}
+	}
+}
 
-		switch(bytes_per_pixel)
-		{
-		case 1:
-			if (fillbg || isfg) fb_writeb(dst, color);
-			dst++;
-			break;
-		case 2:
-			if (fillbg || isfg) fb_writew(dst, color);
-			dst += 2;
-			break;
-		case 4:
-			if (fillbg || isfg) fb_writel(dst, color);
-			dst += 4;
-			break;
+static void drawFtFontBpp16(u8 *dst, u8 *pixmap, u32 width, u8 fc, u8 bc)
+{
+	u32 color;
+	u8 red, green, blue;
+	u8 pixel;
+
+	for (; width--; pixmap++, dst += 2) {
+		pixel = *pixmap;
+
+		if (pixel) {
+			red = palette[bc].red + (((palette[fc].red - palette[bc].red) * pixel) >> 8);
+			green = palette[bc].green + (((palette[fc].green - palette[bc].green) * pixel) >> 8);
+			blue = palette[bc].blue + (((palette[fc].blue - palette[bc].blue) * pixel) >> 8);
+
+			color = ((red >> 3 << 11) | (green >> 2 << 5) | (blue >> 3));
+			fb_writew(dst, color);
+		} else {
+			fb_writew(dst, fillColors[bc]);
+		}
+	}
+}
+
+static void drawFtFontBpp32(u8 *dst, u8 *pixmap, u32 width, u8 fc, u8 bc)
+{
+	u32 color;
+	u8 red, green, blue;
+	u8 pixel;
+
+	for (; width--; pixmap++, dst += 4) {
+		pixel = *pixmap;
+
+		if (pixel) {
+			red = palette[bc].red + (((palette[fc].red - palette[bc].red) * pixel) >> 8);
+			green = palette[bc].green + (((palette[fc].green - palette[bc].green) * pixel) >> 8);
+			blue = palette[bc].blue + (((palette[fc].blue - palette[bc].blue) * pixel) >> 8);
+
+			color = ((red << 16) | (green << 8) | blue);
+			fb_writel(dst, color);
+		} else {
+			fb_writel(dst, fillColors[bc]);
 		}
 	}
 }
 
 static void initFillDraw()
 {
-    ppl = 4 / bytes_per_pixel;
-    ppw = ppl >> 1;
-    ppb = ppl >> 2;
+	ppl = 4 / bytes_per_pixel;
+	ppw = ppl >> 1;
+	ppb = ppl >> 2;
+
+	switch (vinfo.bits_per_pixel) {
+	case 8:
+		draw = drawFtFontBpp8;
+		break;
+	case 15:
+		draw = drawFtFontBpp15;
+		break;
+	case 16:
+		draw = drawFtFontBpp16;
+		break;
+	case 32:
+		draw = drawFtFontBpp32;
+		break;
+	}
 }

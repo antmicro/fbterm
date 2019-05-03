@@ -42,7 +42,7 @@ static void im_deactive()
 	first_show = 1;
 }
 
-static void process_raw_key(char *buf, unsigned short len) 
+static void process_raw_key(char *buf, unsigned short len)
 {
 	for (unsigned short i = 0; i < len; i++) {
 		char down = !(buf[i] & 0x80);
@@ -55,7 +55,7 @@ static void process_raw_key(char *buf, unsigned short len)
 			code |= buf[++i] & 0x7f;
 			if (!(buf[i] & 0x80) || !(buf[i - 1] & 0x80)) continue;
 		}
-        
+
 		unsigned short keysym = keycode_to_keysym(code, down);
 		char *str = keysym_to_term_string(keysym, down);
 
@@ -76,13 +76,13 @@ static void cursor_pos_changed(unsigned x, unsigned y)
 {
 	static const char str[] = "a IM example";
 	#define NSTR (sizeof(str) - 1)
-	
+
 	ImWin wins[] = {
 		{ x + 10, y + 10, 40, 20 },
-		{ x + 10, y + 40, W(NSTR) + 10, H(1) + 10 }
+		{ x + 10, y + 40, FW(NSTR) + 10, FH(1) + 10 }
 	};
 	set_im_windows(wins, 2);
-	
+
 	if (first_show) {
 		first_show = 0;
 
@@ -94,7 +94,7 @@ static void cursor_pos_changed(unsigned x, unsigned y)
 
 	// the better way is only filling margins
 	Screen::instance()->fillRect(wins[1].x, wins[1].y, wins[1].w, wins[1].h, White);
-	
+
 	unsigned short unistr[NSTR];
 	bool dws[NSTR];
 	for (int i = 0; i < NSTR; i++) {
@@ -107,7 +107,7 @@ static void cursor_pos_changed(unsigned x, unsigned y)
 
 static void update_fbterm_info(Info *info)
 {
-	Font::setFontInfo(info->fontName, info->fontSize);
+	Font::setFontInfo(info->fontName, info->fontSize, info->fontHeight, info->fontWidth);
 	Screen::setRotateType((RotateType)info->rotate);
 	if (!Screen::instance()) {
 		exit(1);

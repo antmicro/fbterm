@@ -34,9 +34,9 @@ protected:
 			return fcolor != a.fcolor || bcolor != a.bcolor || intensity != a.intensity
 				|| italic != a.italic || underline != a.underline || blink != a.blink || reverse != a.reverse;
 		}
-		
-		u16 fcolor : 4;
-		u16 bcolor : 4;
+
+		u16 fcolor : 8;
+		u16 bcolor : 8;
 		u16 intensity : 2; // 0 = half-bright, 1 = normal, 2 = bold
 		u16 italic : 1;
 		u16 underline : 1;
@@ -163,9 +163,11 @@ private:
 	void set_charset();
 	void set_cursor_type();
 	void linux_specific();
+	void begin_set_palette();
 	void set_palette();
 	void reset_palette();
 	void set_led();
+	void fbterm_specific();
 
 	CharAttr normal_char_attr();
 	CharAttr erase_char_attr();
@@ -235,7 +237,7 @@ private:
 	CharAttr char_attr, s_char_attr;
 
 	static CharAttr default_char_attr;
-	s8 cur_fcolor, cur_bcolor, cur_underline_color, cur_halfbright_color;
+	u8 cur_fcolor, cur_bcolor, cur_underline_color, cur_halfbright_color;
 
 	// action parameters
 	#define NPAR 16

@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/wait.h>
 #include <linux/vt.h>
 #include "config.h"
 #include "fbterm.h"
@@ -74,7 +75,7 @@ static void signalHandler(s32 signo)
 static void pollSignal()
 {
 	if (!pendsigs) return;
-	
+
 	sig_atomic_t sigs = pendsigs;
 	pendsigs = 0;
 
@@ -122,6 +123,10 @@ void FbTerm::init()
 #ifdef HAVE_SIGNALFD
 	sigset_t sigmask;
 	sigemptyset(&sigmask);
+
+#ifndef HAVE_EPOLL
+	sigaddset(&sigmask, SIGCHLD);
+#endif
 	sigaddset(&sigmask, SIGUSR1);
 	sigaddset(&sigmask, SIGUSR2);
 	sigaddset(&sigmask, SIGALRM);
@@ -133,6 +138,9 @@ void FbTerm::init()
 #else
 	sighandler_t sh = signalHandler;
 
+#ifndef HAVE_EPOLL
+	signal(SIGCHLD, sh);
+#endif
 	signal(SIGUSR1, sh);
 	signal(SIGUSR2, sh);
 	signal(SIGALRM, sh);
@@ -184,6 +192,18 @@ void FbTerm::processSignal(u32 signo)
 		Screen::instance()->switchVc(true);
 		FbShellManager::instance()->switchVc(true);
 		break;
+
+#ifndef HAVE_EPOLL
+	case SIGCHLD:
+		if (mRun) {
+			s32 pid = waitpid(WAIT_ANY, 0, WNOHANG);
+			if (pid > 0) {
+				FbShellManager::instance()->checkShellProcessExited(pid);
+				ImProxy::instance()->checkImProcessExited(pid);
+			}
+		}
+		break;
+#endif
 
 	default:
 		break;
@@ -241,9 +261,7 @@ void FbTerm::processSysKey(u32 key)
 
 void FbTerm::initChildProcess()
 {
-#ifndef HAVE_FS_CAPABILITY
-    setuid(getuid());
-#endif
+	setuid(getuid());
 
 #ifdef HAVE_SIGNALFD
 	sigprocmask(SIG_SETMASK, &oldSigmask, 0);
@@ -252,22 +270,18 @@ void FbTerm::initChildProcess()
 	signal(SIGPIPE, SIG_DFL);
 }
 
-#ifndef HAVE_FS_CAPABILITY
 u32 effective_uid;
-#endif
 
 int main(int argc, char **argv)
 {
-#ifndef HAVE_FS_CAPABILITY
 	effective_uid = geteuid();
 	seteuid(getuid());
-#endif
 
 	if (Config::instance()->parseArgs(argc, argv)) {
 		FbTerm::instance()->run();
 		FbTerm::uninstance();
 	}
-	
+
 	Config::uninstance();
 	return 0;
 }

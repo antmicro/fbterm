@@ -54,7 +54,7 @@ typedef enum {
 
 typedef struct {
 	unsigned char rotate;
-	unsigned short fontSize;
+	unsigned short fontSize, fontHeight, fontWidth;
 	char fontName[0];
 } Info;
 
@@ -76,7 +76,7 @@ typedef struct {
 		unsigned shell;  // for Active, FbTerm's active window while sending this message
 
 		Info info; // for FbTermInfo
-		
+
 		struct {
 			char crWithLf;
 			char applicKeypad;

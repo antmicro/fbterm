@@ -85,7 +85,7 @@ Screen *Screen::createInstance()
 	for (unsigned i = 0; i < FB_MAX; i++) {
 		snprintf(devname, sizeof(devname), "/dev/fb%d", i);
 		devFd = open(devname, O_RDWR);
-        if (devFd >= 0) break;
+		if (devFd >= 0) break;
 	}
 
 	if (devFd < 0) {
@@ -131,18 +131,21 @@ Screen *Screen::createInstance()
 		mScreenw = vinfo.yres;
 		mScreenh = vinfo.xres;
 	}
-	
-	if (!Font::instance()) return 0;
 
-	if (mScreenw / W(1) == 0 || mScreenh / H(1) == 0) {
+	if (!Font::instance() || FW(1) == 0 || FH(1) == 0) {
+		fprintf(stderr, "init font error!\n");
+		return 0;
+	}
+
+	if (mScreenw / FW(1) == 0 || mScreenh / FH(1) == 0) {
 		fprintf(stderr, "font size is too huge!\n");
 		return 0;
 	}
-	
+
 	if (vinfo.bits_per_pixel == 15) bytes_per_pixel = 2;
 	else bytes_per_pixel = (vinfo.bits_per_pixel >> 3);
 
-	initFillDraw();	
+	initFillDraw();
 	return new Screen(devFd);
 }
 
@@ -168,10 +171,10 @@ void Screen::drawText(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned
 {
 	if (x >= mScreenw || y >= mScreenh || fc >= NR_COLORS || bc >= NR_COLORS || !num || !text || !dw) return;
 
-	unsigned startx, startnum, fw = W(1);
+	unsigned startx, startnum, fw = FW(1);
 	unsigned short *starttext;
 	bool *startdw, draw_space = false, draw_text = false;
-	
+
 
 	for (; num; num--, text++, dw++, x += fw) {
 		if (*text == 0x20) {
@@ -187,7 +190,7 @@ void Screen::drawText(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned
 		} else {
 			if (draw_space) {
 				draw_space = false;
-				fillRect(startx, y, x - startx, H(1), bc);
+				fillRect(startx, y, x - startx, FH(1), bc);
 			}
 
 			if (!draw_text) {
@@ -205,23 +208,15 @@ void Screen::drawText(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned
 	if (draw_text) {
 		drawGlyphs(startx, y, x - startx, fc, bc, startnum - num, starttext, startdw);
 	} else if (draw_space) {
-		fillRect(startx, y, x - startx, H(1), bc);
+		fillRect(startx, y, x - startx, FH(1), bc);
 	}
 }
 
 void Screen::drawGlyphs(unsigned x, unsigned y, unsigned w, unsigned fc, unsigned bc, unsigned num, unsigned short *text, bool *dw)
 {
-	if (Font::instance()->isMonospace()) {
-		for (; num--; text++, dw++) {
-			drawGlyph(x, y, fc, bc, *text, *dw, true);
-			x += *dw ? W(2) : W(1);
-		}
-	} else {
-		fillRect(x, y, w, H(1), bc);
-
-		for (; num--; text++, dw++) {
-			x += drawGlyph(x, y, fc, bc, *text, *dw, false);
-		}
+	for (; num--; text++, dw++) {
+		drawGlyph(x, y, fc, bc, *text, *dw);
+		x += *dw ? FW(2) : FW(1);
 	}
 }
 
@@ -308,18 +303,18 @@ void Screen::fillRect(unsigned x, unsigned y, unsigned w, unsigned h, unsigned c
 	}
 }
 
-int Screen::drawGlyph(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned short code, bool dw, bool fillbg)
+void Screen::drawGlyph(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned short code, bool dw)
 {
-	if (x >= mScreenw || y >= mScreenh) return 0;
+	if (x >= mScreenw || y >= mScreenh) return;
 
-	int w = (dw ? W(2) : W(1)), h = H(1);
+	int w = (dw ? FW(2) : FW(1)), h = FH(1);
 	if (x + w > mScreenw) w = mScreenw - x;
 	if (y + h > mScreenh) h = mScreenh - y;
 
 	Font::Glyph *glyph = (Font::Glyph *)Font::instance()->getGlyph(code);
 	if (!glyph) {
-		if (fillbg) fillRect(x, y, w, h, bc);
-		return w;
+		fillRect(x, y, w, h, bc);
+		return;
 	}
 
 	int top = glyph->top;
@@ -327,7 +322,7 @@ int Screen::drawGlyph(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned
 
 	int left = glyph->left;
 	if ((int)x + left < 0) left = -x;
-	
+
 	int width = glyph->width;
 	if (width > w - left) width = w - left;
 	if ((int)x + left + width > (int)mScreenw) width = mScreenw - ((int)x + left);
@@ -337,44 +332,40 @@ int Screen::drawGlyph(unsigned x, unsigned y, unsigned fc, unsigned bc, unsigned
 	if (height > h - top) height = h - top;
 	if (y + top + height > mScreenh) height = mScreenh - (y + top);
 	if (height < 0) height = 0;
-	
-	if (fillbg) {
-		if (top) fillRect(x, y, w, top, bc);
-		if (left > 0) fillRect(x, y + top, left, height, bc);
-	
-		int right = width + left;
-		if (w > right) fillRect((int)x + right, y + top, w - right, height, bc);
-	
-		int bot = top + height;
-		if (h > bot) fillRect(x, y + bot, w, h - bot, bc);
-	}
+
+	if (top) fillRect(x, y, w, top, bc);
+	if (left > 0) fillRect(x, y + top, left, height, bc);
+
+	int right = width + left;
+	if (w > right) fillRect((int)x + right, y + top, w - right, height, bc);
+
+	int bot = top + height;
+	if (h > bot) fillRect(x, y + bot, w, h - bot, bc);
 
 	x += left;
 	y += top;
-	if (x >= mScreenw || y >= mScreenh || !width || !height) return glyph->advance;
+	if (x >= mScreenw || y >= mScreenh || !width || !height) return;
 
 	unsigned nwidth = width, nheight = height;
 	rotateRect(x, y, nwidth, nheight);
 
 	char *pixmap = glyph->pixmap;
 	unsigned wdiff = glyph->width - width, hdiff = glyph->height - height;
-	
+
 	if (wdiff) {
 		if (mRotate == Rotate180) pixmap += wdiff;
 		else if (mRotate == Rotate270) pixmap += wdiff * glyph->pitch;
 	}
-	
+
 	if (hdiff) {
 		if (mRotate == Rotate90) pixmap += hdiff;
 		else if (mRotate == Rotate180) pixmap += hdiff * glyph->pitch;
 	}
-	
+
 	char *dst, *dst_line = mpMemStart + x * bytes_per_pixel;
 
 	for (; nheight--; y++, pixmap += glyph->pitch) {
 		dst = dst_line + offsetY(y) * finfo.line_length;
-		draw(dst, pixmap, nwidth, fillbg, fc, bc);
+		draw(dst, pixmap, nwidth, fc, bc);
 	}
-
-	return glyph->advance;
 }

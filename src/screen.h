@@ -24,10 +24,10 @@
 #include "type.h"
 #include "instance.h"
 
-#define NR_COLORS 16
+#define NR_COLORS 256
 
 struct Color {
-    u8 blue, green, red;
+	u8 red, green, blue;
 };
 
 struct Rectangle {
@@ -41,9 +41,9 @@ class Screen
 {
 	DECLARE_INSTANCE(Screen)
 public :
-	static RotateType rotateType() { return mRotate; }
-	static void rotateRect(u32 &x, u32 &y, u32 &w, u32 &h);
-	static void rotatePoint(u32 w, u32 h, u32 &x, u32 &y);
+	RotateType rotateType();
+	void rotateRect(u32 &x, u32 &y, u32 &w, u32 &h);
+	void rotatePoint(u32 w, u32 h, u32 &x, u32 &y);
 
 	u16 cols() { return mCols; }
 	u16 rows() { return mRows; }
@@ -63,14 +63,12 @@ private:
 
 	void fillRect(u32 x, u32 y, u32 w, u32 h, u8 color, bool clip = true);
 	void drawGlyphs(u32 x, u32 y, u32 w, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool clip);
-	s16 drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool fillbg, bool clip);
+	void drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool clip);
 
 	u16 mCols, mRows;
 	u8 mScrollAccel; // 0 = none, 1 = ypan, 2 = ywrap
 	s32 mFd;
 	u8 *mpMemStart;
-	static RotateType mRotate;
-	static u32 mScreenw, mScreenh;
 };
 
 #endif
