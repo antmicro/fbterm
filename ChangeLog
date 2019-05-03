@@ -1,0 +1,23 @@
+2008-08-23 version 1.1
+	* fbshell.h fbshell.cpp fbterm.cpp input_key.h:
+	added configurable additional text encoding support and switch between them with hot keys
+	
+	* lib/term.h lib/term.cpp fbshell.cpp:
+	added a option in configure file to let user adjust max scroll-back history lines of every window
+	
+	* lib/term.cpp:
+	expose(): fixed a bug of NOT redraw whole changed area
+	a example is cursor drawing error while shell command line containing double width characters
+	
+	* hash.cpp:
+	find(): fixed a bug to get a little better hash search performance
+	
+	* fbterm.cpp:
+	pollSingal(): fixed a variable name spelling error in source for older kernel support
+	SignalIo::readyRead(): fixed a compile failure while kernel headers version less than 2.6.24
+	
+	* screen.cpp:
+	createInstance(): fixed a compile failure under certain systems
+
+2008-07-05 verson 1.0
+	first release

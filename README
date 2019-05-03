@@ -1,0 +1,71 @@
+FbTerm - a fast FrameBuffer based TERMinal emulator for linux
+
+
+DESCRIPTION
+
+  FbTerm is a fast terminal emulator for linux with frame buffer device. Features include:
+  
+  * mostly as fast as terminal of linux kernel while accelerated scrolling is enabled on framebuffer device
+  * select font with fontconfig and draw text with freetype2, same as Qt/Gtk+ based GUI apps
+  * dynamicly create/destroy up to 10 windows initially running default shell
+  * record scrollback history for every window
+  * auto-detect current locale and convert text encoding, support double width scripts like Chinese, Japanese etc
+  * switch between configurable additional text encoding with hot keys on the fly
+  * copy/past selected text between windows with mouse when gpm server is running
+
+
+CONFIGURE FILE
+
+  On startup, FbTerm try to load configuration from $HOME/.fbtermrc. If that file dosn't exist, FbTerm will create it with
+default options. Through the configure file, you can control font family/size, text background/foreground color, additional
+text encodings etc. See comments in that file for details.
+
+
+SHORTCUT SUMMAY
+
+keyboard:
+CTRL_ALT_E:    exit from FbTerm
+CTRL_ALT_C:    create a new window
+CTRL_ALT_D:    destroy current window
+CTRL_ALT_1:    switch to window 1
+CTRL_ALT_2:    switch to window 2
+CTRL_ALT_3:    switch to window 3
+CTRL_ALT_4:    switch to window 4
+CTRL_ALT_5:    switch to window 5
+CTRL_ALT_6:    switch to window 6
+CTRL_ALT_7:    switch to window 7
+CTRL_ALT_8:    switch to window 8
+CTRL_ALT_9:    switch to window 9
+CTRL_ALT_0:    switch to window 10
+SHIFT_LEFT:    switch to previous window
+SHIFT_RIGHT:   switch to next window
+SHIFT_PAGEUP:    history scroll up
+SHIFT_PAGEDOWN:  history scroll down
+CTRL_ALT_F1:                 switch to encoding of current locale
+CTRL_ALT_F2 to CTRL_ALT_F6:  switch to additional encodings
+
+mouse:
+move when left button down:      select text
+double click with left button:   auto select text
+click with right button:         paste selected text
+
+Sometimes above actions will not work, please try to redo them with shift key holding down.
+
+
+NOTATION
+
+For VESA framebuffer device, accelerated scrolling is disabled defaultly, FbTerm will run slowly while scrolling text.
+you may modify GRUB/LILO configure file to enable it. A GRUB example is showed below:
+
+--Before--
+title Ubuntu
+    root (hd0,0)
+    kernel /boot/vmlinuz ro root=LABEL=UBUNTU splash vga=0x317
+    initrd /boot/initrd.img
+
+--After--
+title Ubuntu
+    root (hd0,0)
+    kernel /boot/vmlinuz ro root=LABEL=UBUNTU splash vga=0x317 video=vesafb:ypan
+    initrd /boot/initrd.img
+
