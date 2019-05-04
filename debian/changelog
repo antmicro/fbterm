@@ -1,3 +1,10 @@
+fbterm (1.7-5) UNRELEASED; urgency=medium
+
+  * Fix FTBFS to cross-compile. (Closes: #909679)
+    Add patches/fix_ftbfs_crosscompile.patch.
+
+ -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Sun, 05 May 2019 07:56:05 +0900
+
 fbterm (1.7-4) unstable; urgency=medium
 
   * Fix FTBFS with gcc-6. (Closes: #811719)
