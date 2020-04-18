@@ -1,4 +1,4 @@
-fbterm (1.7-6) UNRELEASED; urgency=medium
+fbterm (1.7-5) unstable; urgency=medium
 
   * Fix FTBFS to cross-compile. (Closes: #909679)
     Add patches/fix_ftbfs_crosscompile.patch.
