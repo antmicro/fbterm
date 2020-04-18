@@ -2,12 +2,13 @@ fbterm (1.7-5) unstable; urgency=medium
 
   * Update debian/control.
     - Bump Standards-Version to 4.5.0.
+    - Set debhelper-compat version in Build-Depends.
   * Fix FTBFS to cross-compile. (Closes: #909679)
     Add patches/fix_ftbfs_crosscompile.patch.
   * Fix FTBFS for architectures without epoll support. (Closes: #909680)
     Add patches/fix_ftbfs_epoll.patch.
 
- -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Sun, 05 May 2019 08:03:35 +0900
+ -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Sat, 18 Apr 2020 15:58:38 +0900
 
 fbterm (1.7-4) unstable; urgency=medium
 

@@ -2,7 +2,8 @@ Source: fbterm
 Section: utils
 Priority: optional
 Maintainer: Nobuhiro Iwamatsu <iwamatsu@debian.org>
-Build-Depends: debhelper (>= 9), autotools-dev, libfreetype6-dev,
+Build-Depends: debhelper-compat (= 12), debhelper (>= 12),
+		autotools-dev, libfreetype6-dev,
 		libfontconfig1-dev, libgpm-dev, pkg-config,
 		libx86-dev [i386 amd64]
 Standards-Version: 4.5.0
