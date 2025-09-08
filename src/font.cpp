@@ -141,6 +141,7 @@ Font::Font()
 		mHeight = sizes[index].height;
 		mWidth = sizes[index].width;
 	}
+	mBaseline = face->size->metrics.ascender >> 6;
 
 	if (!(face->face_flags & FT_FACE_FLAG_FIXED_WIDTH)) mWidth = MIN(mWidth, (mHeight + 1) / 2);
 
@@ -164,6 +165,17 @@ Font::Font()
 
 		if (buf[0] == '+' || buf[0] == '-') mHeight += (s32)height;
 		else mHeight = height;
+	}
+
+	u32 baseline = 0;
+	Config::instance()->getOption("font-baseline", baseline);
+
+	if (baseline) {
+		s8 buf[64];
+		Config::instance()->getOption("font-baseline", buf, sizeof(buf));
+
+		if (buf[0] == '+' || buf[0] == '-') mBaseline += (s32)baseline;
+		else mBaseline = baseline;
 	}
 }
 
@@ -304,16 +316,22 @@ Font::Glyph *Font::getGlyph(u32 unicode)
 	x = y = 0;
 	w = nw = bitmap.width;
 	h = nh = bitmap.rows;
+	u8 *buf = bitmap.buffer;
+	s32 top = (s32)mBaseline - face->glyph->bitmap_top;
+	if (top < 0) {
+		buf -= top * bitmap.pitch;
+		h = nh += top;
+		top = 0;
+	}
 	Screen::instance()->rotateRect(x, y, nw, nh);
 
 	Glyph *glyph = (Glyph *)new u8[OFFSET(Glyph, pixmap) + nw * nh];
-	glyph->left = face->glyph->metrics.horiBearingX >> 6;
-	glyph->top = mHeight - 1 + (face->size->metrics.descender >> 6) - (face->glyph->metrics.horiBearingY >> 6);
-	glyph->width = face->glyph->metrics.width >> 6;
-	glyph->height = face->glyph->metrics.height >> 6;
+	glyph->left = face->glyph->bitmap_left;
+	glyph->top = top;
+	glyph->width = w;
+	glyph->height = h;
 	glyph->pitch = nw;
 
-	u8 *buf = bitmap.buffer;
 	for (y = 0; y < h; y++, buf += bitmap.pitch) {
 		for (x = 0; x < w; x++) {
 			nx = x, ny = y;
