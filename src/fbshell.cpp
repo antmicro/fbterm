@@ -542,6 +542,8 @@ void FbShell::request(RequestType type,  u32 val)
 		break;
 
 	case VcSwitch:
+		manager->createShell();
+		manager->deleteShell();
 		break;
 
 	default:

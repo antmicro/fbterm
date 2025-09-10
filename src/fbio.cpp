@@ -30,6 +30,7 @@
 #define NR_EPOLL_FDS 10
 s32 epollFd;
 #else
+#include <sys/select.h>
 static fd_set fds;
 static u32 maxfd = 0;
 #endif

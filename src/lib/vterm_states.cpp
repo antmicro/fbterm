@@ -130,6 +130,7 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 
 	// EShash
 	{ '8', &VTerm::screen_align,	ESnormal },
+	{ '9', &VTerm::screen_clear,    ESnormal },
 	ENDSEQ,
 
 	// ESfunckey

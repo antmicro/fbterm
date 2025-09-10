@@ -150,6 +150,7 @@ private:
 	void erase_line();
 	void erase_display();
 	void screen_align();
+	void screen_clear();
 	void set_margins();
 	void respond_id();
 	void status_report();

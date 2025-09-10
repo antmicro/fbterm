@@ -338,6 +338,11 @@ void VTerm::erase_display()
 	}
 }
 
+void VTerm::screen_clear()
+{
+    request(VcSwitch);
+}
+
 void VTerm::screen_align()
 {
 	for (u16 y = 0; y < height; y++) {
