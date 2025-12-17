@@ -231,6 +231,10 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "verbose", no_argument, 0, 'v' },
 		{ "font-names", required_argument, 0, 'n' },
 		{ "font-size", required_argument, 0, 's' },
+		{ "margin-top", required_argument, 0, 'T' },
+		{ "margin-bottom", required_argument, 0, 'G' },
+		{ "margin-left", required_argument, 0, 'L' },
+		{ "margin-right", required_argument, 0, 'R' },
 		{ "color-foreground", required_argument, 0, 'f' },
 		{ "color-background", required_argument, 0, 'b' },
 		{ "text-encodings", required_argument, 0, 'e' },
@@ -250,7 +254,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 	};
 
 	s32 index;
-	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:c:C:W:H:B:al", options, 0)) != -1) {
+	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:c:C:T:G:B:L:W:H:B:al", options, 0)) != -1) {
 		switch (index) {
 		case 'V':
 			printf("FbTerm version " VERSION "\n");
@@ -278,6 +282,10 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"  -i, --input-method=TEXT         specify input method program\n"
 				"  -c, --cursor-shape=NUM          specify default cursor shape\n"
 				"  -C, --cursor-interval=NUM       specify cursor flash interval\n"
+				"  -T, --margin-top=NUM            specify top margin in pixels\n"
+				"  -G, --margin-bottom=NUM         specify bottom margin in pixels\n"
+				"  -L, --margin-left=NUM           specify left margin in pixels\n"
+				"  -R, --margin-right=NUM          specify right margin in pixels\n"
 #ifdef ENABLE_VESA
 				"      --vesa-mode=NUM             force VESA video mode\n"
 				"                  list            display available VESA video modes\n"

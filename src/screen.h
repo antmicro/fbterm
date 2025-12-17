@@ -30,6 +30,19 @@ struct Color {
 	u8 red, green, blue;
 };
 
+struct ScreenConfig {
+	u32 top;
+	u32 bottom;
+	u32 left;
+	u32 right;
+
+	ScreenConfig();
+	ScreenConfig(u32 top, u32 bottom, u32 left, u32 right);
+
+	u32 marginWidth() const;
+	u32 marginHeight() const;
+};
+
 typedef enum { Rotate0 = 0, Rotate90, Rotate180, Rotate270 } RotateType;
 
 class Screen
@@ -58,6 +71,7 @@ public :
 
 protected:
 	u32 mWidth, mHeight;
+	u32 mOffsetLeft, mOffsetTop;
 	u16 mCols, mRows;
 	u32 mBitsPerPixel, mBytesPerLine;
 

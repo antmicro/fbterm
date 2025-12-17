@@ -212,7 +212,7 @@ void VesaDev::printModes()
 	get_mode(0, true);
 }
 
-VesaDev *VesaDev::initVesaDev(s16 mode)
+VesaDev *VesaDev::initVesaDev(s16 mode, ScreenConfig config)
 {
 	cur_mode = get_mode(mode, false);
 	if (cur_mode == -1) return 0;
@@ -228,13 +228,15 @@ VesaDev *VesaDev::initVesaDev(s16 mode)
 	LRMI_free_real(minfo);
 
 	cur_mode |= 0x4000; // use linear frame buffer mode
-	return new VesaDev();
+	return new VesaDev(config);
 }
 
-VesaDev::VesaDev()
+VesaDev::VesaDev(ScreenConfig config)
 {
-	mWidth = mode_info.x_resolution;
-	mHeight = mode_info.y_resolution;
+	mWidth = mode_info.x_resolution - config.marginWidth();
+	mHeight = mode_info.y_resolution - config.marginHeight();
+	mOffsetLeft = config.left;
+	mOffsetTop = config.top;
 	mBitsPerPixel = mode_info.bits_per_pixel;
 
 	scanline_width = mWidth;

@@ -41,6 +41,32 @@ static const s8 disable_blank[] = "\e[9;0]";
 static const s8 enable_blank[] = "\e[9;10]";
 static const s8 clear_screen[] = "\e[2J\e[H";
 
+ScreenConfig::ScreenConfig()
+{
+	this->top = 0;
+	this->bottom = 0;
+	this->left = 0;
+	this->right = 0;
+}
+
+ScreenConfig::ScreenConfig(u32 t, u32 b, u32 l, u32 r)
+{
+	top = t;
+	bottom = b;
+	left = l;
+	right = r;
+}
+
+u32 ScreenConfig::marginWidth() const
+{
+	return right + left;
+}
+
+u32 ScreenConfig::marginHeight() const
+{
+	return bottom + top;
+}
+
 DEFINE_INSTANCE(Screen)
 
 Screen *Screen::createInstance()
@@ -51,6 +77,12 @@ Screen *Screen::createInstance()
 	}
 
 	Screen *pScreen = 0;
+
+	ScreenConfig config = ScreenConfig();
+	Config::instance()->getOption("margin-top", config.top);
+	Config::instance()->getOption("margin-bottom", config.bottom);
+	Config::instance()->getOption("margin-left", config.left);
+	Config::instance()->getOption("margin-right", config.right);
 
 #ifdef ENABLE_VESA
 	s8 buf[16];
@@ -63,10 +95,10 @@ Screen *Screen::createInstance()
 	u32 mode = 0;
 	Config::instance()->getOption("vesa-mode", mode);
 
-	if (!mode) pScreen = FbDev::initFbDev();
-	if (!pScreen) pScreen = VesaDev::initVesaDev(mode);
+	if (!mode) pScreen = FbDev::initFbDev(config);
+	if (!pScreen) pScreen = VesaDev::initVesaDev(mode, config);
 #else
-	pScreen = FbDev::initFbDev();
+	pScreen = FbDev::initFbDev(config);
 #endif
 
 	if (!pScreen) return 0;
@@ -265,7 +297,7 @@ void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color)
 
 	for (; h--;) {
 		if (mScrollType == YWrap && y > mOffsetMax) y -= mOffsetMax + 1;
-		(this->*fill)(x, y++, w, color);
+		(this->*fill)(x + mOffsetLeft, y++ + mOffsetTop, w, color);
 	}
 }
 
@@ -331,7 +363,7 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw)
 	adjustOffset(x, y);
 	for (; nheight--; y++, pixmap += glyph->pitch) {
 		if ((mScrollType == YWrap) && y > mOffsetMax) y -= mOffsetMax + 1;
-		(this->*draw)(x, y, nwidth, fc, bc, pixmap);
+		(this->*draw)(x + mOffsetLeft, y + mOffsetTop, nwidth, fc, bc, pixmap);
 	}
 }
 
