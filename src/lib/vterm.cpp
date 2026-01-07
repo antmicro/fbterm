@@ -25,6 +25,10 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+WindowInfo::~WindowInfo() {
+
+}
+
 VTerm::CharAttr VTerm::default_char_attr = { 0, 0, 1, 0, 0, 0, 0, VTerm::CharAttr::Single };
 
 VTerm::CharAttr VTerm::normal_char_attr()
@@ -821,6 +825,10 @@ void VTerm::historyDisplay(bool absolute, s32 num)
 	}
 
 	draw_cursor();
+}
+
+WindowInfo* VTerm::getWindowInfo() {
+	return 0;
 }
 
 u16 VTerm::get_line(u16 y)

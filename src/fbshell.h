@@ -23,6 +23,20 @@
 
 #include "shell.h"
 
+struct MarginConfig {
+	u32 top;
+	u32 bottom;
+	u32 left;
+	u32 right;
+
+	MarginConfig();
+	MarginConfig(u32 top, u32 bottom, u32 left, u32 right);
+
+	u32 width() const;
+	u32 height() const;
+};
+
+
 class FbShell : public Shell {
 public:
 	void keyInput(s8 *buf, u32 len);
@@ -48,6 +62,7 @@ private:
 
 	virtual void initShellProcess();
 	virtual void readyRead(s8 *buf, u32 len);
+	virtual WindowInfo* getWindowInfo();
 
 	void switchVt(bool enter, FbShell *peer);
 	void adjustCharAttr(CharAttr &attr);

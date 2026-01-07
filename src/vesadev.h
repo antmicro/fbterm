@@ -27,9 +27,9 @@ class VesaDev : public Screen {
 private:
 	friend class Screen;
 	static void printModes();
-	static VesaDev *initVesaDev(s16 mode, ScreenConfig config);
+	static VesaDev *initVesaDev(s16 mode);
 
-	VesaDev(ScreenConfig config);
+	VesaDev();
 	~VesaDev();
 
 	virtual void setupOffset();

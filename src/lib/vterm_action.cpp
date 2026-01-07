@@ -107,6 +107,66 @@ void VTerm::save_cursor()
 	s_char_attr = char_attr;
 }
 
+void VTerm::window_ops()
+{
+	// Text-Area Size (chars)
+	if (param[0] == 18) {
+		s8 str[32];
+		snprintf(str, sizeof(str), "\e[8;%d;%dt", height, width);
+		sendBack(str);
+		return;	
+	}
+
+	WindowInfo* info = getWindowInfo();
+	if (info == NULL) return;
+
+	// Resize Window (pixels)
+	if (param[0] == 4) {
+		info->setSize(param[2], param[1]);
+		reset();
+
+		resize(info->mCols, info->mRows);
+		max_width = width;
+		max_height = height;
+		return;
+	}
+	
+	// Move Window (pixels)
+	if (param[0] == 3) {
+		info->setOffset(param[1], param[2]);
+		reset();
+
+		resize(info->mCols, info->mRows);
+		max_width = width;
+		max_height = height;
+		return;	
+	}
+
+	// Get Window/Text-Area position (pixels)
+	if (param[0] == 13) {
+		s8 str[32];
+		snprintf(str, sizeof(str), "\e[3;%d;%dt", info->mOffsetLeft, info->mOffsetTop);
+		sendBack(str);
+		return;	
+	}
+	
+	// Get Window/Text-Area size (pixels)
+	if (param[0] == 14) {
+		s8 str[32];
+		snprintf(str, sizeof(str), "\e[4;%d;%dt", info->mHeight, info->mWidth);
+		sendBack(str);
+		return;	
+	}
+	
+	// Get Screen size (pixels)
+	if (param[0] == 15) {
+		s8 str[32];
+		snprintf(str, sizeof(str), "\e[5;%d;%dt", info->mScreenHeight, info->mScreenWidth);
+		sendBack(str);
+		return;	
+	}
+}
+
 void VTerm::restore_cursor()
 {
 	g0_charset = s_g0_charset;

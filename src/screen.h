@@ -23,6 +23,7 @@
 
 #include "type.h"
 #include "instance.h"
+#include "vterm.h"
 
 #define NR_COLORS 256
 
@@ -30,22 +31,9 @@ struct Color {
 	u8 red, green, blue;
 };
 
-struct ScreenConfig {
-	u32 top;
-	u32 bottom;
-	u32 left;
-	u32 right;
-
-	ScreenConfig();
-	ScreenConfig(u32 top, u32 bottom, u32 left, u32 right);
-
-	u32 marginWidth() const;
-	u32 marginHeight() const;
-};
-
 typedef enum { Rotate0 = 0, Rotate90, Rotate180, Rotate270 } RotateType;
 
-class Screen
+class Screen : public WindowInfo
 {
 	DECLARE_INSTANCE(Screen)
 public :
@@ -68,11 +56,11 @@ public :
 
 	void showInfo(bool verbose);
 	virtual void switchVc(bool enter);
+	
+	virtual void setSize(int w, int h);
+	virtual void setOffset(int x, int y);
 
 protected:
-	u32 mWidth, mHeight;
-	u32 mOffsetLeft, mOffsetTop;
-	u16 mCols, mRows;
 	u32 mBitsPerPixel, mBytesPerLine;
 
 	RotateType mRotateType;

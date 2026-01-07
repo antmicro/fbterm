@@ -26,9 +26,9 @@
 class FbDev : public Screen {
 private:
 	friend class Screen;
-	static FbDev *initFbDev(ScreenConfig config);
+	static FbDev *initFbDev();
 
-	FbDev(ScreenConfig config);
+	FbDev();
 	~FbDev();
 
 	virtual void setupOffset();

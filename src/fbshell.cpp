@@ -305,6 +305,32 @@ static const Color defaultPalette[NR_COLORS] = {
 	{0xee, 0xee, 0xee}, /* 255 */
 };
 
+MarginConfig::MarginConfig()
+{
+	this->top = 0;
+	this->bottom = 0;
+	this->left = 0;
+	this->right = 0;
+}
+
+MarginConfig::MarginConfig(u32 t, u32 b, u32 l, u32 r)
+{
+	top = t;
+	bottom = b;
+	left = l;
+	right = r;
+}
+
+u32 MarginConfig::width() const
+{
+	return right + left;
+}
+
+u32 MarginConfig::height() const
+{
+	return bottom + top;
+}
+
 static bool firstShell = true;
 
 u16 VTerm::init_history_lines()
@@ -351,7 +377,22 @@ FbShell::FbShell()
 	mPalette = 0;
 	Config::instance()->getOption("term-is-linux", mTermIsLinux);
 	createShellProcess(Config::instance()->getShellCommand());
-	resize(screen->cols(), screen->rows());
+
+	MarginConfig config {};
+	Config::instance()->getOption("margin-top", config.top);
+	Config::instance()->getOption("margin-bottom", config.bottom);
+	Config::instance()->getOption("margin-left", config.left);
+	Config::instance()->getOption("margin-right", config.right);
+
+	WindowInfo* info = getWindowInfo();
+	if (info == NULL) {
+		resize(screen->cols(), screen->rows());
+	} else {
+		info->setSize(info->mWidth - config.width(), info->mHeight - config.height());
+		info->setOffset(config.left, config.top);
+
+		resize(info->mCols, info->mRows);
+	}
 
 	firstShell = false;
 }
@@ -677,6 +718,10 @@ void FbShell::readyRead(s8 *buf, u32 len)
 {
 	clearMousePointer();
 	Shell::readyRead(buf, len);
+}
+
+WindowInfo* FbShell::getWindowInfo() {
+	return screen;
 }
 
 void FbShell::clearMousePointer()

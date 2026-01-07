@@ -25,6 +25,21 @@
 
 #include "type.h"
 
+class WindowInfo {
+public:
+
+	virtual ~WindowInfo();
+
+	virtual void setSize(int w, int h) = 0;
+	virtual void setOffset(int x, int y) = 0;
+
+	u32 mScreenWidth, mScreenHeight;
+	u32 mWidth, mHeight;
+	u32 mOffsetLeft, mOffsetTop;
+	u16 mCols, mRows;
+	
+};
+
 class VTerm {
 public:
 	struct CharAttr {
@@ -98,6 +113,7 @@ protected:
 	virtual void historyChanged(u32 cur, u32 total) {}
 	virtual void request(RequestType type, u32 val = 0) {}
 	virtual void requestUpdate(u16 x, u16 y, u16 w, u16 h);
+	virtual WindowInfo* getWindowInfo();
 
 private:
 	// utility functions
@@ -127,6 +143,7 @@ private:
 	void keypad_numeric();
 	void keypad_application();
 	void save_cursor();
+	void window_ops();
 	void restore_cursor();
 	void set_tab();
 	void clear_tab();

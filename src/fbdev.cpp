@@ -37,7 +37,7 @@ static fb_var_screeninfo vinfo;
 
 static s32 fbdev_fd;
 
-FbDev *FbDev::initFbDev(ScreenConfig config)
+FbDev *FbDev::initFbDev()
 {
 	s8 *fbdev = getenv("FRAMEBUFFER");
 
@@ -84,15 +84,17 @@ FbDev *FbDev::initFbDev(ScreenConfig config)
 		return 0;
 	}
 
-	return new FbDev(config);
+	return new FbDev();
 }
 
-FbDev::FbDev(ScreenConfig config)
+FbDev::FbDev()
 {
-	mWidth = vinfo.xres - config.marginWidth();
-	mHeight = vinfo.yres - config.marginHeight();
-	mOffsetLeft = config.left;
-	mOffsetTop = config.top;
+	mScreenWidth = vinfo.xres;
+	mScreenHeight = vinfo.yres;
+	mWidth = vinfo.xres;
+	mHeight = vinfo.yres;
+	mOffsetLeft = 0;
+	mOffsetTop = 0;
 	mBitsPerPixel = vinfo.bits_per_pixel;
 	mBytesPerLine = finfo.line_length;
 	mVMemBase = (u8 *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbdev_fd, 0);

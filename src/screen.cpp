@@ -41,32 +41,6 @@ static const s8 disable_blank[] = "\e[9;0]";
 static const s8 enable_blank[] = "\e[9;10]";
 static const s8 clear_screen[] = "\e[2J\e[H";
 
-ScreenConfig::ScreenConfig()
-{
-	this->top = 0;
-	this->bottom = 0;
-	this->left = 0;
-	this->right = 0;
-}
-
-ScreenConfig::ScreenConfig(u32 t, u32 b, u32 l, u32 r)
-{
-	top = t;
-	bottom = b;
-	left = l;
-	right = r;
-}
-
-u32 ScreenConfig::marginWidth() const
-{
-	return right + left;
-}
-
-u32 ScreenConfig::marginHeight() const
-{
-	return bottom + top;
-}
-
 DEFINE_INSTANCE(Screen)
 
 Screen *Screen::createInstance()
@@ -77,12 +51,6 @@ Screen *Screen::createInstance()
 	}
 
 	Screen *pScreen = 0;
-
-	ScreenConfig config = ScreenConfig();
-	Config::instance()->getOption("margin-top", config.top);
-	Config::instance()->getOption("margin-bottom", config.bottom);
-	Config::instance()->getOption("margin-left", config.left);
-	Config::instance()->getOption("margin-right", config.right);
 
 #ifdef ENABLE_VESA
 	s8 buf[16];
@@ -95,10 +63,10 @@ Screen *Screen::createInstance()
 	u32 mode = 0;
 	Config::instance()->getOption("vesa-mode", mode);
 
-	if (!mode) pScreen = FbDev::initFbDev(config);
-	if (!pScreen) pScreen = VesaDev::initVesaDev(mode, config);
+	if (!mode) pScreen = FbDev::initFbDev();
+	if (!pScreen) pScreen = VesaDev::initVesaDev(mode);
 #else
-	pScreen = FbDev::initFbDev(config);
+	pScreen = FbDev::initFbDev();
 #endif
 
 	if (!pScreen) return 0;
@@ -153,6 +121,52 @@ Screen::~Screen()
 	s32 ret = write(STDIN_FILENO, show_cursor, sizeof(show_cursor) - 1);
 	ret = write(STDIN_FILENO, enable_blank, sizeof(enable_blank) - 1);
 	ret = write(STDIN_FILENO, clear_screen, sizeof(clear_screen) - 1);
+}
+
+void Screen::setSize(int w, int h) 
+{
+
+	const int wMax = mScreenWidth - mOffsetLeft;
+	const int hMax = mScreenHeight - mOffsetTop;
+
+	int wFree = wMax - w;
+	int hFree = hMax - h;
+	
+	if (wFree < 0) wFree = 0;
+	if (hFree < 0) hFree = 0;
+
+	mWidth = wMax - wFree;
+	mHeight = hMax - hFree;
+
+	mCols = mWidth / FW(1);
+	mRows = mHeight / FH(1);
+}
+
+void Screen::setOffset(int x, int y) 
+{
+	if (x > mScreenWidth) {
+		x = mScreenWidth - 1;
+	}
+	
+	if (y > mScreenHeight) {
+		y = mScreenHeight - 1;
+	}
+
+	mOffsetLeft = x;
+	mOffsetTop = y;
+	
+	int wFree = mScreenWidth - x;
+	int hFree = mScreenHeight - y;
+	
+	if (wFree < mWidth) {
+		mWidth = wFree;
+		mCols = mWidth / FW(1);
+	}
+	
+	if (hFree < mHeight) {
+		mHeight = hFree;
+		mRows = mHeight / FH(1);
+	}
 }
 
 void Screen::showInfo(bool verbose)

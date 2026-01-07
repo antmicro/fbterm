@@ -101,6 +101,7 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	{ 'q', &VTerm::set_led, ESnormal },
 	{ 'r', &VTerm::set_margins,	ESnormal },
 	{ 's', &VTerm::save_cursor,	ESnormal },
+	{ 't', &VTerm::window_ops,      ESnormal },
 	{ 'u', &VTerm::restore_cursor,	ESnormal },
 	{ '`', &VTerm::cursor_position_col,	ESnormal },
 	{ ']', &VTerm::linux_specific, ESnormal },
