@@ -21,6 +21,7 @@
 
 #include "vterm.h"
 
+// Allows the same state mapping to be repeated 'len' times for the following ASCII characters
 #define ADDSAME(len) ((len) << 8)
 #define ENDSEQ  { ((u16)-1) }
 
@@ -109,11 +110,19 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	ENDSEQ,
 
 	// ESnonstd
-	{ '0' | ADDSAME(9), &VTerm::set_palette,    ESkeep },
-	{ 'A' | ADDSAME(5), &VTerm::set_palette,    ESkeep },
-	{ 'a' | ADDSAME(5), &VTerm::set_palette,    ESkeep },
-	{ 'P', &VTerm::begin_set_palette, ESkeep },
-	{ 'R', &VTerm::reset_palette, ESnormal },
+	{ '0', 0, ESkeep }, // ignore set window and icon title
+	{ '1', 0, ESkeep }, // ignore set icon label
+	{ '2', 0, ESkeep }, // ignore set window title
+	{ ';', 0, ESkeep }, // next param
+	{ ' ' | ADDSAME(94), 0, ESkeep }, // consume printable characters
+	{ /* BEL */ 7, 0, ESnormal },
+
+// FBTerm specific palette codes
+//	{ '0' | ADDSAME(9), &VTerm::set_palette,    ESkeep },
+//	{ 'A' | ADDSAME(5), &VTerm::set_palette,    ESkeep },
+//	{ 'a' | ADDSAME(5), &VTerm::set_palette,    ESkeep },
+//	{ 'P', &VTerm::begin_set_palette, ESkeep },
+//	{ 'R', &VTerm::reset_palette, ESnormal },
 	ENDSEQ,
 
 	// ESpercent
