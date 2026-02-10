@@ -21,6 +21,12 @@
 
 #include <string.h>
 #include "vterm.h"
+#include "../fbshellman.h"
+#include "io.h"
+
+#include <asm/termbits.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -263,6 +269,20 @@ void VTerm::resize(u16 w, u16 h)
 
 	width = w;
 	height = h;
+
+	struct winsize ws;
+	ws.ws_xpixel = 0;
+	ws.ws_ypixel = 0;
+	ws.ws_row = height;
+	ws.ws_col = width;
+
+	FbShellManager* manager = FbShellManager::instance();
+
+	// shell may not exist yet
+	if (manager) {
+		IoPipe* pipe = (IoPipe*) manager->activeShell();
+		if (pipe) ioctl(pipe->fd(), TIOCSWINSZ, &ws);
+	}
 
 	if (h_changed) {
 		historyChanged(visual_start_line, total_history_lines());

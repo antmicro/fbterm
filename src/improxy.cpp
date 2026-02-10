@@ -39,8 +39,8 @@
 #define NR_WIN_MSGS 512
 #define MSG_DRAWTEXT_MAX_LEN 10240
 
-#define sw FW(Screen::instance()->cols())
-#define sh FH(Screen::instance()->rows())
+#define sw FW(FbShellManager::instance()->activeShell()->w())
+#define sh FH(FbShellManager::instance()->activeShell()->h())
 
 #define OFFSET(TYPE, MEMBER) ((size_t)(&(((TYPE *)0)->MEMBER)))
 #define MSG(a) ((Message *)(a))
