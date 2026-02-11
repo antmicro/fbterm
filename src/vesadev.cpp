@@ -18,7 +18,6 @@
  *
  */
 
-#include "config.h"
 #ifdef ENABLE_VESA
 
 #include <stdlib.h>

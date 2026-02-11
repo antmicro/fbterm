@@ -26,7 +26,6 @@
 #include <sys/wait.h>
 #include <linux/vt.h>
 #include <linux/kdev_t.h>
-#include "config.h"
 #include "fbterm.h"
 #include "fbshell.h"
 #include "fbshellman.h"

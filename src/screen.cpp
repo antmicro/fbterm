@@ -26,7 +26,6 @@
 #include "fbshellman.h"
 #include "fbconfig.h"
 #include "fbdev.h"
-#include "config.h"
 #ifdef ENABLE_VESA
 #include "vesadev.h"
 #endif

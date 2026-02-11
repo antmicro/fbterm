@@ -25,7 +25,6 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <sys/stat.h>
-#include "config.h"
 #include "fbconfig.h"
 
 #define MAX_CONFIG_FILE_SIZE 10240

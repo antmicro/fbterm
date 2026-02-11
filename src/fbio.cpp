@@ -20,7 +20,6 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include "config.h"
 #include "fbio.h"
 
 #define NR_FDS 32

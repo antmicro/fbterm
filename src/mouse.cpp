@@ -21,7 +21,6 @@
 #include "mouse.h"
 DEFINE_INSTANCE(Mouse)
 
-#include "config.h"
 #ifdef ENABLE_GPM
 
 #include <stddef.h>
