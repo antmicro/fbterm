@@ -388,7 +388,7 @@ FbShell::FbShell()
 		resize(screen->cols(), screen->rows());
 	} else {
 		info->setSize(info->mScreenWidth - config.width(), info->mScreenHeight - config.height());
-		info->setOffset(config.left, config.top);
+		info->setOffset(info->mOffsetLeft + config.left, info->mOffsetTop + config.top);
 
 		resize(info->mCols, info->mRows);
 	}
