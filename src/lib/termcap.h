@@ -1,0 +1,936 @@
+#pragma once
+#include <cstdint>
+
+// codes
+#define TERMCAP_AUTO_LEFT_MARGIN 0x6277 /* bw */
+#define TERMCAP_AUTO_RIGHT_MARGIN 0x616d /* am */
+#define TERMCAP_BACK_COLOR_ERASE 0x7574 /* ut */
+#define TERMCAP_CAN_CHANGE 0x6363 /* cc */
+#define TERMCAP_CEOL_STANDOUT_GLITCH 0x7873 /* xs */
+#define TERMCAP_COL_ADDR_GLITCH 0x5941 /* YA */
+#define TERMCAP_CPI_CHANGES_RES 0x5946 /* YF */
+#define TERMCAP_CR_CANCELS_MICRO_MODE 0x5942 /* YB */
+#define TERMCAP_DEST_TABS_MAGIC_SMSO 0x7874 /* xt */
+#define TERMCAP_EAT_NEWLINE_GLITCH 0x786e /* xn */
+#define TERMCAP_ERASE_OVERSTRIKE 0x656f /* eo */
+#define TERMCAP_GENERIC_TYPE 0x676e /* gn */
+#define TERMCAP_HARD_COPY 0x6863 /* hc */
+#define TERMCAP_HARD_CURSOR 0x4843 /* HC */
+#define TERMCAP_HAS_META_KEY 0x6b6d /* km */
+#define TERMCAP_HAS_PRINT_WHEEL 0x5943 /* YC */
+#define TERMCAP_HAS_STATUS_LINE 0x6873 /* hs */
+#define TERMCAP_HUE_LIGHTNESS_SATURATION 0x686c /* hl */
+#define TERMCAP_INSERT_NULL_GLITCH 0x696e /* in */
+#define TERMCAP_LPI_CHANGES_RES 0x5947 /* YG */
+#define TERMCAP_MEMORY_ABOVE 0x6461 /* da */
+#define TERMCAP_MEMORY_BELOW 0x6462 /* db */
+#define TERMCAP_MOVE_INSERT_MODE 0x6d69 /* mi */
+#define TERMCAP_MOVE_STANDOUT_MODE 0x6d73 /* ms */
+#define TERMCAP_NEEDS_XON_XOFF 0x6e78 /* nx */
+#define TERMCAP_NO_ESC_CTLC 0x7862 /* xb */
+#define TERMCAP_NO_PAD_CHAR 0x4e50 /* NP */
+#define TERMCAP_NON_DEST_SCROLL_REGION 0x4e44 /* ND */
+#define TERMCAP_NON_REV_RMCUP 0x4e52 /* NR */
+#define TERMCAP_OVER_STRIKE 0x6f73 /* os */
+#define TERMCAP_PRTR_SILENT 0x3569 /* 5i */
+#define TERMCAP_ROW_ADDR_GLITCH 0x5944 /* YD */
+#define TERMCAP_SEMI_AUTO_RIGHT_MARGIN 0x5945 /* YE */
+#define TERMCAP_STATUS_LINE_ESC_OK 0x6573 /* es */
+#define TERMCAP_TILDE_GLITCH 0x687a /* hz */
+#define TERMCAP_TRANSPARENT_UNDERLINE 0x756c /* ul */
+#define TERMCAP_XON_XOFF 0x786f /* xo */
+#define TERMCAP_COLUMNS 0x636f /* co */
+#define TERMCAP_INIT_TABS 0x6974 /* it */
+#define TERMCAP_LABEL_HEIGHT 0x6c68 /* lh */
+#define TERMCAP_LABEL_WIDTH 0x6c77 /* lw */
+#define TERMCAP_LINES 0x6c69 /* li */
+#define TERMCAP_LINES_OF_MEMORY 0x6c6d /* lm */
+#define TERMCAP_MAGIC_COOKIE_GLITCH 0x7367 /* sg */
+#define TERMCAP_MAX_ATTRIBUTES 0x6d61 /* ma */
+#define TERMCAP_MAX_COLORS 0x436f /* Co */
+#define TERMCAP_MAX_PAIRS 0x7061 /* pa */
+#define TERMCAP_MAXIMUM_WINDOWS 0x4d57 /* MW */
+#define TERMCAP_NO_COLOR_VIDEO 0x4e43 /* NC */
+#define TERMCAP_NUM_LABELS 0x4e6c /* Nl */
+#define TERMCAP_PADDING_BAUD_RATE 0x7062 /* pb */
+#define TERMCAP_VIRTUAL_TERMINAL 0x7674 /* vt */
+#define TERMCAP_WIDTH_STATUS_LINE 0x7773 /* ws */
+#define TERMCAP_BIT_IMAGE_ENTWINING 0x596f /* Yo */
+#define TERMCAP_BIT_IMAGE_TYPE 0x5970 /* Yp */
+#define TERMCAP_BUFFER_CAPACITY 0x5961 /* Ya */
+#define TERMCAP_BUTTONS 0x4254 /* BT */
+#define TERMCAP_DOT_HORZ_SPACING 0x5963 /* Yc */
+#define TERMCAP_DOT_VERT_SPACING 0x5962 /* Yb */
+#define TERMCAP_MAX_MICRO_ADDRESS 0x5964 /* Yd */
+#define TERMCAP_MAX_MICRO_JUMP 0x5965 /* Ye */
+#define TERMCAP_MICRO_COL_SIZE 0x5966 /* Yf */
+#define TERMCAP_MICRO_LINE_SIZE 0x5967 /* Yg */
+#define TERMCAP_NUMBER_OF_PINS 0x5968 /* Yh */
+#define TERMCAP_OUTPUT_RES_CHAR 0x5969 /* Yi */
+#define TERMCAP_OUTPUT_RES_HORZ_INCH 0x596b /* Yk */
+#define TERMCAP_OUTPUT_RES_LINE 0x596a /* Yj */
+#define TERMCAP_OUTPUT_RES_VERT_INCH 0x596c /* Yl */
+#define TERMCAP_PRINT_RATE 0x596d /* Ym */
+#define TERMCAP_WIDE_CHAR_SIZE 0x596e /* Yn */
+#define TERMCAP_ACS_CHARS 0x6163 /* ac */
+#define TERMCAP_BACK_TAB 0x6274 /* bt */
+#define TERMCAP_BELL 0x626c /* bl */
+#define TERMCAP_CARRIAGE_RETURN 0x6372 /* cr */
+#define TERMCAP_CHANGE_CHAR_PITCH 0x5a41 /* ZA */
+#define TERMCAP_CHANGE_LINE_PITCH 0x5a42 /* ZB */
+#define TERMCAP_CHANGE_RES_HORZ 0x5a43 /* ZC */
+#define TERMCAP_CHANGE_RES_VERT 0x5a44 /* ZD */
+#define TERMCAP_CHANGE_SCROLL_REGION 0x6373 /* cs */
+#define TERMCAP_CHAR_PADDING 0x7250 /* rP */
+#define TERMCAP_CLEAR_ALL_TABS 0x6374 /* ct */
+#define TERMCAP_CLEAR_MARGINS 0x4d43 /* MC */
+#define TERMCAP_CLEAR_SCREEN 0x636c /* cl */
+#define TERMCAP_CLR_BOL 0x6362 /* cb */
+#define TERMCAP_CLR_EOL 0x6365 /* ce */
+#define TERMCAP_CLR_EOS 0x6364 /* cd */
+#define TERMCAP_COLUMN_ADDRESS 0x6368 /* ch */
+#define TERMCAP_COMMAND_CHARACTER 0x4343 /* CC */
+#define TERMCAP_CREATE_WINDOW 0x4357 /* CW */
+#define TERMCAP_CURSOR_ADDRESS 0x636d /* cm */
+#define TERMCAP_CURSOR_DOWN 0x646f /* do */
+#define TERMCAP_CURSOR_HOME 0x686f /* ho */
+#define TERMCAP_CURSOR_INVISIBLE 0x7669 /* vi */
+#define TERMCAP_CURSOR_LEFT 0x6c65 /* le */
+#define TERMCAP_CURSOR_MEM_ADDRESS 0x434d /* CM */
+#define TERMCAP_CURSOR_NORMAL 0x7665 /* ve */
+#define TERMCAP_CURSOR_RIGHT 0x6e64 /* nd */
+#define TERMCAP_CURSOR_TO_LL 0x6c6c /* ll */
+#define TERMCAP_CURSOR_UP 0x7570 /* up */
+#define TERMCAP_CURSOR_VISIBLE 0x7673 /* vs */
+#define TERMCAP_DEFINE_CHAR 0x5a45 /* ZE */
+#define TERMCAP_DELETE_CHARACTER 0x6463 /* dc */
+#define TERMCAP_DELETE_LINE 0x646c /* dl */
+#define TERMCAP_DIAL_PHONE 0x4449 /* DI */
+#define TERMCAP_DIS_STATUS_LINE 0x6473 /* ds */
+#define TERMCAP_DISPLAY_CLOCK 0x444b /* DK */
+#define TERMCAP_DOWN_HALF_LINE 0x6864 /* hd */
+#define TERMCAP_ENA_ACS 0x6541 /* eA */
+#define TERMCAP_ENTER_ALT_CHARSET_MODE 0x6173 /* as */
+#define TERMCAP_ENTER_AM_MODE 0x5341 /* SA */
+#define TERMCAP_ENTER_BLINK_MODE 0x6d62 /* mb */
+#define TERMCAP_ENTER_BOLD_MODE 0x6d64 /* md */
+#define TERMCAP_ENTER_CA_MODE 0x7469 /* ti */
+#define TERMCAP_ENTER_DELETE_MODE 0x646d /* dm */
+#define TERMCAP_ENTER_DIM_MODE 0x6d68 /* mh */
+#define TERMCAP_ENTER_DOUBLEWIDE_MODE 0x5a46 /* ZF */
+#define TERMCAP_ENTER_DRAFT_QUALITY 0x5a47 /* ZG */
+#define TERMCAP_ENTER_INSERT_MODE 0x696d /* im */
+#define TERMCAP_ENTER_ITALICS_MODE 0x5a48 /* ZH */
+#define TERMCAP_ENTER_LEFTWARD_MODE 0x5a49 /* ZI */
+#define TERMCAP_ENTER_MICRO_MODE 0x5a4a /* ZJ */
+#define TERMCAP_ENTER_NEAR_LETTER_QUALITY 0x5a4b /* ZK */
+#define TERMCAP_ENTER_NORMAL_QUALITY 0x5a4c /* ZL */
+#define TERMCAP_ENTER_PROTECTED_MODE 0x6d70 /* mp */
+#define TERMCAP_ENTER_REVERSE_MODE 0x6d72 /* mr */
+#define TERMCAP_ENTER_SECURE_MODE 0x6d6b /* mk */
+#define TERMCAP_ENTER_SHADOW_MODE 0x5a4d /* ZM */
+#define TERMCAP_ENTER_STANDOUT_MODE 0x736f /* so */
+#define TERMCAP_ENTER_SUBSCRIPT_MODE 0x5a4e /* ZN */
+#define TERMCAP_ENTER_SUPERSCRIPT_MODE 0x5a4f /* ZO */
+#define TERMCAP_ENTER_UNDERLINE_MODE 0x7573 /* us */
+#define TERMCAP_ENTER_UPWARD_MODE 0x5a50 /* ZP */
+#define TERMCAP_ENTER_XON_MODE 0x5358 /* SX */
+#define TERMCAP_ERASE_CHARS 0x6563 /* ec */
+#define TERMCAP_EXIT_ALT_CHARSET_MODE 0x6165 /* ae */
+#define TERMCAP_EXIT_AM_MODE 0x5241 /* RA */
+#define TERMCAP_EXIT_ATTRIBUTE_MODE 0x6d65 /* me */
+#define TERMCAP_EXIT_CA_MODE 0x7465 /* te */
+#define TERMCAP_EXIT_DELETE_MODE 0x6564 /* ed */
+#define TERMCAP_EXIT_DOUBLEWIDE_MODE 0x5a51 /* ZQ */
+#define TERMCAP_EXIT_INSERT_MODE 0x6569 /* ei */
+#define TERMCAP_EXIT_ITALICS_MODE 0x5a52 /* ZR */
+#define TERMCAP_EXIT_LEFTWARD_MODE 0x5a53 /* ZS */
+#define TERMCAP_EXIT_MICRO_MODE 0x5a54 /* ZT */
+#define TERMCAP_EXIT_SHADOW_MODE 0x5a55 /* ZU */
+#define TERMCAP_EXIT_STANDOUT_MODE 0x7365 /* se */
+#define TERMCAP_EXIT_SUBSCRIPT_MODE 0x5a56 /* ZV */
+#define TERMCAP_EXIT_SUPERSCRIPT_MODE 0x5a57 /* ZW */
+#define TERMCAP_EXIT_UNDERLINE_MODE 0x7565 /* ue */
+#define TERMCAP_EXIT_UPWARD_MODE 0x5a58 /* ZX */
+#define TERMCAP_EXIT_XON_MODE 0x5258 /* RX */
+#define TERMCAP_FIXED_PAUSE 0x5041 /* PA */
+#define TERMCAP_FLASH_HOOK 0x6668 /* fh */
+#define TERMCAP_FLASH_SCREEN 0x7662 /* vb */
+#define TERMCAP_FORM_FEED 0x6666 /* ff */
+#define TERMCAP_FROM_STATUS_LINE 0x6673 /* fs */
+#define TERMCAP_GOTO_WINDOW 0x5747 /* WG */
+#define TERMCAP_HANGUP 0x4855 /* HU */
+#define TERMCAP_INIT_1STRING 0x6931 /* i1 */
+#define TERMCAP_INIT_2STRING 0x6973 /* is */
+#define TERMCAP_INIT_3STRING 0x6933 /* i3 */
+#define TERMCAP_INIT_FILE 0x6966 /* if */
+#define TERMCAP_INIT_PROG 0x6950 /* iP */
+#define TERMCAP_INITIALIZE_COLOR 0x4963 /* Ic */
+#define TERMCAP_INITIALIZE_PAIR 0x4970 /* Ip */
+#define TERMCAP_INSERT_CHARACTER 0x6963 /* ic */
+#define TERMCAP_INSERT_LINE 0x616c /* al */
+#define TERMCAP_INSERT_PADDING 0x6970 /* ip */
+#define TERMCAP_KEY_A1 0x4b31 /* K1 */
+#define TERMCAP_KEY_A3 0x4b33 /* K3 */
+#define TERMCAP_KEY_B2 0x4b32 /* K2 */
+#define TERMCAP_KEY_BACKSPACE 0x6b62 /* kb */
+#define TERMCAP_KEY_BEG 0x4031 /* @1 */
+#define TERMCAP_KEY_BTAB 0x6b42 /* kB */
+#define TERMCAP_KEY_C1 0x4b34 /* K4 */
+#define TERMCAP_KEY_C3 0x4b35 /* K5 */
+#define TERMCAP_KEY_CANCEL 0x4032 /* @2 */
+#define TERMCAP_KEY_CATAB 0x6b61 /* ka */
+#define TERMCAP_KEY_CLEAR 0x6b43 /* kC */
+#define TERMCAP_KEY_CLOSE 0x4033 /* @3 */
+#define TERMCAP_KEY_COMMAND 0x4034 /* @4 */
+#define TERMCAP_KEY_COPY 0x4035 /* @5 */
+#define TERMCAP_KEY_CREATE 0x4036 /* @6 */
+#define TERMCAP_KEY_CTAB 0x6b74 /* kt */
+#define TERMCAP_KEY_DC 0x6b44 /* kD */
+#define TERMCAP_KEY_DL 0x6b4c /* kL */
+#define TERMCAP_KEY_DOWN 0x6b64 /* kd */
+#define TERMCAP_KEY_EIC 0x6b4d /* kM */
+#define TERMCAP_KEY_END 0x4037 /* @7 */
+#define TERMCAP_KEY_ENTER 0x4038 /* @8 */
+#define TERMCAP_KEY_EOL 0x6b45 /* kE */
+#define TERMCAP_KEY_EOS 0x6b53 /* kS */
+#define TERMCAP_KEY_EXIT 0x4039 /* @9 */
+#define TERMCAP_KEY_F0 0x6b30 /* k0 */
+#define TERMCAP_KEY_F1 0x6b31 /* k1 */
+#define TERMCAP_KEY_F10 0x6b3b /* k */
+#define TERMCAP_KEY_F11 0x4631 /* F1 */
+#define TERMCAP_KEY_F12 0x4632 /* F2 */
+#define TERMCAP_KEY_F13 0x4633 /* F3 */
+#define TERMCAP_KEY_F14 0x4634 /* F4 */
+#define TERMCAP_KEY_F15 0x4635 /* F5 */
+#define TERMCAP_KEY_F16 0x4636 /* F6 */
+#define TERMCAP_KEY_F17 0x4637 /* F7 */
+#define TERMCAP_KEY_F18 0x4638 /* F8 */
+#define TERMCAP_KEY_F19 0x4639 /* F9 */
+#define TERMCAP_KEY_F2 0x6b32 /* k2 */
+#define TERMCAP_KEY_F20 0x4641 /* FA */
+#define TERMCAP_KEY_F21 0x4642 /* FB */
+#define TERMCAP_KEY_F22 0x4643 /* FC */
+#define TERMCAP_KEY_F23 0x4644 /* FD */
+#define TERMCAP_KEY_F24 0x4645 /* FE */
+#define TERMCAP_KEY_F25 0x4646 /* FF */
+#define TERMCAP_KEY_F26 0x4647 /* FG */
+#define TERMCAP_KEY_F27 0x4648 /* FH */
+#define TERMCAP_KEY_F28 0x4649 /* FI */
+#define TERMCAP_KEY_F29 0x464a /* FJ */
+#define TERMCAP_KEY_F3 0x6b33 /* k3 */
+#define TERMCAP_KEY_F30 0x464b /* FK */
+#define TERMCAP_KEY_F31 0x464c /* FL */
+#define TERMCAP_KEY_F32 0x464d /* FM */
+#define TERMCAP_KEY_F33 0x464e /* FN */
+#define TERMCAP_KEY_F34 0x464f /* FO */
+#define TERMCAP_KEY_F35 0x4650 /* FP */
+#define TERMCAP_KEY_F36 0x4651 /* FQ */
+#define TERMCAP_KEY_F37 0x4652 /* FR */
+#define TERMCAP_KEY_F38 0x4653 /* FS */
+#define TERMCAP_KEY_F39 0x4654 /* FT */
+#define TERMCAP_KEY_F4 0x6b34 /* k4 */
+#define TERMCAP_KEY_F40 0x4655 /* FU */
+#define TERMCAP_KEY_F41 0x4656 /* FV */
+#define TERMCAP_KEY_F42 0x4657 /* FW */
+#define TERMCAP_KEY_F43 0x4658 /* FX */
+#define TERMCAP_KEY_F44 0x4659 /* FY */
+#define TERMCAP_KEY_F45 0x465a /* FZ */
+#define TERMCAP_KEY_F46 0x4661 /* Fa */
+#define TERMCAP_KEY_F47 0x4662 /* Fb */
+#define TERMCAP_KEY_F48 0x4663 /* Fc */
+#define TERMCAP_KEY_F49 0x4664 /* Fd */
+#define TERMCAP_KEY_F5 0x6b35 /* k5 */
+#define TERMCAP_KEY_F50 0x4665 /* Fe */
+#define TERMCAP_KEY_F51 0x4666 /* Ff */
+#define TERMCAP_KEY_F52 0x4667 /* Fg */
+#define TERMCAP_KEY_F53 0x4668 /* Fh */
+#define TERMCAP_KEY_F54 0x4669 /* Fi */
+#define TERMCAP_KEY_F55 0x466a /* Fj */
+#define TERMCAP_KEY_F56 0x466b /* Fk */
+#define TERMCAP_KEY_F57 0x466c /* Fl */
+#define TERMCAP_KEY_F58 0x466d /* Fm */
+#define TERMCAP_KEY_F59 0x466e /* Fn */
+#define TERMCAP_KEY_F6 0x6b36 /* k6 */
+#define TERMCAP_KEY_F60 0x466f /* Fo */
+#define TERMCAP_KEY_F61 0x4670 /* Fp */
+#define TERMCAP_KEY_F62 0x4671 /* Fq */
+#define TERMCAP_KEY_F63 0x4672 /* Fr */
+#define TERMCAP_KEY_F7 0x6b37 /* k7 */
+#define TERMCAP_KEY_F8 0x6b38 /* k8 */
+#define TERMCAP_KEY_F9 0x6b39 /* k9 */
+#define TERMCAP_KEY_FIND 0x4030 /* @0 */
+#define TERMCAP_KEY_HELP 0x2531 /* %1 */
+#define TERMCAP_KEY_HOME 0x6b68 /* kh */
+#define TERMCAP_KEY_IC 0x6b49 /* kI */
+#define TERMCAP_KEY_IL 0x6b41 /* kA */
+#define TERMCAP_KEY_LEFT 0x6b6c /* kl */
+#define TERMCAP_KEY_LL 0x6b48 /* kH */
+#define TERMCAP_KEY_MARK 0x2532 /* %2 */
+#define TERMCAP_KEY_MESSAGE 0x2533 /* %3 */
+#define TERMCAP_KEY_MOVE 0x2534 /* %4 */
+#define TERMCAP_KEY_NEXT 0x2535 /* %5 */
+#define TERMCAP_KEY_NPAGE 0x6b4e /* kN */
+#define TERMCAP_KEY_OPEN 0x2536 /* %6 */
+#define TERMCAP_KEY_OPTIONS 0x2537 /* %7 */
+#define TERMCAP_KEY_PPAGE 0x6b50 /* kP */
+#define TERMCAP_KEY_PREVIOUS 0x2538 /* %8 */
+#define TERMCAP_KEY_PRINT 0x2539 /* %9 */
+#define TERMCAP_KEY_REDO 0x2530 /* %0 */
+#define TERMCAP_KEY_REFERENCE 0x2631 /* &1 */
+#define TERMCAP_KEY_REFRESH 0x2632 /* &2 */
+#define TERMCAP_KEY_REPLACE 0x2633 /* &3 */
+#define TERMCAP_KEY_RESTART 0x2634 /* &4 */
+#define TERMCAP_KEY_RESUME 0x2635 /* &5 */
+#define TERMCAP_KEY_RIGHT 0x6b72 /* kr */
+#define TERMCAP_KEY_SAVE 0x2636 /* &6 */
+#define TERMCAP_KEY_SBEG 0x2639 /* &9 */
+#define TERMCAP_KEY_SCANCEL 0x2630 /* &0 */
+#define TERMCAP_KEY_SCOMMAND 0x2a31 /* *1 */
+#define TERMCAP_KEY_SCOPY 0x2a32 /* *2 */
+#define TERMCAP_KEY_SCREATE 0x2a33 /* *3 */
+#define TERMCAP_KEY_SDC 0x2a34 /* *4 */
+#define TERMCAP_KEY_SDL 0x2a35 /* *5 */
+#define TERMCAP_KEY_SELECT 0x2a36 /* *6 */
+#define TERMCAP_KEY_SEND 0x2a37 /* *7 */
+#define TERMCAP_KEY_SEOL 0x2a38 /* *8 */
+#define TERMCAP_KEY_SEXIT 0x2a39 /* *9 */
+#define TERMCAP_KEY_SF 0x6b46 /* kF */
+#define TERMCAP_KEY_SFIND 0x2a30 /* *0 */
+#define TERMCAP_KEY_SHELP 0x2331 /* #1 */
+#define TERMCAP_KEY_SHOME 0x2332 /* #2 */
+#define TERMCAP_KEY_SIC 0x2333 /* #3 */
+#define TERMCAP_KEY_SLEFT 0x2334 /* #4 */
+#define TERMCAP_KEY_SMESSAGE 0x2561 /* %a */
+#define TERMCAP_KEY_SMOVE 0x2562 /* %b */
+#define TERMCAP_KEY_SNEXT 0x2563 /* %c */
+#define TERMCAP_KEY_SOPTIONS 0x2564 /* %d */
+#define TERMCAP_KEY_SPREVIOUS 0x2565 /* %e */
+#define TERMCAP_KEY_SPRINT 0x2566 /* %f */
+#define TERMCAP_KEY_SR 0x6b52 /* kR */
+#define TERMCAP_KEY_SREDO 0x2567 /* %g */
+#define TERMCAP_KEY_SREPLACE 0x2568 /* %h */
+#define TERMCAP_KEY_SRIGHT 0x2569 /* %i */
+#define TERMCAP_KEY_SRSUME 0x256a /* %j */
+#define TERMCAP_KEY_SSAVE 0x2131 /* !1 */
+#define TERMCAP_KEY_SSUSPEND 0x2132 /* !2 */
+#define TERMCAP_KEY_STAB 0x6b54 /* kT */
+#define TERMCAP_KEY_SUNDO 0x2133 /* !3 */
+#define TERMCAP_KEY_SUSPEND 0x2637 /* &7 */
+#define TERMCAP_KEY_UNDO 0x2638 /* &8 */
+#define TERMCAP_KEY_UP 0x6b75 /* ku */
+#define TERMCAP_KEYPAD_LOCAL 0x6b65 /* ke */
+#define TERMCAP_KEYPAD_XMIT 0x6b73 /* ks */
+#define TERMCAP_LAB_F0 0x6c30 /* l0 */
+#define TERMCAP_LAB_F1 0x6c31 /* l1 */
+#define TERMCAP_LAB_F10 0x6c61 /* la */
+#define TERMCAP_LAB_F2 0x6c32 /* l2 */
+#define TERMCAP_LAB_F3 0x6c33 /* l3 */
+#define TERMCAP_LAB_F4 0x6c34 /* l4 */
+#define TERMCAP_LAB_F5 0x6c35 /* l5 */
+#define TERMCAP_LAB_F6 0x6c36 /* l6 */
+#define TERMCAP_LAB_F7 0x6c37 /* l7 */
+#define TERMCAP_LAB_F8 0x6c38 /* l8 */
+#define TERMCAP_LAB_F9 0x6c39 /* l9 */
+#define TERMCAP_LABEL_FORMAT 0x4c66 /* Lf */
+#define TERMCAP_LABEL_OFF 0x4c46 /* LF */
+#define TERMCAP_LABEL_ON 0x4c4f /* LO */
+#define TERMCAP_META_OFF 0x6d6f /* mo */
+#define TERMCAP_META_ON 0x6d6d /* mm */
+#define TERMCAP_MICRO_COLUMN_ADDRESS 0x5a59 /* ZY */
+#define TERMCAP_MICRO_DOWN 0x5a5a /* ZZ */
+#define TERMCAP_MICRO_LEFT 0x5a61 /* Za */
+#define TERMCAP_MICRO_RIGHT 0x5a62 /* Zb */
+#define TERMCAP_MICRO_ROW_ADDRESS 0x5a63 /* Zc */
+#define TERMCAP_MICRO_UP 0x5a64 /* Zd */
+#define TERMCAP_NEWLINE 0x6e77 /* nw */
+#define TERMCAP_ORDER_OF_PINS 0x5a65 /* Ze */
+#define TERMCAP_ORIG_COLORS 0x6f63 /* oc */
+#define TERMCAP_ORIG_PAIR 0x6f70 /* op */
+#define TERMCAP_PAD_CHAR 0x7063 /* pc */
+#define TERMCAP_PARM_DCH 0x4443 /* DC */
+#define TERMCAP_PARM_DELETE_LINE 0x444c /* DL */
+#define TERMCAP_PARM_DOWN_CURSOR 0x444f /* DO */
+#define TERMCAP_PARM_DOWN_MICRO 0x5a66 /* Zf */
+#define TERMCAP_PARM_ICH 0x4943 /* IC */
+#define TERMCAP_PARM_INDEX 0x5346 /* SF */
+#define TERMCAP_PARM_INSERT_LINE 0x414c /* AL */
+#define TERMCAP_PARM_LEFT_CURSOR 0x4c45 /* LE */
+#define TERMCAP_PARM_LEFT_MICRO 0x5a67 /* Zg */
+#define TERMCAP_PARM_RIGHT_CURSOR 0x5249 /* RI */
+#define TERMCAP_PARM_RIGHT_MICRO 0x5a68 /* Zh */
+#define TERMCAP_PARM_RINDEX 0x5352 /* SR */
+#define TERMCAP_PARM_UP_CURSOR 0x5550 /* UP */
+#define TERMCAP_PARM_UP_MICRO 0x5a69 /* Zi */
+#define TERMCAP_PKEY_KEY 0x706b /* pk */
+#define TERMCAP_PKEY_LOCAL 0x706c /* pl */
+#define TERMCAP_PKEY_XMIT 0x7078 /* px */
+#define TERMCAP_PLAB_NORM 0x706e /* pn */
+#define TERMCAP_PRINT_SCREEN 0x7073 /* ps */
+#define TERMCAP_PRTR_NON 0x704f /* pO */
+#define TERMCAP_PRTR_OFF 0x7066 /* pf */
+#define TERMCAP_PRTR_ON 0x706f /* po */
+#define TERMCAP_PULSE 0x5055 /* PU */
+#define TERMCAP_QUICK_DIAL 0x5144 /* QD */
+#define TERMCAP_REMOVE_CLOCK 0x5243 /* RC */
+#define TERMCAP_REPEAT_CHAR 0x7270 /* rp */
+#define TERMCAP_REQ_FOR_INPUT 0x5246 /* RF */
+#define TERMCAP_RESET_1STRING 0x7231 /* r1 */
+#define TERMCAP_RESET_2STRING 0x7232 /* r2 */
+#define TERMCAP_RESET_3STRING 0x7233 /* r3 */
+#define TERMCAP_RESET_FILE 0x7266 /* rf */
+#define TERMCAP_RESTORE_CURSOR 0x7263 /* rc */
+#define TERMCAP_ROW_ADDRESS 0x6376 /* cv */
+#define TERMCAP_SAVE_CURSOR 0x7363 /* sc */
+#define TERMCAP_SCROLL_FORWARD 0x7366 /* sf */
+#define TERMCAP_SCROLL_REVERSE 0x7372 /* sr */
+#define TERMCAP_SELECT_CHAR_SET 0x5a6a /* Zj */
+#define TERMCAP_SET_ATTRIBUTES 0x7361 /* sa */
+#define TERMCAP_SET_BACKGROUND 0x5362 /* Sb */
+#define TERMCAP_SET_BOTTOM_MARGIN 0x5a6b /* Zk */
+#define TERMCAP_SET_BOTTOM_MARGIN_PARM 0x5a6c /* Zl */
+#define TERMCAP_SET_CLOCK 0x5343 /* SC */
+#define TERMCAP_SET_COLOR_PAIR 0x7370 /* sp */
+#define TERMCAP_SET_FOREGROUND 0x5366 /* Sf */
+#define TERMCAP_SET_LEFT_MARGIN_PARM 0x5a6d /* Zm */
+#define TERMCAP_SET_RIGHT_MARGIN 0x4d52 /* MR */
+#define TERMCAP_SET_RIGHT_MARGIN_PARM 0x5a6e /* Zn */
+#define TERMCAP_SET_TAB 0x7374 /* st */
+#define TERMCAP_SET_TOP_MARGIN 0x5a6f /* Zo */
+#define TERMCAP_SET_TOP_MARGIN_PARM 0x5a70 /* Zp */
+#define TERMCAP_SET_WINDOW 0x7769 /* wi */
+#define TERMCAP_START_BIT_IMAGE 0x5a71 /* Zq */
+#define TERMCAP_START_CHAR_SET_DEF 0x5a72 /* Zr */
+#define TERMCAP_STOP_BIT_IMAGE 0x5a73 /* Zs */
+#define TERMCAP_STOP_CHAR_SET_DEF 0x5a74 /* Zt */
+#define TERMCAP_SUBSCRIPT_CHARACTERS 0x5a75 /* Zu */
+#define TERMCAP_SUPERSCRIPT_CHARACTERS 0x5a76 /* Zv */
+#define TERMCAP_TAB 0x7461 /* ta */
+#define TERMCAP_THESE_CAUSE_CR 0x5a77 /* Zw */
+#define TERMCAP_TO_STATUS_LINE 0x7473 /* ts */
+#define TERMCAP_TONE 0x544f /* TO */
+#define TERMCAP_UNDERLINE_CHAR 0x7563 /* uc */
+#define TERMCAP_UP_HALF_LINE 0x6875 /* hu */
+#define TERMCAP_USER0 0x7530 /* u0 */
+#define TERMCAP_USER1 0x7531 /* u1 */
+#define TERMCAP_USER2 0x7532 /* u2 */
+#define TERMCAP_USER3 0x7533 /* u3 */
+#define TERMCAP_USER4 0x7534 /* u4 */
+#define TERMCAP_USER5 0x7535 /* u5 */
+#define TERMCAP_USER6 0x7536 /* u6 */
+#define TERMCAP_USER7 0x7537 /* u7 */
+#define TERMCAP_USER8 0x7538 /* u8 */
+#define TERMCAP_USER9 0x7539 /* u9 */
+#define TERMCAP_WAIT_TONE 0x5741 /* WA */
+#define TERMCAP_XOFF_CHARACTER 0x5846 /* XF */
+#define TERMCAP_XON_CHARACTER 0x584e /* XN */
+#define TERMCAP_ZERO_MOTION 0x5a78 /* Zx */
+#define TERMCAP_ALT_SCANCODE_ESC 0x5338 /* S8 */
+#define TERMCAP_BIT_IMAGE_CARRIAGE_RETURN 0x5976 /* Yv */
+#define TERMCAP_BIT_IMAGE_NEWLINE 0x5a7a /* Zz */
+#define TERMCAP_BIT_IMAGE_REPEAT 0x5879 /* Xy */
+#define TERMCAP_CHAR_SET_NAMES 0x5a79 /* Zy */
+#define TERMCAP_CODE_SET_INIT 0x6369 /* ci */
+#define TERMCAP_COLOR_NAMES 0x5977 /* Yw */
+#define TERMCAP_DEFINE_BIT_IMAGE_REGION 0x5978 /* Yx */
+#define TERMCAP_DEVICE_TYPE 0x6476 /* dv */
+#define TERMCAP_DISPLAY_PC_CHAR 0x5331 /* S1 */
+#define TERMCAP_END_BIT_IMAGE_REGION 0x5979 /* Yy */
+#define TERMCAP_ENTER_PC_CHARSET_MODE 0x5332 /* S2 */
+#define TERMCAP_ENTER_SCANCODE_MODE 0x5334 /* S4 */
+#define TERMCAP_EXIT_PC_CHARSET_MODE 0x5333 /* S3 */
+#define TERMCAP_EXIT_SCANCODE_MODE 0x5335 /* S5 */
+#define TERMCAP_GET_MOUSE 0x476d /* Gm */
+#define TERMCAP_KEY_MOUSE 0x4b6d /* Km */
+#define TERMCAP_MOUSE_INFO 0x4d69 /* Mi */
+#define TERMCAP_PC_TERM_OPTIONS 0x5336 /* S6 */
+#define TERMCAP_PKEY_PLAB 0x786c /* xl */
+#define TERMCAP_REQ_MOUSE_POS 0x5251 /* RQ */
+#define TERMCAP_SCANCODE_ESCAPE 0x5337 /* S7 */
+#define TERMCAP_SET0_DES_SEQ 0x7330 /* s0 */
+#define TERMCAP_SET1_DES_SEQ 0x7331 /* s1 */
+#define TERMCAP_SET2_DES_SEQ 0x7332 /* s2 */
+#define TERMCAP_SET3_DES_SEQ 0x7333 /* s3 */
+#define TERMCAP_SET_A_BACKGROUND 0x4142 /* AB */
+#define TERMCAP_SET_A_FOREGROUND 0x4146 /* AF */
+#define TERMCAP_SET_COLOR_BAND 0x597a /* Yz */
+#define TERMCAP_SET_LEFT_MARGIN 0x4d4c /* ML */
+#define TERMCAP_SET_PAGE_LENGTH 0x595a /* YZ */
+#define TERMCAP_SET_TB_MARGIN 0x4d54 /* MT */
+#define TERMCAP_ENTER_HORIZONTAL_HL_MODE 0x5868 /* Xh */
+#define TERMCAP_ENTER_LEFT_HL_MODE 0x586c /* Xl */
+#define TERMCAP_ENTER_LOW_HL_MODE 0x586f /* Xo */
+#define TERMCAP_ENTER_RIGHT_HL_MODE 0x5872 /* Xr */
+#define TERMCAP_ENTER_TOP_HL_MODE 0x5874 /* Xt */
+#define TERMCAP_ENTER_VERTICAL_HL_MODE 0x5876 /* Xv */
+#define TERMCAP_SET_A_ATTRIBUTES 0x7341 /* sA */
+#define TERMCAP_SET_PGLEN_INCH 0x734c /* sL */
+
+// converter
+inline const char* termcap_string(uint16_t code) {
+	if (code == TERMCAP_AUTO_LEFT_MARGIN) return "auto_left_margin";
+	if (code == TERMCAP_AUTO_RIGHT_MARGIN) return "auto_right_margin";
+	if (code == TERMCAP_BACK_COLOR_ERASE) return "back_color_erase";
+	if (code == TERMCAP_CAN_CHANGE) return "can_change";
+	if (code == TERMCAP_CEOL_STANDOUT_GLITCH) return "ceol_standout_glitch";
+	if (code == TERMCAP_COL_ADDR_GLITCH) return "col_addr_glitch";
+	if (code == TERMCAP_CPI_CHANGES_RES) return "cpi_changes_res";
+	if (code == TERMCAP_CR_CANCELS_MICRO_MODE) return "cr_cancels_micro_mode";
+	if (code == TERMCAP_DEST_TABS_MAGIC_SMSO) return "dest_tabs_magic_smso";
+	if (code == TERMCAP_EAT_NEWLINE_GLITCH) return "eat_newline_glitch";
+	if (code == TERMCAP_ERASE_OVERSTRIKE) return "erase_overstrike";
+	if (code == TERMCAP_GENERIC_TYPE) return "generic_type";
+	if (code == TERMCAP_HARD_COPY) return "hard_copy";
+	if (code == TERMCAP_HARD_CURSOR) return "hard_cursor";
+	if (code == TERMCAP_HAS_META_KEY) return "has_meta_key";
+	if (code == TERMCAP_HAS_PRINT_WHEEL) return "has_print_wheel";
+	if (code == TERMCAP_HAS_STATUS_LINE) return "has_status_line";
+	if (code == TERMCAP_HUE_LIGHTNESS_SATURATION) return "hue_lightness_saturation";
+	if (code == TERMCAP_INSERT_NULL_GLITCH) return "insert_null_glitch";
+	if (code == TERMCAP_LPI_CHANGES_RES) return "lpi_changes_res";
+	if (code == TERMCAP_MEMORY_ABOVE) return "memory_above";
+	if (code == TERMCAP_MEMORY_BELOW) return "memory_below";
+	if (code == TERMCAP_MOVE_INSERT_MODE) return "move_insert_mode";
+	if (code == TERMCAP_MOVE_STANDOUT_MODE) return "move_standout_mode";
+	if (code == TERMCAP_NEEDS_XON_XOFF) return "needs_xon_xoff";
+	if (code == TERMCAP_NO_ESC_CTLC) return "no_esc_ctlc";
+	if (code == TERMCAP_NO_PAD_CHAR) return "no_pad_char";
+	if (code == TERMCAP_NON_DEST_SCROLL_REGION) return "non_dest_scroll_region";
+	if (code == TERMCAP_NON_REV_RMCUP) return "non_rev_rmcup";
+	if (code == TERMCAP_OVER_STRIKE) return "over_strike";
+	if (code == TERMCAP_PRTR_SILENT) return "prtr_silent";
+	if (code == TERMCAP_ROW_ADDR_GLITCH) return "row_addr_glitch";
+	if (code == TERMCAP_SEMI_AUTO_RIGHT_MARGIN) return "semi_auto_right_margin";
+	if (code == TERMCAP_STATUS_LINE_ESC_OK) return "status_line_esc_ok";
+	if (code == TERMCAP_TILDE_GLITCH) return "tilde_glitch";
+	if (code == TERMCAP_TRANSPARENT_UNDERLINE) return "transparent_underline";
+	if (code == TERMCAP_XON_XOFF) return "xon_xoff";
+	if (code == TERMCAP_COLUMNS) return "columns";
+	if (code == TERMCAP_INIT_TABS) return "init_tabs";
+	if (code == TERMCAP_LABEL_HEIGHT) return "label_height";
+	if (code == TERMCAP_LABEL_WIDTH) return "label_width";
+	if (code == TERMCAP_LINES) return "lines";
+	if (code == TERMCAP_LINES_OF_MEMORY) return "lines_of_memory";
+	if (code == TERMCAP_MAGIC_COOKIE_GLITCH) return "magic_cookie_glitch";
+	if (code == TERMCAP_MAX_ATTRIBUTES) return "max_attributes";
+	if (code == TERMCAP_MAX_COLORS) return "max_colors";
+	if (code == TERMCAP_MAX_PAIRS) return "max_pairs";
+	if (code == TERMCAP_MAXIMUM_WINDOWS) return "maximum_windows";
+	if (code == TERMCAP_NO_COLOR_VIDEO) return "no_color_video";
+	if (code == TERMCAP_NUM_LABELS) return "num_labels";
+	if (code == TERMCAP_PADDING_BAUD_RATE) return "padding_baud_rate";
+	if (code == TERMCAP_VIRTUAL_TERMINAL) return "virtual_terminal";
+	if (code == TERMCAP_WIDTH_STATUS_LINE) return "width_status_line";
+	if (code == TERMCAP_BIT_IMAGE_ENTWINING) return "bit_image_entwining";
+	if (code == TERMCAP_BIT_IMAGE_TYPE) return "bit_image_type";
+	if (code == TERMCAP_BUFFER_CAPACITY) return "buffer_capacity";
+	if (code == TERMCAP_BUTTONS) return "buttons";
+	if (code == TERMCAP_DOT_HORZ_SPACING) return "dot_horz_spacing";
+	if (code == TERMCAP_DOT_VERT_SPACING) return "dot_vert_spacing";
+	if (code == TERMCAP_MAX_MICRO_ADDRESS) return "max_micro_address";
+	if (code == TERMCAP_MAX_MICRO_JUMP) return "max_micro_jump";
+	if (code == TERMCAP_MICRO_COL_SIZE) return "micro_col_size";
+	if (code == TERMCAP_MICRO_LINE_SIZE) return "micro_line_size";
+	if (code == TERMCAP_NUMBER_OF_PINS) return "number_of_pins";
+	if (code == TERMCAP_OUTPUT_RES_CHAR) return "output_res_char";
+	if (code == TERMCAP_OUTPUT_RES_HORZ_INCH) return "output_res_horz_inch";
+	if (code == TERMCAP_OUTPUT_RES_LINE) return "output_res_line";
+	if (code == TERMCAP_OUTPUT_RES_VERT_INCH) return "output_res_vert_inch";
+	if (code == TERMCAP_PRINT_RATE) return "print_rate";
+	if (code == TERMCAP_WIDE_CHAR_SIZE) return "wide_char_size";
+	if (code == TERMCAP_ACS_CHARS) return "acs_chars";
+	if (code == TERMCAP_BACK_TAB) return "back_tab";
+	if (code == TERMCAP_BELL) return "bell";
+	if (code == TERMCAP_CARRIAGE_RETURN) return "carriage_return";
+	if (code == TERMCAP_CHANGE_CHAR_PITCH) return "change_char_pitch";
+	if (code == TERMCAP_CHANGE_LINE_PITCH) return "change_line_pitch";
+	if (code == TERMCAP_CHANGE_RES_HORZ) return "change_res_horz";
+	if (code == TERMCAP_CHANGE_RES_VERT) return "change_res_vert";
+	if (code == TERMCAP_CHANGE_SCROLL_REGION) return "change_scroll_region";
+	if (code == TERMCAP_CHAR_PADDING) return "char_padding";
+	if (code == TERMCAP_CLEAR_ALL_TABS) return "clear_all_tabs";
+	if (code == TERMCAP_CLEAR_MARGINS) return "clear_margins";
+	if (code == TERMCAP_CLEAR_SCREEN) return "clear_screen";
+	if (code == TERMCAP_CLR_BOL) return "clr_bol";
+	if (code == TERMCAP_CLR_EOL) return "clr_eol";
+	if (code == TERMCAP_CLR_EOS) return "clr_eos";
+	if (code == TERMCAP_COLUMN_ADDRESS) return "column_address";
+	if (code == TERMCAP_COMMAND_CHARACTER) return "command_character";
+	if (code == TERMCAP_CREATE_WINDOW) return "create_window";
+	if (code == TERMCAP_CURSOR_ADDRESS) return "cursor_address";
+	if (code == TERMCAP_CURSOR_DOWN) return "cursor_down";
+	if (code == TERMCAP_CURSOR_HOME) return "cursor_home";
+	if (code == TERMCAP_CURSOR_INVISIBLE) return "cursor_invisible";
+	if (code == TERMCAP_CURSOR_LEFT) return "cursor_left";
+	if (code == TERMCAP_CURSOR_MEM_ADDRESS) return "cursor_mem_address";
+	if (code == TERMCAP_CURSOR_NORMAL) return "cursor_normal";
+	if (code == TERMCAP_CURSOR_RIGHT) return "cursor_right";
+	if (code == TERMCAP_CURSOR_TO_LL) return "cursor_to_ll";
+	if (code == TERMCAP_CURSOR_UP) return "cursor_up";
+	if (code == TERMCAP_CURSOR_VISIBLE) return "cursor_visible";
+	if (code == TERMCAP_DEFINE_CHAR) return "define_char";
+	if (code == TERMCAP_DELETE_CHARACTER) return "delete_character";
+	if (code == TERMCAP_DELETE_LINE) return "delete_line";
+	if (code == TERMCAP_DIAL_PHONE) return "dial_phone";
+	if (code == TERMCAP_DIS_STATUS_LINE) return "dis_status_line";
+	if (code == TERMCAP_DISPLAY_CLOCK) return "display_clock";
+	if (code == TERMCAP_DOWN_HALF_LINE) return "down_half_line";
+	if (code == TERMCAP_ENA_ACS) return "ena_acs";
+	if (code == TERMCAP_ENTER_ALT_CHARSET_MODE) return "enter_alt_charset_mode";
+	if (code == TERMCAP_ENTER_AM_MODE) return "enter_am_mode";
+	if (code == TERMCAP_ENTER_BLINK_MODE) return "enter_blink_mode";
+	if (code == TERMCAP_ENTER_BOLD_MODE) return "enter_bold_mode";
+	if (code == TERMCAP_ENTER_CA_MODE) return "enter_ca_mode";
+	if (code == TERMCAP_ENTER_DELETE_MODE) return "enter_delete_mode";
+	if (code == TERMCAP_ENTER_DIM_MODE) return "enter_dim_mode";
+	if (code == TERMCAP_ENTER_DOUBLEWIDE_MODE) return "enter_doublewide_mode";
+	if (code == TERMCAP_ENTER_DRAFT_QUALITY) return "enter_draft_quality";
+	if (code == TERMCAP_ENTER_INSERT_MODE) return "enter_insert_mode";
+	if (code == TERMCAP_ENTER_ITALICS_MODE) return "enter_italics_mode";
+	if (code == TERMCAP_ENTER_LEFTWARD_MODE) return "enter_leftward_mode";
+	if (code == TERMCAP_ENTER_MICRO_MODE) return "enter_micro_mode";
+	if (code == TERMCAP_ENTER_NEAR_LETTER_QUALITY) return "enter_near_letter_quality";
+	if (code == TERMCAP_ENTER_NORMAL_QUALITY) return "enter_normal_quality";
+	if (code == TERMCAP_ENTER_PROTECTED_MODE) return "enter_protected_mode";
+	if (code == TERMCAP_ENTER_REVERSE_MODE) return "enter_reverse_mode";
+	if (code == TERMCAP_ENTER_SECURE_MODE) return "enter_secure_mode";
+	if (code == TERMCAP_ENTER_SHADOW_MODE) return "enter_shadow_mode";
+	if (code == TERMCAP_ENTER_STANDOUT_MODE) return "enter_standout_mode";
+	if (code == TERMCAP_ENTER_SUBSCRIPT_MODE) return "enter_subscript_mode";
+	if (code == TERMCAP_ENTER_SUPERSCRIPT_MODE) return "enter_superscript_mode";
+	if (code == TERMCAP_ENTER_UNDERLINE_MODE) return "enter_underline_mode";
+	if (code == TERMCAP_ENTER_UPWARD_MODE) return "enter_upward_mode";
+	if (code == TERMCAP_ENTER_XON_MODE) return "enter_xon_mode";
+	if (code == TERMCAP_ERASE_CHARS) return "erase_chars";
+	if (code == TERMCAP_EXIT_ALT_CHARSET_MODE) return "exit_alt_charset_mode";
+	if (code == TERMCAP_EXIT_AM_MODE) return "exit_am_mode";
+	if (code == TERMCAP_EXIT_ATTRIBUTE_MODE) return "exit_attribute_mode";
+	if (code == TERMCAP_EXIT_CA_MODE) return "exit_ca_mode";
+	if (code == TERMCAP_EXIT_DELETE_MODE) return "exit_delete_mode";
+	if (code == TERMCAP_EXIT_DOUBLEWIDE_MODE) return "exit_doublewide_mode";
+	if (code == TERMCAP_EXIT_INSERT_MODE) return "exit_insert_mode";
+	if (code == TERMCAP_EXIT_ITALICS_MODE) return "exit_italics_mode";
+	if (code == TERMCAP_EXIT_LEFTWARD_MODE) return "exit_leftward_mode";
+	if (code == TERMCAP_EXIT_MICRO_MODE) return "exit_micro_mode";
+	if (code == TERMCAP_EXIT_SHADOW_MODE) return "exit_shadow_mode";
+	if (code == TERMCAP_EXIT_STANDOUT_MODE) return "exit_standout_mode";
+	if (code == TERMCAP_EXIT_SUBSCRIPT_MODE) return "exit_subscript_mode";
+	if (code == TERMCAP_EXIT_SUPERSCRIPT_MODE) return "exit_superscript_mode";
+	if (code == TERMCAP_EXIT_UNDERLINE_MODE) return "exit_underline_mode";
+	if (code == TERMCAP_EXIT_UPWARD_MODE) return "exit_upward_mode";
+	if (code == TERMCAP_EXIT_XON_MODE) return "exit_xon_mode";
+	if (code == TERMCAP_FIXED_PAUSE) return "fixed_pause";
+	if (code == TERMCAP_FLASH_HOOK) return "flash_hook";
+	if (code == TERMCAP_FLASH_SCREEN) return "flash_screen";
+	if (code == TERMCAP_FORM_FEED) return "form_feed";
+	if (code == TERMCAP_FROM_STATUS_LINE) return "from_status_line";
+	if (code == TERMCAP_GOTO_WINDOW) return "goto_window";
+	if (code == TERMCAP_HANGUP) return "hangup";
+	if (code == TERMCAP_INIT_1STRING) return "init_1string";
+	if (code == TERMCAP_INIT_2STRING) return "init_2string";
+	if (code == TERMCAP_INIT_3STRING) return "init_3string";
+	if (code == TERMCAP_INIT_FILE) return "init_file";
+	if (code == TERMCAP_INIT_PROG) return "init_prog";
+	if (code == TERMCAP_INITIALIZE_COLOR) return "initialize_color";
+	if (code == TERMCAP_INITIALIZE_PAIR) return "initialize_pair";
+	if (code == TERMCAP_INSERT_CHARACTER) return "insert_character";
+	if (code == TERMCAP_INSERT_LINE) return "insert_line";
+	if (code == TERMCAP_INSERT_PADDING) return "insert_padding";
+	if (code == TERMCAP_KEY_A1) return "key_a1";
+	if (code == TERMCAP_KEY_A3) return "key_a3";
+	if (code == TERMCAP_KEY_B2) return "key_b2";
+	if (code == TERMCAP_KEY_BACKSPACE) return "key_backspace";
+	if (code == TERMCAP_KEY_BEG) return "key_beg";
+	if (code == TERMCAP_KEY_BTAB) return "key_btab";
+	if (code == TERMCAP_KEY_C1) return "key_c1";
+	if (code == TERMCAP_KEY_C3) return "key_c3";
+	if (code == TERMCAP_KEY_CANCEL) return "key_cancel";
+	if (code == TERMCAP_KEY_CATAB) return "key_catab";
+	if (code == TERMCAP_KEY_CLEAR) return "key_clear";
+	if (code == TERMCAP_KEY_CLOSE) return "key_close";
+	if (code == TERMCAP_KEY_COMMAND) return "key_command";
+	if (code == TERMCAP_KEY_COPY) return "key_copy";
+	if (code == TERMCAP_KEY_CREATE) return "key_create";
+	if (code == TERMCAP_KEY_CTAB) return "key_ctab";
+	if (code == TERMCAP_KEY_DC) return "key_dc";
+	if (code == TERMCAP_KEY_DL) return "key_dl";
+	if (code == TERMCAP_KEY_DOWN) return "key_down";
+	if (code == TERMCAP_KEY_EIC) return "key_eic";
+	if (code == TERMCAP_KEY_END) return "key_end";
+	if (code == TERMCAP_KEY_ENTER) return "key_enter";
+	if (code == TERMCAP_KEY_EOL) return "key_eol";
+	if (code == TERMCAP_KEY_EOS) return "key_eos";
+	if (code == TERMCAP_KEY_EXIT) return "key_exit";
+	if (code == TERMCAP_KEY_F0) return "key_f0";
+	if (code == TERMCAP_KEY_F1) return "key_f1";
+	if (code == TERMCAP_KEY_F10) return "key_f10";
+	if (code == TERMCAP_KEY_F11) return "key_f11";
+	if (code == TERMCAP_KEY_F12) return "key_f12";
+	if (code == TERMCAP_KEY_F13) return "key_f13";
+	if (code == TERMCAP_KEY_F14) return "key_f14";
+	if (code == TERMCAP_KEY_F15) return "key_f15";
+	if (code == TERMCAP_KEY_F16) return "key_f16";
+	if (code == TERMCAP_KEY_F17) return "key_f17";
+	if (code == TERMCAP_KEY_F18) return "key_f18";
+	if (code == TERMCAP_KEY_F19) return "key_f19";
+	if (code == TERMCAP_KEY_F2) return "key_f2";
+	if (code == TERMCAP_KEY_F20) return "key_f20";
+	if (code == TERMCAP_KEY_F21) return "key_f21";
+	if (code == TERMCAP_KEY_F22) return "key_f22";
+	if (code == TERMCAP_KEY_F23) return "key_f23";
+	if (code == TERMCAP_KEY_F24) return "key_f24";
+	if (code == TERMCAP_KEY_F25) return "key_f25";
+	if (code == TERMCAP_KEY_F26) return "key_f26";
+	if (code == TERMCAP_KEY_F27) return "key_f27";
+	if (code == TERMCAP_KEY_F28) return "key_f28";
+	if (code == TERMCAP_KEY_F29) return "key_f29";
+	if (code == TERMCAP_KEY_F3) return "key_f3";
+	if (code == TERMCAP_KEY_F30) return "key_f30";
+	if (code == TERMCAP_KEY_F31) return "key_f31";
+	if (code == TERMCAP_KEY_F32) return "key_f32";
+	if (code == TERMCAP_KEY_F33) return "key_f33";
+	if (code == TERMCAP_KEY_F34) return "key_f34";
+	if (code == TERMCAP_KEY_F35) return "key_f35";
+	if (code == TERMCAP_KEY_F36) return "key_f36";
+	if (code == TERMCAP_KEY_F37) return "key_f37";
+	if (code == TERMCAP_KEY_F38) return "key_f38";
+	if (code == TERMCAP_KEY_F39) return "key_f39";
+	if (code == TERMCAP_KEY_F4) return "key_f4";
+	if (code == TERMCAP_KEY_F40) return "key_f40";
+	if (code == TERMCAP_KEY_F41) return "key_f41";
+	if (code == TERMCAP_KEY_F42) return "key_f42";
+	if (code == TERMCAP_KEY_F43) return "key_f43";
+	if (code == TERMCAP_KEY_F44) return "key_f44";
+	if (code == TERMCAP_KEY_F45) return "key_f45";
+	if (code == TERMCAP_KEY_F46) return "key_f46";
+	if (code == TERMCAP_KEY_F47) return "key_f47";
+	if (code == TERMCAP_KEY_F48) return "key_f48";
+	if (code == TERMCAP_KEY_F49) return "key_f49";
+	if (code == TERMCAP_KEY_F5) return "key_f5";
+	if (code == TERMCAP_KEY_F50) return "key_f50";
+	if (code == TERMCAP_KEY_F51) return "key_f51";
+	if (code == TERMCAP_KEY_F52) return "key_f52";
+	if (code == TERMCAP_KEY_F53) return "key_f53";
+	if (code == TERMCAP_KEY_F54) return "key_f54";
+	if (code == TERMCAP_KEY_F55) return "key_f55";
+	if (code == TERMCAP_KEY_F56) return "key_f56";
+	if (code == TERMCAP_KEY_F57) return "key_f57";
+	if (code == TERMCAP_KEY_F58) return "key_f58";
+	if (code == TERMCAP_KEY_F59) return "key_f59";
+	if (code == TERMCAP_KEY_F6) return "key_f6";
+	if (code == TERMCAP_KEY_F60) return "key_f60";
+	if (code == TERMCAP_KEY_F61) return "key_f61";
+	if (code == TERMCAP_KEY_F62) return "key_f62";
+	if (code == TERMCAP_KEY_F63) return "key_f63";
+	if (code == TERMCAP_KEY_F7) return "key_f7";
+	if (code == TERMCAP_KEY_F8) return "key_f8";
+	if (code == TERMCAP_KEY_F9) return "key_f9";
+	if (code == TERMCAP_KEY_FIND) return "key_find";
+	if (code == TERMCAP_KEY_HELP) return "key_help";
+	if (code == TERMCAP_KEY_HOME) return "key_home";
+	if (code == TERMCAP_KEY_IC) return "key_ic";
+	if (code == TERMCAP_KEY_IL) return "key_il";
+	if (code == TERMCAP_KEY_LEFT) return "key_left";
+	if (code == TERMCAP_KEY_LL) return "key_ll";
+	if (code == TERMCAP_KEY_MARK) return "key_mark";
+	if (code == TERMCAP_KEY_MESSAGE) return "key_message";
+	if (code == TERMCAP_KEY_MOVE) return "key_move";
+	if (code == TERMCAP_KEY_NEXT) return "key_next";
+	if (code == TERMCAP_KEY_NPAGE) return "key_npage";
+	if (code == TERMCAP_KEY_OPEN) return "key_open";
+	if (code == TERMCAP_KEY_OPTIONS) return "key_options";
+	if (code == TERMCAP_KEY_PPAGE) return "key_ppage";
+	if (code == TERMCAP_KEY_PREVIOUS) return "key_previous";
+	if (code == TERMCAP_KEY_PRINT) return "key_print";
+	if (code == TERMCAP_KEY_REDO) return "key_redo";
+	if (code == TERMCAP_KEY_REFERENCE) return "key_reference";
+	if (code == TERMCAP_KEY_REFRESH) return "key_refresh";
+	if (code == TERMCAP_KEY_REPLACE) return "key_replace";
+	if (code == TERMCAP_KEY_RESTART) return "key_restart";
+	if (code == TERMCAP_KEY_RESUME) return "key_resume";
+	if (code == TERMCAP_KEY_RIGHT) return "key_right";
+	if (code == TERMCAP_KEY_SAVE) return "key_save";
+	if (code == TERMCAP_KEY_SBEG) return "key_sbeg";
+	if (code == TERMCAP_KEY_SCANCEL) return "key_scancel";
+	if (code == TERMCAP_KEY_SCOMMAND) return "key_scommand";
+	if (code == TERMCAP_KEY_SCOPY) return "key_scopy";
+	if (code == TERMCAP_KEY_SCREATE) return "key_screate";
+	if (code == TERMCAP_KEY_SDC) return "key_sdc";
+	if (code == TERMCAP_KEY_SDL) return "key_sdl";
+	if (code == TERMCAP_KEY_SELECT) return "key_select";
+	if (code == TERMCAP_KEY_SEND) return "key_send";
+	if (code == TERMCAP_KEY_SEOL) return "key_seol";
+	if (code == TERMCAP_KEY_SEXIT) return "key_sexit";
+	if (code == TERMCAP_KEY_SF) return "key_sf";
+	if (code == TERMCAP_KEY_SFIND) return "key_sfind";
+	if (code == TERMCAP_KEY_SHELP) return "key_shelp";
+	if (code == TERMCAP_KEY_SHOME) return "key_shome";
+	if (code == TERMCAP_KEY_SIC) return "key_sic";
+	if (code == TERMCAP_KEY_SLEFT) return "key_sleft";
+	if (code == TERMCAP_KEY_SMESSAGE) return "key_smessage";
+	if (code == TERMCAP_KEY_SMOVE) return "key_smove";
+	if (code == TERMCAP_KEY_SNEXT) return "key_snext";
+	if (code == TERMCAP_KEY_SOPTIONS) return "key_soptions";
+	if (code == TERMCAP_KEY_SPREVIOUS) return "key_sprevious";
+	if (code == TERMCAP_KEY_SPRINT) return "key_sprint";
+	if (code == TERMCAP_KEY_SR) return "key_sr";
+	if (code == TERMCAP_KEY_SREDO) return "key_sredo";
+	if (code == TERMCAP_KEY_SREPLACE) return "key_sreplace";
+	if (code == TERMCAP_KEY_SRIGHT) return "key_sright";
+	if (code == TERMCAP_KEY_SRSUME) return "key_srsume";
+	if (code == TERMCAP_KEY_SSAVE) return "key_ssave";
+	if (code == TERMCAP_KEY_SSUSPEND) return "key_ssuspend";
+	if (code == TERMCAP_KEY_STAB) return "key_stab";
+	if (code == TERMCAP_KEY_SUNDO) return "key_sundo";
+	if (code == TERMCAP_KEY_SUSPEND) return "key_suspend";
+	if (code == TERMCAP_KEY_UNDO) return "key_undo";
+	if (code == TERMCAP_KEY_UP) return "key_up";
+	if (code == TERMCAP_KEYPAD_LOCAL) return "keypad_local";
+	if (code == TERMCAP_KEYPAD_XMIT) return "keypad_xmit";
+	if (code == TERMCAP_LAB_F0) return "lab_f0";
+	if (code == TERMCAP_LAB_F1) return "lab_f1";
+	if (code == TERMCAP_LAB_F10) return "lab_f10";
+	if (code == TERMCAP_LAB_F2) return "lab_f2";
+	if (code == TERMCAP_LAB_F3) return "lab_f3";
+	if (code == TERMCAP_LAB_F4) return "lab_f4";
+	if (code == TERMCAP_LAB_F5) return "lab_f5";
+	if (code == TERMCAP_LAB_F6) return "lab_f6";
+	if (code == TERMCAP_LAB_F7) return "lab_f7";
+	if (code == TERMCAP_LAB_F8) return "lab_f8";
+	if (code == TERMCAP_LAB_F9) return "lab_f9";
+	if (code == TERMCAP_LABEL_FORMAT) return "label_format";
+	if (code == TERMCAP_LABEL_OFF) return "label_off";
+	if (code == TERMCAP_LABEL_ON) return "label_on";
+	if (code == TERMCAP_META_OFF) return "meta_off";
+	if (code == TERMCAP_META_ON) return "meta_on";
+	if (code == TERMCAP_MICRO_COLUMN_ADDRESS) return "micro_column_address";
+	if (code == TERMCAP_MICRO_DOWN) return "micro_down";
+	if (code == TERMCAP_MICRO_LEFT) return "micro_left";
+	if (code == TERMCAP_MICRO_RIGHT) return "micro_right";
+	if (code == TERMCAP_MICRO_ROW_ADDRESS) return "micro_row_address";
+	if (code == TERMCAP_MICRO_UP) return "micro_up";
+	if (code == TERMCAP_NEWLINE) return "newline";
+	if (code == TERMCAP_ORDER_OF_PINS) return "order_of_pins";
+	if (code == TERMCAP_ORIG_COLORS) return "orig_colors";
+	if (code == TERMCAP_ORIG_PAIR) return "orig_pair";
+	if (code == TERMCAP_PAD_CHAR) return "pad_char";
+	if (code == TERMCAP_PARM_DCH) return "parm_dch";
+	if (code == TERMCAP_PARM_DELETE_LINE) return "parm_delete_line";
+	if (code == TERMCAP_PARM_DOWN_CURSOR) return "parm_down_cursor";
+	if (code == TERMCAP_PARM_DOWN_MICRO) return "parm_down_micro";
+	if (code == TERMCAP_PARM_ICH) return "parm_ich";
+	if (code == TERMCAP_PARM_INDEX) return "parm_index";
+	if (code == TERMCAP_PARM_INSERT_LINE) return "parm_insert_line";
+	if (code == TERMCAP_PARM_LEFT_CURSOR) return "parm_left_cursor";
+	if (code == TERMCAP_PARM_LEFT_MICRO) return "parm_left_micro";
+	if (code == TERMCAP_PARM_RIGHT_CURSOR) return "parm_right_cursor";
+	if (code == TERMCAP_PARM_RIGHT_MICRO) return "parm_right_micro";
+	if (code == TERMCAP_PARM_RINDEX) return "parm_rindex";
+	if (code == TERMCAP_PARM_UP_CURSOR) return "parm_up_cursor";
+	if (code == TERMCAP_PARM_UP_MICRO) return "parm_up_micro";
+	if (code == TERMCAP_PKEY_KEY) return "pkey_key";
+	if (code == TERMCAP_PKEY_LOCAL) return "pkey_local";
+	if (code == TERMCAP_PKEY_XMIT) return "pkey_xmit";
+	if (code == TERMCAP_PLAB_NORM) return "plab_norm";
+	if (code == TERMCAP_PRINT_SCREEN) return "print_screen";
+	if (code == TERMCAP_PRTR_NON) return "prtr_non";
+	if (code == TERMCAP_PRTR_OFF) return "prtr_off";
+	if (code == TERMCAP_PRTR_ON) return "prtr_on";
+	if (code == TERMCAP_PULSE) return "pulse";
+	if (code == TERMCAP_QUICK_DIAL) return "quick_dial";
+	if (code == TERMCAP_REMOVE_CLOCK) return "remove_clock";
+	if (code == TERMCAP_REPEAT_CHAR) return "repeat_char";
+	if (code == TERMCAP_REQ_FOR_INPUT) return "req_for_input";
+	if (code == TERMCAP_RESET_1STRING) return "reset_1string";
+	if (code == TERMCAP_RESET_2STRING) return "reset_2string";
+	if (code == TERMCAP_RESET_3STRING) return "reset_3string";
+	if (code == TERMCAP_RESET_FILE) return "reset_file";
+	if (code == TERMCAP_RESTORE_CURSOR) return "restore_cursor";
+	if (code == TERMCAP_ROW_ADDRESS) return "row_address";
+	if (code == TERMCAP_SAVE_CURSOR) return "save_cursor";
+	if (code == TERMCAP_SCROLL_FORWARD) return "scroll_forward";
+	if (code == TERMCAP_SCROLL_REVERSE) return "scroll_reverse";
+	if (code == TERMCAP_SELECT_CHAR_SET) return "select_char_set";
+	if (code == TERMCAP_SET_ATTRIBUTES) return "set_attributes";
+	if (code == TERMCAP_SET_BACKGROUND) return "set_background";
+	if (code == TERMCAP_SET_BOTTOM_MARGIN) return "set_bottom_margin";
+	if (code == TERMCAP_SET_BOTTOM_MARGIN_PARM) return "set_bottom_margin_parm";
+	if (code == TERMCAP_SET_CLOCK) return "set_clock";
+	if (code == TERMCAP_SET_COLOR_PAIR) return "set_color_pair";
+	if (code == TERMCAP_SET_FOREGROUND) return "set_foreground";
+	if (code == TERMCAP_SET_LEFT_MARGIN_PARM) return "set_left_margin_parm";
+	if (code == TERMCAP_SET_RIGHT_MARGIN) return "set_right_margin";
+	if (code == TERMCAP_SET_RIGHT_MARGIN_PARM) return "set_right_margin_parm";
+	if (code == TERMCAP_SET_TAB) return "set_tab";
+	if (code == TERMCAP_SET_TOP_MARGIN) return "set_top_margin";
+	if (code == TERMCAP_SET_TOP_MARGIN_PARM) return "set_top_margin_parm";
+	if (code == TERMCAP_SET_WINDOW) return "set_window";
+	if (code == TERMCAP_START_BIT_IMAGE) return "start_bit_image";
+	if (code == TERMCAP_START_CHAR_SET_DEF) return "start_char_set_def";
+	if (code == TERMCAP_STOP_BIT_IMAGE) return "stop_bit_image";
+	if (code == TERMCAP_STOP_CHAR_SET_DEF) return "stop_char_set_def";
+	if (code == TERMCAP_SUBSCRIPT_CHARACTERS) return "subscript_characters";
+	if (code == TERMCAP_SUPERSCRIPT_CHARACTERS) return "superscript_characters";
+	if (code == TERMCAP_TAB) return "tab";
+	if (code == TERMCAP_THESE_CAUSE_CR) return "these_cause_cr";
+	if (code == TERMCAP_TO_STATUS_LINE) return "to_status_line";
+	if (code == TERMCAP_TONE) return "tone";
+	if (code == TERMCAP_UNDERLINE_CHAR) return "underline_char";
+	if (code == TERMCAP_UP_HALF_LINE) return "up_half_line";
+	if (code == TERMCAP_USER0) return "user0";
+	if (code == TERMCAP_USER1) return "user1";
+	if (code == TERMCAP_USER2) return "user2";
+	if (code == TERMCAP_USER3) return "user3";
+	if (code == TERMCAP_USER4) return "user4";
+	if (code == TERMCAP_USER5) return "user5";
+	if (code == TERMCAP_USER6) return "user6";
+	if (code == TERMCAP_USER7) return "user7";
+	if (code == TERMCAP_USER8) return "user8";
+	if (code == TERMCAP_USER9) return "user9";
+	if (code == TERMCAP_WAIT_TONE) return "wait_tone";
+	if (code == TERMCAP_XOFF_CHARACTER) return "xoff_character";
+	if (code == TERMCAP_XON_CHARACTER) return "xon_character";
+	if (code == TERMCAP_ZERO_MOTION) return "zero_motion";
+	if (code == TERMCAP_ALT_SCANCODE_ESC) return "alt_scancode_esc";
+	if (code == TERMCAP_BIT_IMAGE_CARRIAGE_RETURN) return "bit_image_carriage_return";
+	if (code == TERMCAP_BIT_IMAGE_NEWLINE) return "bit_image_newline";
+	if (code == TERMCAP_BIT_IMAGE_REPEAT) return "bit_image_repeat";
+	if (code == TERMCAP_CHAR_SET_NAMES) return "char_set_names";
+	if (code == TERMCAP_CODE_SET_INIT) return "code_set_init";
+	if (code == TERMCAP_COLOR_NAMES) return "color_names";
+	if (code == TERMCAP_DEFINE_BIT_IMAGE_REGION) return "define_bit_image_region";
+	if (code == TERMCAP_DEVICE_TYPE) return "device_type";
+	if (code == TERMCAP_DISPLAY_PC_CHAR) return "display_pc_char";
+	if (code == TERMCAP_END_BIT_IMAGE_REGION) return "end_bit_image_region";
+	if (code == TERMCAP_ENTER_PC_CHARSET_MODE) return "enter_pc_charset_mode";
+	if (code == TERMCAP_ENTER_SCANCODE_MODE) return "enter_scancode_mode";
+	if (code == TERMCAP_EXIT_PC_CHARSET_MODE) return "exit_pc_charset_mode";
+	if (code == TERMCAP_EXIT_SCANCODE_MODE) return "exit_scancode_mode";
+	if (code == TERMCAP_GET_MOUSE) return "get_mouse";
+	if (code == TERMCAP_KEY_MOUSE) return "key_mouse";
+	if (code == TERMCAP_MOUSE_INFO) return "mouse_info";
+	if (code == TERMCAP_PC_TERM_OPTIONS) return "pc_term_options";
+	if (code == TERMCAP_PKEY_PLAB) return "pkey_plab";
+	if (code == TERMCAP_REQ_MOUSE_POS) return "req_mouse_pos";
+	if (code == TERMCAP_SCANCODE_ESCAPE) return "scancode_escape";
+	if (code == TERMCAP_SET0_DES_SEQ) return "set0_des_seq";
+	if (code == TERMCAP_SET1_DES_SEQ) return "set1_des_seq";
+	if (code == TERMCAP_SET2_DES_SEQ) return "set2_des_seq";
+	if (code == TERMCAP_SET3_DES_SEQ) return "set3_des_seq";
+	if (code == TERMCAP_SET_A_BACKGROUND) return "set_a_background";
+	if (code == TERMCAP_SET_A_FOREGROUND) return "set_a_foreground";
+	if (code == TERMCAP_SET_COLOR_BAND) return "set_color_band";
+	if (code == TERMCAP_SET_LEFT_MARGIN) return "set_left_margin";
+	if (code == TERMCAP_SET_PAGE_LENGTH) return "set_page_length";
+	if (code == TERMCAP_SET_TB_MARGIN) return "set_tb_margin";
+	if (code == TERMCAP_ENTER_HORIZONTAL_HL_MODE) return "enter_horizontal_hl_mode";
+	if (code == TERMCAP_ENTER_LEFT_HL_MODE) return "enter_left_hl_mode";
+	if (code == TERMCAP_ENTER_LOW_HL_MODE) return "enter_low_hl_mode";
+	if (code == TERMCAP_ENTER_RIGHT_HL_MODE) return "enter_right_hl_mode";
+	if (code == TERMCAP_ENTER_TOP_HL_MODE) return "enter_top_hl_mode";
+	if (code == TERMCAP_ENTER_VERTICAL_HL_MODE) return "enter_vertical_hl_mode";
+	if (code == TERMCAP_SET_A_ATTRIBUTES) return "set_a_attributes";
+	if (code == TERMCAP_SET_PGLEN_INCH) return "set_pglen_inch";
+
+	return "unknown";
+}

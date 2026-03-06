@@ -59,7 +59,7 @@ protected:
 
 private:
 	static void initWordChars(s8 *buf, u32 len);
-	virtual void sendBack(const s8 *data);
+	virtual void sendBack(const s8* format, ...);
 
 	void textSelect(u16 x, u16 y, s32 type, s32 buttons);
 	void startTextSelect(u16 x, u16 y);

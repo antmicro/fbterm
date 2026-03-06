@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "vterm.h"
+#include "termcap.h"
 
 void VTerm::cr()
 {
@@ -69,8 +70,14 @@ void VTerm::set_tab()
 	tab_stops[cursor_x / 8] |=  (1 << (cursor_x % 8));
 }
 
+// CSI g
 void VTerm::clear_tab()
 {
+	if (q_mode) {
+		printf("[vterm] Unknown sequence 'CSI ? g'\n");
+		return;
+	}
+
 	if (param[0] == 3) {
 		memset(tab_stops, 0, max_width / 8 + 1);
 	} else if (param[0] == 0) {
@@ -81,6 +88,25 @@ void VTerm::clear_tab()
 void VTerm::param_digit()
 {
 	param[npar] = param[npar] * 10 + cur_char - '0';
+}
+
+void VTerm::param_hex_digit()
+{
+	int digit = 0;
+
+	if (cur_char >= '0' && cur_char <= '9') {
+		digit = cur_char - '0';
+	}
+
+	else if (cur_char >= 'a' && cur_char <= 'z') {
+		digit = cur_char - 'a' + 10;
+	}
+
+	else if (cur_char >= 'A' && cur_char <= 'Z') {
+		digit = cur_char - 'A' + 10;
+	}
+
+	param[npar] = param[npar] * 16 + digit;
 }
 
 void VTerm::next_param()
@@ -96,8 +122,14 @@ void VTerm::clear_param()
 	memset(param, 0, sizeof(param));
 }
 
+// CSI s
 void VTerm::save_cursor()
 {
+	if (q_mode) {
+		printf("[vterm] Unknown sequence 'CSI ? s'\n");
+		return;
+	}
+
 	s_g0_charset = g0_charset;
 	s_g1_charset = g1_charset;
 	s_g0_is_active = g0_is_active;
@@ -111,10 +143,8 @@ void VTerm::window_ops()
 {
 	// Text-Area Size (chars)
 	if (param[0] == 18) {
-		s8 str[32];
-		snprintf(str, sizeof(str), "\e[8;%d;%dt", height, width);
-		sendBack(str);
-		return;	
+		sendBack("\e[8;%d;%dt", height, width);
+		return;
 	}
 
 	WindowInfo* info = getWindowInfo();
@@ -130,7 +160,7 @@ void VTerm::window_ops()
 		max_height = height;
 		return;
 	}
-	
+
 	// Move Window (pixels)
 	if (param[0] == 3) {
 		info->setOffset(param[1], param[2]);
@@ -139,31 +169,25 @@ void VTerm::window_ops()
 		resize(info->mCols, info->mRows);
 		max_width = width;
 		max_height = height;
-		return;	
+		return;
 	}
 
 	// Get Window/Text-Area position (pixels)
 	if (param[0] == 13) {
-		s8 str[32];
-		snprintf(str, sizeof(str), "\e[3;%d;%dt", info->mOffsetLeft, info->mOffsetTop);
-		sendBack(str);
-		return;	
+		sendBack("\e[3;%d;%dt", info->mOffsetLeft, info->mOffsetTop);
+		return;
 	}
-	
+
 	// Get Window/Text-Area size (pixels)
 	if (param[0] == 14) {
-		s8 str[32];
-		snprintf(str, sizeof(str), "\e[4;%d;%dt", info->mHeight, info->mWidth);
-		sendBack(str);
-		return;	
+		sendBack("\e[4;%d;%dt", info->mHeight, info->mWidth);
+		return;
 	}
-	
+
 	// Get Screen size (pixels)
 	if (param[0] == 15) {
-		s8 str[32];
-		snprintf(str, sizeof(str), "\e[5;%d;%dt", info->mScreenHeight, info->mScreenWidth);
-		sendBack(str);
-		return;	
+		sendBack("\e[5;%d;%dt", info->mScreenHeight, info->mScreenWidth);
+		return;
 	}
 }
 
@@ -366,8 +390,14 @@ void VTerm::delete_line()
 	else scroll_region(cursor_y, scroll_bot, n);
 }
 
+// CSI K
 void VTerm::erase_line()
 {
+	if (q_mode) {
+		printf("[vterm] Unknown sequence 'CSI ? K'\n");
+		return;
+	}
+
 	switch (param[0]) {
 	case 0:
 		clear_area(cursor_x, cursor_y, width - 1, cursor_y);
@@ -381,8 +411,14 @@ void VTerm::erase_line()
 	}
 }
 
+// CSI J
 void VTerm::erase_display()
 {
+	if (q_mode) {
+		printf("[vterm] Unknown sequence 'CSI ? J'\n");
+		return;
+	}
+
 	switch (param[0]) {
 	case 0:
 		clear_area(cursor_x, cursor_y, width - 1, cursor_y);
@@ -416,8 +452,14 @@ void VTerm::screen_align()
 	}
 }
 
+// CSI r
 void VTerm::set_margins()
 {
+	if (q_mode) {
+		printf("[vterm] Unknown sequence 'CSI ? r'\n");
+		return;
+	}
+
 	u16 t, b;
 
 	t = param[0];
@@ -439,14 +481,18 @@ void VTerm::respond_id()
 	sendBack("\e[?6c"); // response 'I'm a VT102'
 }
 
+// CSI n
 void VTerm::status_report()
 {
+	if (q_mode) {
+		printf("[vterm] Unknown sequence 'CSI ? n'\n");
+		return;
+	}
+
 	if (param[0] == 5) { // device status report
 		sendBack("\e[0n"); // response 'Terminal OK'
 	} else if (param[0] == 6) { // cursor position report
-		s8 str[32];
-		snprintf(str, sizeof(str), "\e[%d;%dR", cursor_y + 1, cursor_x + 1);
-		sendBack(str);
+		sendBack("\e[%d;%dR", cursor_y + 1, cursor_x + 1);
 	}
 }
 
@@ -515,95 +561,152 @@ void VTerm::enable_mode(bool enable)
 	}
 }
 
+// CSI h
 void VTerm::set_mode()
 {
 	enable_mode(true);
 }
 
+// CSI l
 void VTerm::clear_mode()
 {
 	enable_mode(false);
 }
 
+// CSI m
 void VTerm::set_display_attr()
 {
+	if (q_mode) {
+		get_key_modifier();
+		return;
+	}
+
+	enum struct State {
+		DEFAULT,
+		COLOR_PREFIX,
+		COLOR_INDEXED
+	};
+
+	bool background = false;
+	State state = State::DEFAULT;
+
 	for (u16 n = 0; n <= npar; n++) {
-		switch (param[n]) {
-		case 0:
-			char_attr = default_char_attr;
-			break;
-		case 1:
-			char_attr.intensity = 2;
-			break;
-		case 2:
-			char_attr.intensity = 0;
-			break;
-		case 3:
-			char_attr.italic = true;
-			break;
-		case 4:
-			char_attr.underline = true;
-			break;
-		case 5:
-			char_attr.blink = true;
-			break;
-		case 7:
-			char_attr.reverse = true;
-			break;
-		case 10:
-			charset = (g0_is_active ? g0_charset : g1_charset);
-			mode_flags.display_ctrl = false;
-			mode_flags.toggle_meta = false;
-			break;
-		case 11:
-			charset = IbmpcMap;
-			mode_flags.display_ctrl = true;
-			mode_flags.toggle_meta = false;
-			break;
-		case 12:
-			charset = IbmpcMap;
-			mode_flags.display_ctrl = true;
-			mode_flags.toggle_meta = true;
-			break;
-		case 21:
-		case 22:
-			char_attr.intensity = 1;
-			break;
-		case 23:
-			char_attr.italic = false;
-			break;
-		case 24:
-			char_attr.underline = false;
-			break;
-		case 25:
-			char_attr.blink = false;
-			break;
-		case 27:
-			char_attr.reverse = false;
-			break;
-		case 30 ... 37:
-			char_attr.fcolor = param[n] % 10;
-			break;
-		case 38:
-			char_attr.fcolor = cur_fcolor;
-			char_attr.underline = true;
-			break;
-		case 39:
-			char_attr.fcolor = cur_fcolor;
-			char_attr.underline = false;
-			break;
-		case 40 ... 47:
-			char_attr.bcolor = param[n] % 10;
-			break;
-		case 49:
-			char_attr.bcolor = cur_bcolor;
-			break;
-		default :
-			break;
+		const u16 code = param[n];
+
+		if (state == State::COLOR_INDEXED) {
+			if (background) {
+				char_attr.bcolor = code;
+			} else {
+				char_attr.fcolor = code;
+			}
+
+			state = State::DEFAULT;
+			continue;
+		}
+
+		if (state == State::COLOR_PREFIX) {
+			switch (code) {
+			case 2:
+				printf("[vterm] Received unsupported direct-color sequence!\n");
+				break;
+			case 5:
+				state = State::COLOR_INDEXED;
+				break;
+			default:
+				state = State::DEFAULT;
+				break;
+			}
+			continue;
+		}
+
+		if (state == State::DEFAULT) {
+			switch (code) {
+			case 0:
+				char_attr = default_char_attr;
+				break;
+			case 1:
+				char_attr.intensity = 2;
+				break;
+			case 2:
+				char_attr.intensity = 0;
+				break;
+			case 3:
+				char_attr.italic = true;
+				break;
+			case 4:
+				char_attr.underline = true;
+				break;
+			case 5:
+				char_attr.blink = true;
+				break;
+			case 7:
+				char_attr.reverse = true;
+				break;
+			case 10:
+				charset = (g0_is_active ? g0_charset : g1_charset);
+				mode_flags.display_ctrl = false;
+				mode_flags.toggle_meta = false;
+				break;
+			case 11:
+				charset = IbmpcMap;
+				mode_flags.display_ctrl = true;
+				mode_flags.toggle_meta = false;
+				break;
+			case 12:
+				charset = IbmpcMap;
+				mode_flags.display_ctrl = true;
+				mode_flags.toggle_meta = true;
+				break;
+			case 21:
+			case 22:
+				char_attr.intensity = 1;
+				break;
+			case 23:
+				char_attr.italic = false;
+				break;
+			case 24:
+				char_attr.underline = false;
+				break;
+			case 25:
+				char_attr.blink = false;
+				break;
+			case 27:
+				char_attr.reverse = false;
+				break;
+			case 30 ... 37:
+				char_attr.fcolor = code % 10;
+				break;
+			case 90 ... 97:
+				char_attr.fcolor = code % 10 + 0x08;
+				break;
+			case 38:
+				background = false;
+				state = State::COLOR_PREFIX;
+				break;
+			case 39:
+				char_attr.fcolor = cur_fcolor;
+				char_attr.underline = false;
+				break;
+			case 40 ... 47:
+				char_attr.bcolor = code % 10;
+				break;
+			case 100 ... 107:
+				char_attr.bcolor = code % 10 + 0x08;
+				break;
+			case 48:
+				background = true;
+				state = State::COLOR_PREFIX;
+				break;
+			case 49:
+				char_attr.bcolor = cur_bcolor;
+				break;
+			}
+			continue;
 		}
 	}
 }
 
+// CSI ?
 void VTerm::set_q_mode()
 {
 	q_mode = 1;
@@ -764,4 +867,57 @@ void VTerm::fbterm_specific()
 	default:
 		break;
 	}
+}
+
+void VTerm::get_device_attribute()
+{
+	// respond 'I'm a VT525' - copied from GNOME terminal
+	sendBack("\e[>65;7006;1c");
+}
+
+void VTerm::request_termcap()
+{
+	u16 code = param[0];
+	const s8 length = 32;
+	s8 numeric[length] {0};
+
+	if (code == TERMCAP_MAX_COLORS) {
+		encode_termcap_number(numeric, length, 256);
+		sendBack("\eP1+r%04X=%s\e\\", code, numeric);
+		return;
+	}
+
+	if (code == TERMCAP_MAX_PAIRS) {
+		encode_termcap_number(numeric, length, 65536);
+		sendBack("\eP1+r%04X=%s\e\\", code, numeric);
+		return;
+	}
+
+	if (code == TERMCAP_LINES) {
+		encode_termcap_number(numeric, length, h());
+		sendBack("\eP1+r%04X=%s\e\\", code, numeric);
+		return;
+	}
+
+	if (code == TERMCAP_COLUMNS) {
+		encode_termcap_number(numeric, length, w());
+		sendBack("\eP1+r%04X=%s\e\\", code, numeric);
+		return;
+	}
+
+	// responds "not supported" to all others
+	sendBack("\eP0+r%04X\e\\", code);
+	printf("[vterm] Unknown termcap sequence (0x%x - %s)!\n", code, termcap_string(code));
+}
+
+// CSI [ > m
+void VTerm::set_key_modifier()
+{
+	printf("[vterm] Unknown set_key_modifier (0x%x) (0x%x)\n", param[0], param[1]);
+}
+
+// CSI [ ? m
+void VTerm::get_key_modifier()
+{
+	printf("[vterm] Unknown get_key_modifier (0x%x)\n", param[0]);
 }

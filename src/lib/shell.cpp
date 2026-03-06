@@ -31,6 +31,7 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include "shell.h"
+#include <stdarg.h>
 
 void waitChildProcessExit(s32 pid)
 {
@@ -110,9 +111,23 @@ void Shell::readyRead(s8 *buf, u32 len)
 	input((const u8 *)buf, len);
 }
 
-void Shell::sendBack(const s8 *data)
+void Shell::sendBack(const s8* format, ...)
 {
-	write((s8*)data, strlen(data));
+	va_list args;
+	va_start(args, format);
+
+	const int size = 64;
+
+	s8 buffer[size];
+	int bytes = vsnprintf(buffer, size, format, args);
+
+	if (bytes > size) {
+		bytes = size;
+	}
+
+	write(buffer, bytes);
+
+	va_end(args);
 }
 
 void Shell::resize(u16 w, u16 h)
@@ -181,9 +196,7 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 	}
 
 	if (val != -1) {
-		s8 buf[8];
-		snprintf(buf, sizeof(buf), "\e[M%c%c%c", ' ' + val, ' ' + x + 1, ' ' + y + 1);
-		sendBack(buf);
+		sendBack("\e[M%c%c%c", ' ' + val, ' ' + x + 1, ' ' + y + 1);
 	}
 }
 

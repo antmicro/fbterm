@@ -37,7 +37,7 @@ public:
 	u32 mWidth, mHeight;
 	u32 mOffsetLeft, mOffsetTop;
 	u16 mCols, mRows;
-	
+
 };
 
 class VTerm {
@@ -108,7 +108,7 @@ protected:
 	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars, bool *dws) = 0;
 	virtual bool moveChars(u16 sx, u16 sy, u16 dx, u16 dy, u16 w, u16 h) { return false; }
 	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c) {}
-	virtual void sendBack(const s8 *data) {}
+	virtual void sendBack(const s8* format, ...) {}
 	virtual void modeChanged(ModeType type) {}
 	virtual void historyChanged(u32 cur, u32 total) {}
 	virtual void request(RequestType type, u32 val = 0) {}
@@ -126,6 +126,7 @@ private:
 	void move_cursor(u16 x, u16 y);
 	void update();
 	void draw_cursor();
+	void encode_termcap_number(s8* output, s32 size, s32 value);
 	u16 get_line(u16 y);
 	u16 total_history_lines() { return history_full ? history_lines : history_save_line; }
 
@@ -133,6 +134,7 @@ private:
 	void set_q_mode();
 	void clear_param();
 	void param_digit();
+	void param_hex_digit();
 	void next_param();
 
 	// non-printing characters
@@ -190,6 +192,10 @@ private:
 	void reset_palette();
 	void set_led();
 	void fbterm_specific();
+	void get_device_attribute();
+	void request_termcap();
+	void set_key_modifier();
+	void get_key_modifier();
 
 	CharAttr normal_char_attr();
 	CharAttr erase_char_attr();
@@ -203,8 +209,38 @@ private:
 	static bool init_ambiguous_wide();
 
 	typedef enum {
-		ESnormal = 0, ESesc, ESsquare, ESnonstd, ESpercent, EScharset, EShash, ESfunckey, ESkeep
+		ESnormal  = 0,
+		ESesc     = 1,
+		EScsi     = 2,
+		ESosc     = 3,
+		ESpercent = 4,
+		EScharset = 5,
+		EShash    = 6,
+		ESgreater = 7,
+		ESdcs     = 8,
+		EStermcap = 9,
+		ESst      = 10,
+		ESkeep    = 11
 	} EscapeState;
+
+	static inline const char* EscapeStateToString(EscapeState state) {
+		switch (state) {
+			case ESnormal:  return "<nothing>";
+			case ESesc:     return "ESC";
+			case EScsi:     return "CSI";
+			case ESosc:     return "OSC";
+			case ESpercent: return "ESC %";
+			case EScharset: return "ESC )";
+			case EShash:    return "ESC #";
+			case ESgreater: return "CSI >";
+			case ESdcs:     return "DCS";
+			case EStermcap: return "DCS + q";
+			case ESst:      return "ST";
+			case ESkeep:    return "<previous>";
+		}
+
+		return "<invalid>";
+	}
 
 	EscapeState esc_state;
 
@@ -217,7 +253,7 @@ private:
 
 	static const Sequence control_sequences[], escape_sequences[];
 
-	#define NR_STATES ESkeep
+	#define NR_STATES ((int) ESkeep)
 	#define MAX_CONTROL_CODE 256
 	#define MAX_ESCAPE_CODE 128
 

@@ -26,37 +26,40 @@
 #define ENDSEQ  { ((u16)-1) }
 
 const VTerm::Sequence VTerm::control_sequences[] = {
-	{ 0,	0,	ESkeep },
-	{ 7,	&VTerm::bell,	ESkeep },
-	{ 8,	&VTerm::bs,		ESkeep },
-	{ 9,	&VTerm::tab,	ESkeep },
-	{ 0xA,	&VTerm::lf,	ESkeep },
-	{ 0xB,	&VTerm::lf,	ESkeep },
-	{ 0xC,	&VTerm::lf,	ESkeep },
-	{ 0xD,	&VTerm::cr,	ESkeep },
-	{ 0xE,	&VTerm::active_g1,	ESkeep },
-	{ 0xF,	&VTerm::active_g0,	ESkeep },
-	{ 0x18, 0,	ESnormal },
-	{ 0x1A, 0,	ESnormal },
-	{ 0x1B, 0,	ESesc },
-	{ 0x7F, 0,	ESkeep },
-	{ 0x9B, 0,	ESsquare },
+	{ 0x00, nullptr, ESkeep },
+	{ 0x07, &VTerm::bell, ESkeep },
+	{ 0x08, &VTerm::bs, ESkeep },
+	{ 0x09, &VTerm::tab, ESkeep },
+	{ 0x0A, &VTerm::lf, ESkeep },
+	{ 0x0B, &VTerm::lf, ESkeep },
+	{ 0x0C, &VTerm::lf, ESkeep },
+	{ 0x0D, &VTerm::cr, ESkeep },
+	{ 0x0E, &VTerm::active_g1, ESkeep },
+	{ 0x0F, &VTerm::active_g0, ESkeep },
+	{ 0x18, nullptr, ESnormal },
+	{ 0x1A, nullptr, ESnormal },
+	{ 0x1B, nullptr, ESesc },
+	{ 0x7F, nullptr, ESkeep },
+	{ 0x9B, nullptr, EScsi },
 	ENDSEQ
 };
 
 const VTerm::Sequence VTerm::escape_sequences[] = {
-	{   0, 0, ESnormal },
 
-	// ESnormal
+	// ESnormal #0
+	{ 0, nullptr, ESnormal },
+	{ 0, nullptr, ESnormal }, // default fallthough case
 	ENDSEQ,
 
-	// ESesc
-	{ '[', &VTerm::clear_param,	ESsquare },
-	{ ']', &VTerm::clear_param,	ESnonstd },
-	{ '%', 0,	ESpercent },
-	{ '#', 0,	EShash },
+	// ESesc #1 "ESC"
+	{ '[', &VTerm::clear_param,	EScsi },
+	{ ']', &VTerm::clear_param,	ESosc },
+	{ 'P', &VTerm::clear_param, ESdcs },
+	{ '%', nullptr, ESpercent },
+	{ '#', nullptr, EShash },
 	{ '(', &VTerm::current_is_g0,	EScharset },
 	{ ')', &VTerm::current_is_g1,	EScharset },
+	{ 'Z', &VTerm::get_device_attribute, ESnormal }, // Obsolete form of 'CSI c'
 	{ 'c', &VTerm::reset,		ESnormal },
 	{ 'D', &VTerm::index_down,	ESnormal },
 	{ 'E', &VTerm::next_line,	ESnormal },
@@ -69,11 +72,12 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	{ '=', &VTerm::keypad_application,	ESnormal },
 	ENDSEQ,
 
-	// ESsquare
-	{ '[', 0,	ESfunckey },
+	// EScsi #2 "ESC ["
 	{ '?', &VTerm::set_q_mode,	ESkeep },
+	{ '>', nullptr, ESgreater },
 	{ '0' | ADDSAME(9), &VTerm::param_digit,	ESkeep },
-	{ ';', &VTerm::next_param,	ESkeep },
+	{ ';', &VTerm::next_param, ESkeep },
+	{ ':', &VTerm::next_param, ESkeep }, // some codes use ':' instead of ';' as the argument separator
 	{ '@', &VTerm::insert_char,	ESnormal },
 	{ 'A', &VTerm::cursor_up,	ESnormal },
 	{ 'B', &VTerm::cursor_down,	ESnormal },
@@ -107,15 +111,17 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	{ '`', &VTerm::cursor_position_col,	ESnormal },
 	{ ']', &VTerm::linux_specific, ESnormal },
 	{ '}', &VTerm::fbterm_specific, ESnormal },
+	{ '%', 0, ESkeep }, // this is a workaround for the wierd, undocumented code "\e[0%m" - otherwise the trailing 'm' gets printed
 	ENDSEQ,
 
-	// ESnonstd
-	{ '0', 0, ESkeep }, // ignore set window and icon title
-	{ '1', 0, ESkeep }, // ignore set icon label
-	{ '2', 0, ESkeep }, // ignore set window title
-	{ ';', 0, ESkeep }, // next param
-	{ ' ' | ADDSAME(94), 0, ESkeep }, // consume printable characters
-	{ /* BEL */ 7, 0, ESnormal },
+	// ESosc #3 "ESC ]"
+	{ '0', nullptr, ESkeep }, // ignore set window and icon title
+	{ '1', nullptr, ESkeep }, // ignore set icon label
+	{ '2', nullptr, ESkeep }, // ignore set window title
+	{ ';', nullptr, ESkeep }, // next param
+	{ ' ' | ADDSAME(94), nullptr, ESkeep }, // consume printable characters
+	{ 0x07, nullptr, ESnormal },
+	{ 0x1b, nullptr, ESst },
 
 // FBTerm specific palette codes
 //	{ '0' | ADDSAME(9), &VTerm::set_palette,    ESkeep },
@@ -125,24 +131,45 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 //	{ 'R', &VTerm::reset_palette, ESnormal },
 	ENDSEQ,
 
-	// ESpercent
+	// ESpercent #4 "ESC %"
 	{ '@', &VTerm::clear_utf8,	ESnormal },
 	{ 'G', &VTerm::set_utf8,	ESnormal },
 	{ '8', &VTerm::set_utf8,	ESnormal },
 	ENDSEQ,
 
-	// EScharset
+	// EScharset #5 "ESC )" or "ESC ("
 	{ '0', &VTerm::set_charset, ESnormal },
 	{ 'B', &VTerm::set_charset, ESnormal },
 	{ 'U', &VTerm::set_charset, ESnormal },
 	{ 'K', &VTerm::set_charset, ESnormal },
 	ENDSEQ,
 
-	// EShash
-	{ '8', &VTerm::screen_align,	ESnormal },
-	{ '9', &VTerm::screen_clear,    ESnormal },
+	// EShash #6 "ESC #"
+	{ '8', &VTerm::screen_align, ESnormal },
+	{ '9', &VTerm::screen_clear, ESnormal },
 	ENDSEQ,
 
-	// ESfunckey
+	// ESgreater #8 "ESC [ >"
+	{ '0' | ADDSAME(9), &VTerm::param_digit, ESkeep },
+	{ ';', &VTerm::next_param,	ESkeep },
+	{ 'c', &VTerm::get_device_attribute, ESnormal }, // Send Device Attributes (Secondary DA)
+	{ 'm', &VTerm::set_key_modifier, ESnormal }, // Set/reset key modifier options
 	ENDSEQ,
+
+	// ESdcs #9 "ESC P"
+	{ '+', nullptr, ESkeep },
+	{ 'q', nullptr, EStermcap },
+	ENDSEQ,
+
+	// EStermcap #10 "ESC P + q"
+	{ '0' | ADDSAME(9), &VTerm::param_hex_digit, ESkeep },
+	{ 'a' | ADDSAME(6), &VTerm::param_hex_digit, ESkeep },
+	{ 'A' | ADDSAME(6), &VTerm::param_hex_digit, ESkeep },
+	{ 0x1B, &VTerm::request_termcap, ESst },
+	ENDSEQ,
+
+	// ESst #11
+	{ '\\', nullptr, ESnormal },
+	ENDSEQ
+
 };

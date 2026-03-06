@@ -23,6 +23,7 @@
 #include "vterm.h"
 #include "../fbshellman.h"
 #include "io.h"
+#include "../fbconfig.h"
 
 #include <asm/termbits.h>
 #include <sys/ioctl.h>
@@ -30,6 +31,8 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define CONTROL_SEQUENCE_FALLBACK 1
 
 WindowInfo::~WindowInfo() {
 
@@ -78,6 +81,8 @@ u8 VTerm::control_map[MAX_CONTROL_CODE], VTerm::escape_map[NR_STATES][MAX_ESCAPE
 
 void VTerm::init_state()
 {
+	memset(escape_map, CONTROL_SEQUENCE_FALLBACK, NR_STATES * MAX_ESCAPE_CODE);
+
 	for (u8 i = 1; control_sequences[i].code != (u16)-1; i++) {
 		control_map[control_sequences[i].code] = i;
 	}
@@ -496,8 +501,26 @@ void VTerm::do_control_char()
 	u8 index = (cur_char < MAX_CONTROL_CODE ? control_map[cur_char] : 0);
 	const Sequence *seq = control_sequences + index;
 
-	if (!index && esc_state != ESnormal && cur_char) {
-		seq = escape_sequences + (cur_char < MAX_ESCAPE_CODE ? escape_map[esc_state][cur_char] : 0);
+	if (esc_state != ESnormal && cur_char) {
+		int index = (cur_char < MAX_ESCAPE_CODE ? escape_map[esc_state][cur_char] : CONTROL_SEQUENCE_FALLBACK);
+		seq = escape_sequences + index;
+
+		// CONTROL_SEQUENCE_FALLBACK is used to mark all "unexpected" graph edges
+		// that is all cases when the transition was not explicitly set in escape_sequences
+		if (index == CONTROL_SEQUENCE_FALLBACK) {
+			const char* fmt = "[vterm] Unexpected byte 0x%x in '%s' (state #%d), sequence broken\n";
+
+			if (cur_char > ' ') {
+				fmt = "[vterm] Unexpected char '%c' in '%s' (state #%d), sequence broken\n";
+			}
+
+			bool verbose = false;
+			Config::instance()->getOption("verbose", verbose);
+
+			if (verbose) {
+				printf(fmt, (char) cur_char, EscapeStateToString(esc_state), esc_state);
+			}
+		}
 	}
 
 	if (seq->action) (this->*(seq->action))();
@@ -551,6 +574,20 @@ void VTerm::draw_cursor()
 	attr.reverse ^= mode_flags.inverse_screen;
 
 	drawCursor(attr, cursor_x, cursor_y, text[yp]);
+}
+
+void VTerm::encode_termcap_number(s8* output, s32 size, s32 value)
+{
+	s8 decimal_string[16] {0};
+	snprintf(decimal_string, 16, "%d", value);
+	int chars = strlen(decimal_string) * 2;
+
+	memset(output, 0, size);
+	int j = 0;
+
+	for (int i = 0; i < chars; i += 2) {
+		snprintf(output + i, size - i, "%02x", decimal_string[j ++]);
+	}
 }
 
 void VTerm::requestUpdate(u16 x, u16 y, u16 w, u16 h)
