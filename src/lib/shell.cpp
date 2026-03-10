@@ -60,7 +60,6 @@ Shell::SelectedText Shell::mSelText;
 Shell::Shell()
 {
 	mPid = -1;
-	mTermIsLinux = false;
 }
 
 Shell::~Shell()
@@ -80,7 +79,7 @@ void Shell::createShellProcess(s8 **command)
 
 	case 0:  // child process
 		initShellProcess();
-		setenv("TERM", mTermIsLinux? "linux": "fbterm", 1);
+		setenv("TERM", "linux", 1);
 
 		if (command) {
 			execvp(command[0], command);

@@ -207,9 +207,6 @@ void Config::checkConfigFile(const s8 *name)
 		"\n"
 		"# treat ambiguous width characters as wide\n"
 		"#ambiguous-wide=yes\n"
-		"\n"
-		"# set TERM to 'linux' instead of the default 'fbterm'\n"
-		"#term-is-linux=no\n"
 		;
 
 	struct stat cstat;
@@ -245,7 +242,6 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "font-height", required_argument, 0, 'H' },
 		{ "font-baseline", required_argument, 0, 'B' },
 		{ "ambiguous-wide", no_argument, 0, 'a' },
-		{ "term-is-linux", no_argument, 0, 'l' },
 #ifdef ENABLE_VESA
 		{ "vesa-mode", required_argument, 0, 0 },
 #endif
@@ -253,7 +249,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 	};
 
 	s32 index;
-	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:c:C:T:G:R:L:W:H:B:al", options, 0)) != -1) {
+	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:c:C:T:G:R:L:W:H:B:a", options, 0)) != -1) {
 		switch (index) {
 		case 'V':
 			printf("FbTerm version " VERSION "\n");
@@ -286,7 +282,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"  -L, --margin-left=NUM           specify left margin in pixels\n"
 				"  -R, --margin-right=NUM          specify right margin in pixels\n"
 #ifdef ENABLE_VESA
-				"      --vesa-mode=NUM             force VESA video mode\n"
+				"      --vesa-mode=NUM           f  force VESA video mode\n"
 				"                  list            display available VESA video modes\n"
 #endif
 				"\n"
