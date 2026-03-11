@@ -39,6 +39,10 @@ add_executable(fbterm
 	src/vesadev.cpp
 )
 
+add_executable(angbd EXCLUDE_FROM_ALL
+	util/angbd.c
+)
+
 target_link_libraries(fbterm PRIVATE Freetype::Freetype Fontconfig::Fontconfig)
 target_include_directories(fbterm PRIVATE src src/lib)
 target_compile_definitions(fbterm PRIVATE VERSION="2.0")
