@@ -387,10 +387,12 @@ FbShell::FbShell()
 	if (info == NULL) {
 		resize(screen->cols(), screen->rows());
 	} else {
-		info->setSize(info->mScreenWidth - config.width(), info->mScreenHeight - config.height());
-		info->setOffset(info->mOffsetLeft + config.left, info->mOffsetTop + config.top);
+		window.w = info->mScreenWidth - config.width();
+		window.h = info->mScreenHeight - config.height();
+		window.x = config.left;
+		window.y = config.top;
 
-		resize(info->mCols, info->mRows);
+		updateWindow();
 	}
 
 	firstShell = false;
@@ -615,6 +617,9 @@ void FbShell::switchVt(bool enter, FbShell *peer)
 		screen->setPalette(mPaletteChanged ? mPalette : defaultPalette);
 		modeChanged(AllModes);
 		reportCursor();
+
+		// restore margins
+		updateWindow();
 	} else if (!peer) {
 		changeMode(CursorKeyEscO, false);
 		changeMode(ApplicKeypad, false);

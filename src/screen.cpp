@@ -122,7 +122,7 @@ Screen::~Screen()
 	ret = write(STDIN_FILENO, clear_screen, sizeof(clear_screen) - 1);
 }
 
-void Screen::setSize(int w, int h) 
+void Screen::setSize(int w, int h)
 {
 
 	const int wMax = mScreenWidth - mOffsetLeft;
@@ -130,7 +130,7 @@ void Screen::setSize(int w, int h)
 
 	int wFree = wMax - w;
 	int hFree = hMax - h;
-	
+
 	if (wFree < 0) wFree = 0;
 	if (hFree < 0) hFree = 0;
 
@@ -141,27 +141,28 @@ void Screen::setSize(int w, int h)
 	mRows = mHeight / FH(1);
 }
 
-void Screen::setOffset(int x, int y) 
+void Screen::setOffset(int x, int y)
 {
+
 	if (x > mScreenWidth) {
 		x = mScreenWidth - 1;
 	}
-	
+
 	if (y > mScreenHeight) {
 		y = mScreenHeight - 1;
 	}
 
 	mOffsetLeft = x;
 	mOffsetTop = y;
-	
+
 	int wFree = mScreenWidth - x;
 	int hFree = mScreenHeight - y;
-	
+
 	if (wFree < mWidth) {
 		mWidth = wFree;
 		mCols = mWidth / FW(1);
 	}
-	
+
 	if (hFree < mHeight) {
 		mHeight = hFree;
 		mRows = mHeight / FH(1);

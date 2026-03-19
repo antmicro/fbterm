@@ -25,6 +25,15 @@
 
 #include "type.h"
 
+struct WindowPlacement {
+
+	int w;
+	int h;
+	int x;
+	int y;
+
+};
+
 class WindowInfo {
 public:
 
@@ -114,6 +123,10 @@ protected:
 	virtual void request(RequestType type, u32 val = 0) {}
 	virtual void requestUpdate(u16 x, u16 y, u16 w, u16 h);
 	virtual WindowInfo* getWindowInfo();
+
+	WindowPlacement window;
+
+	void updateWindow();
 
 private:
 	// utility functions
@@ -283,6 +296,7 @@ private:
 	s8 *tab_stops;
 	u16 *linenumbers;
 	u16 *dirty_startx, *dirty_endx;
+
 	u16 width, height, max_width, max_height;
 	u16 scroll_top, scroll_bot;
 	s32 pending_scroll; // >0 means scroll up

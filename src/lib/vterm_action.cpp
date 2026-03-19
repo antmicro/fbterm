@@ -152,23 +152,17 @@ void VTerm::window_ops()
 
 	// Resize Window (pixels)
 	if (param[0] == 4) {
-		info->setSize(param[2], param[1]);
-		reset();
-
-		resize(info->mCols, info->mRows);
-		max_width = width;
-		max_height = height;
+		window.w = param[2];
+		window.h = param[1];
+		updateWindow();
 		return;
 	}
 
 	// Move Window (pixels)
 	if (param[0] == 3) {
-		info->setOffset(param[1], param[2]);
-		reset();
-
-		resize(info->mCols, info->mRows);
-		max_width = width;
-		max_height = height;
+		window.x = param[1];
+		window.y = param[2];
+		updateWindow();
 		return;
 	}
 

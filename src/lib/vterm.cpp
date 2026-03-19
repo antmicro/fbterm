@@ -885,7 +885,19 @@ void VTerm::historyDisplay(bool absolute, s32 num)
 }
 
 WindowInfo* VTerm::getWindowInfo() {
-	return 0;
+	return nullptr;
+}
+
+void VTerm::updateWindow() {
+	WindowInfo* info = getWindowInfo();
+	if (info == nullptr) return;
+
+	info->setOffset(0, 0);
+	info->setSize(window.w, window.h);
+	info->setOffset(window.x, window.y);
+
+	reset();
+	resize(info->mCols, info->mRows);
 }
 
 u16 VTerm::get_line(u16 y)
