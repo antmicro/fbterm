@@ -149,6 +149,8 @@ private:
 	void param_digit();
 	void param_hex_digit();
 	void next_param();
+	void begin_hex();
+	void param_any_digit();
 
 	// non-printing characters
 	void cr(), lf(), bell(), tab(), bs();
@@ -209,6 +211,7 @@ private:
 	void request_termcap();
 	void set_key_modifier();
 	void get_key_modifier();
+	void osc_end();
 
 	CharAttr normal_char_attr();
 	CharAttr erase_char_attr();
@@ -332,8 +335,10 @@ private:
 
 	// action parameters
 	#define NPAR 16
-	u16 npar, param[NPAR];
+	u32 npar, param[NPAR];
+	bool hex_mode = false;
 	bool q_mode, palette_mode;
+	bool verbose = false;
 
 	//history
 	static u16 history_lines;

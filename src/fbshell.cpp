@@ -566,9 +566,7 @@ void FbShell::request(RequestType type,  u32 val)
 			memcpy(mPalette, defaultPalette, sizeof(defaultPalette));
 		}
 
-		mPalette[val >> 24].red = (val >> 16) & 0xff;
-		mPalette[val >> 24].green = (val >> 8) & 0xff;
-		mPalette[val >> 24].blue = val & 0xff;
+		mPalette[val >> 24] = Color::unpack(val);
 
 		if (active) {
 			screen->setPalette(mPalette);

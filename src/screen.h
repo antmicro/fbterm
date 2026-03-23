@@ -29,6 +29,26 @@
 
 struct Color {
 	u8 red, green, blue;
+
+	constexpr bool operator ==(Color color) const
+	{
+		return (color.red == red) && (color.green == green) && (color.blue == blue);
+	}
+
+	constexpr u32 pack() const
+	{
+		return (red << 16) | (green << 8) | (blue & 0xff);
+	}
+
+	constexpr static Color from(u8 red, u8 green, u8 blue)
+	{
+		return {red, green, blue};
+	}
+
+	constexpr static Color unpack(u32 packed)
+	{
+		return from((packed >> 16) & 0xff, (packed >> 8) & 0xff, packed & 0xff);
+	}
 };
 
 typedef enum { Rotate0 = 0, Rotate90, Rotate180, Rotate270 } RotateType;
@@ -51,12 +71,12 @@ public :
 
 	bool move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h);
 	void setPalette(const Color *palette);
-	
+
 	void enableScroll(bool enable) { mScrollEnable = enable; }
 
 	void showInfo(bool verbose);
 	virtual void switchVc(bool enter);
-	
+
 	virtual void setSize(int w, int h);
 	virtual void setOffset(int x, int y);
 

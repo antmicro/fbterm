@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include "vterm.h"
 #include "termcap.h"
+#include "screen.h"
 
 void VTerm::cr()
 {
@@ -74,7 +75,7 @@ void VTerm::set_tab()
 void VTerm::clear_tab()
 {
 	if (q_mode) {
-		printf("[vterm] Unknown sequence 'CSI ? g'\n");
+		if (verbose) printf("[vterm] Unknown sequence 'CSI ? g'\n");
 		return;
 	}
 
@@ -109,9 +110,25 @@ void VTerm::param_hex_digit()
 	param[npar] = param[npar] * 16 + digit;
 }
 
+void VTerm::param_any_digit()
+{
+	if (hex_mode) {
+		param_hex_digit();
+		return;
+	}
+
+	param_digit();
+}
+
 void VTerm::next_param()
 {
 	if (npar < NPAR - 1) npar++;
+	hex_mode = false;
+}
+
+void VTerm::begin_hex()
+{
+	hex_mode = true;
 }
 
 void VTerm::clear_param()
@@ -119,6 +136,7 @@ void VTerm::clear_param()
 	q_mode = 0;
 	palette_mode = 0;
 	npar = 0;
+	hex_mode = false;
 	memset(param, 0, sizeof(param));
 }
 
@@ -126,7 +144,7 @@ void VTerm::clear_param()
 void VTerm::save_cursor()
 {
 	if (q_mode) {
-		printf("[vterm] Unknown sequence 'CSI ? s'\n");
+		if (verbose) printf("[vterm] Unknown sequence 'CSI ? s'\n");
 		return;
 	}
 
@@ -388,7 +406,7 @@ void VTerm::delete_line()
 void VTerm::erase_line()
 {
 	if (q_mode) {
-		printf("[vterm] Unknown sequence 'CSI ? K'\n");
+		if (verbose) printf("[vterm] Unknown sequence 'CSI ? K'\n");
 		return;
 	}
 
@@ -409,7 +427,7 @@ void VTerm::erase_line()
 void VTerm::erase_display()
 {
 	if (q_mode) {
-		printf("[vterm] Unknown sequence 'CSI ? J'\n");
+		if (verbose) printf("[vterm] Unknown sequence 'CSI ? J'\n");
 		return;
 	}
 
@@ -450,7 +468,7 @@ void VTerm::screen_align()
 void VTerm::set_margins()
 {
 	if (q_mode) {
-		printf("[vterm] Unknown sequence 'CSI ? r'\n");
+		if (verbose) printf("[vterm] Unknown sequence 'CSI ? r'\n");
 		return;
 	}
 
@@ -479,7 +497,7 @@ void VTerm::respond_id()
 void VTerm::status_report()
 {
 	if (q_mode) {
-		printf("[vterm] Unknown sequence 'CSI ? n'\n");
+		if (verbose) printf("[vterm] Unknown sequence 'CSI ? n'\n");
 		return;
 	}
 
@@ -601,7 +619,7 @@ void VTerm::set_display_attr()
 		if (state == State::COLOR_PREFIX) {
 			switch (code) {
 			case 2:
-				printf("[vterm] Received unsupported direct-color sequence!\n");
+				if (verbose) printf("[vterm] Received unsupported direct-color sequence!\n");
 				break;
 			case 5:
 				state = State::COLOR_INDEXED;
@@ -855,10 +873,11 @@ void VTerm::fbterm_specific()
 		break;
 
 	case 3:
-		if (npar == 4) request(PaletteSet, ((param[1] & 0xff) << 24) | ((param[2] & 0xff) << 16) | ((param[3] & 0xff) << 8) | (param[4] & 0xff));
+		if (npar == 4) request(PaletteSet, ((param[1] & 0xff) << 24) | Color::from(param[2], param[3], param[4]).pack());
 		break;
 
 	default:
+		if (verbose) printf("[vterm] Unknown fbterm specific sequence (%d)!\n", param[0]);
 		break;
 	}
 }
@@ -901,17 +920,28 @@ void VTerm::request_termcap()
 
 	// responds "not supported" to all others
 	sendBack("\eP0+r%04X\e\\", code);
-	printf("[vterm] Unknown termcap sequence (0x%x - %s)!\n", code, termcap_string(code));
+	if (verbose) printf("[vterm] Unknown termcap sequence (0x%x - %s)!\n", code, termcap_string(code));
 }
 
 // CSI [ > m
 void VTerm::set_key_modifier()
 {
-	printf("[vterm] Unknown set_key_modifier (0x%x) (0x%x)\n", param[0], param[1]);
+	if (verbose) printf("[vterm] Unknown set_key_modifier (0x%x) (0x%x)\n", param[0], param[1]);
 }
 
 // CSI [ ? m
 void VTerm::get_key_modifier()
 {
-	printf("[vterm] Unknown get_key_modifier (0x%x)\n", param[0]);
+	if (verbose) printf("[vterm] Unknown get_key_modifier (0x%x)\n", param[0]);
+}
+
+// OCS ST
+void VTerm::osc_end()
+{
+	if (param[0] == 4) {
+		if (npar == 2) request(PaletteSet, ((param[1] & 0xff) << 24) | (param[2] & 0xffffff));
+		return;
+	}
+
+	if (verbose) printf("[vterm] Unknown sequence 'OCS %d'\n", param[0]);
 }

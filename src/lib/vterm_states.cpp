@@ -24,6 +24,7 @@
 // Allows the same state mapping to be repeated 'len' times for the following ASCII characters
 #define ADDSAME(len) ((len) << 8)
 #define ENDSEQ  { ((u16)-1) }
+#define CSPAN(start, end) start | ADDSAME(end - start)
 
 const VTerm::Sequence VTerm::control_sequences[] = {
 	{ 0x00, nullptr, ESkeep },
@@ -75,7 +76,7 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	// EScsi #2 "ESC ["
 	{ '?', &VTerm::set_q_mode,	ESkeep },
 	{ '>', nullptr, ESgreater },
-	{ '0' | ADDSAME(9), &VTerm::param_digit,	ESkeep },
+	{ CSPAN('0', '9'), &VTerm::param_digit, ESkeep },
 	{ ';', &VTerm::next_param, ESkeep },
 	{ ':', &VTerm::next_param, ESkeep }, // some codes use ':' instead of ';' as the argument separator
 	{ '@', &VTerm::insert_char,	ESnormal },
@@ -115,13 +116,14 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	ENDSEQ,
 
 	// ESosc #3 "ESC ]"
-	{ '0', nullptr, ESkeep }, // ignore set window and icon title
-	{ '1', nullptr, ESkeep }, // ignore set icon label
-	{ '2', nullptr, ESkeep }, // ignore set window title
-	{ ';', nullptr, ESkeep }, // next param
-	{ ' ' | ADDSAME(94), nullptr, ESkeep }, // consume printable characters
-	{ 0x07, nullptr, ESnormal },
-	{ 0x1b, nullptr, ESst },
+	{ CSPAN(' ', '~'), nullptr, ESkeep }, // consume printable characters
+	{ CSPAN('0', '9'), &VTerm::param_any_digit, ESkeep },
+	{ CSPAN('a', 'f'), &VTerm::param_any_digit, ESkeep },
+	{ CSPAN('A', 'F'), &VTerm::param_any_digit, ESkeep },
+	{ '#', &VTerm::begin_hex, ESkeep },
+	{ ';', &VTerm::next_param, ESkeep },
+	{ 0x07, &VTerm::osc_end, ESnormal },
+	{ 0x1b, &VTerm::osc_end, ESst },
 
 // FBTerm specific palette codes
 //	{ '0' | ADDSAME(9), &VTerm::set_palette,    ESkeep },
@@ -150,7 +152,7 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	ENDSEQ,
 
 	// ESgreater #8 "ESC [ >"
-	{ '0' | ADDSAME(9), &VTerm::param_digit, ESkeep },
+	{ CSPAN('0', '9'), &VTerm::param_digit, ESkeep },
 	{ ';', &VTerm::next_param,	ESkeep },
 	{ 'c', &VTerm::get_device_attribute, ESnormal }, // Send Device Attributes (Secondary DA)
 	{ 'm', &VTerm::set_key_modifier, ESnormal }, // Set/reset key modifier options
@@ -162,9 +164,9 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	ENDSEQ,
 
 	// EStermcap #10 "ESC P + q"
-	{ '0' | ADDSAME(9), &VTerm::param_hex_digit, ESkeep },
-	{ 'a' | ADDSAME(6), &VTerm::param_hex_digit, ESkeep },
-	{ 'A' | ADDSAME(6), &VTerm::param_hex_digit, ESkeep },
+	{ CSPAN('0', '9'), &VTerm::param_hex_digit, ESkeep },
+	{ CSPAN('a', 'f'), &VTerm::param_hex_digit, ESkeep },
+	{ CSPAN('A', 'F'), &VTerm::param_hex_digit, ESkeep },
 	{ 0x1B, &VTerm::request_termcap, ESst },
 	ENDSEQ,
 

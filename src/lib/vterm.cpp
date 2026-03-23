@@ -113,6 +113,8 @@ VTerm::VTerm(u16 w, u16 h)
 		ambiguous_wide = init_ambiguous_wide();
 	}
 
+	Config::instance()->getOption("verbose", verbose);
+
 	text = 0;
 	attrs = 0;
 	tab_stops = 0;
@@ -513,9 +515,6 @@ void VTerm::do_control_char()
 			if (cur_char > ' ') {
 				fmt = "[vterm] Unexpected char '%c' in '%s' (state #%d), sequence broken\n";
 			}
-
-			bool verbose = false;
-			Config::instance()->getOption("verbose", verbose);
 
 			if (verbose) {
 				printf(fmt, (char) cur_char, EscapeStateToString(esc_state), esc_state);
