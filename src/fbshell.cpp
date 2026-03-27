@@ -393,6 +393,7 @@ FbShell::FbShell()
 		window.y = config.top;
 
 		updateWindow();
+		resize(w(), h());
 	}
 
 	firstShell = false;
