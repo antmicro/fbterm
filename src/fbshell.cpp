@@ -29,7 +29,7 @@
 #include <sys/ioctl.h>
 #include "fbshell.h"
 #include "fbshellman.h"
-#include "fbconfig.h"
+#include "config.h"
 #include "screen.h"
 #include "improxy.h"
 #include "fbterm.h"

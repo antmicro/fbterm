@@ -29,7 +29,7 @@
 #include "fbterm.h"
 #include "fbshell.h"
 #include "fbshellman.h"
-#include "fbconfig.h"
+#include "config.h"
 #include "fbio.h"
 #include "screen.h"
 #include "input.h"

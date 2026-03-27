@@ -23,7 +23,7 @@
 #include "vterm.h"
 #include "../fbshellman.h"
 #include "io.h"
-#include "../fbconfig.h"
+#include "../config.h"
 
 #include <asm/termbits.h>
 #include <sys/ioctl.h>

@@ -23,7 +23,7 @@
 #include FT_GLYPH_H
 #include "font.h"
 #include "screen.h"
-#include "fbconfig.h"
+#include "config.h"
 
 #define OFFSET(TYPE, MEMBER) ((size_t)(&(((TYPE *)0)->MEMBER)))
 #define SUBS(a, b) ((a) > (b) ? (a) - (b) : (b) - (a))
@@ -31,7 +31,7 @@
 
 static FcCharSet *unicodeMap;
 static FcFontSet *fontList;
- 
+
 static FT_Library ftlib;
 static FT_Face *fontFaces;
 static u32 *fontFlags;

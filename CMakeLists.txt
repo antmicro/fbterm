@@ -24,7 +24,7 @@ add_executable(fbterm
 	im/imapi.c
 	im/keycode.c
 
-	src/fbconfig.cpp
+	src/config.cpp
 	src/fbdev.cpp
 	src/fbio.cpp
 	src/fbshell.cpp

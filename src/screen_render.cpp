@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "screen.h"
-#include "fbconfig.h"
+#include "config.h"
 
 #define writeb(addr, val) (*(volatile u8 *)(addr) = (val))
 #define writew(addr, val) (*(volatile u16 *)(addr) = (val))

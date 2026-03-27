@@ -24,7 +24,7 @@
 #include "screen.h"
 #include "font.h"
 #include "fbshellman.h"
-#include "fbconfig.h"
+#include "config.h"
 #include "fbdev.h"
 #ifdef ENABLE_VESA
 #include "vesadev.h"

@@ -32,7 +32,7 @@
 #include "fbshellman.h"
 #include "fbterm.h"
 #include "improxy.h"
-#include "fbconfig.h"
+#include "config.h"
 
 static termios oldTm;
 static long oldKbMode;

@@ -27,7 +27,7 @@
 #include <sys/socket.h>
 #include "improxy.h"
 #include "immessage.h"
-#include "fbconfig.h"
+#include "config.h"
 #include "fbshell.h"
 #include "fbshellman.h"
 #include "font.h"
