@@ -895,7 +895,9 @@ void VTerm::updateWindow() {
 	info->setSize(window.w, window.h);
 	info->setOffset(window.x, window.y);
 
-	reset();
+	if (info->mCols != width || info->mRows != height) {
+		reset();
+	}
 	resize(info->mCols, info->mRows);
 }
 
