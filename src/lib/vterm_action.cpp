@@ -620,6 +620,8 @@ void VTerm::set_display_attr()
 			switch (code) {
 			case 2:
 				if (verbose) printf("[vterm] Received unsupported direct-color sequence!\n");
+				n += 3; // if truecolor, skip the next three params
+				state = State::DEFAULT;
 				break;
 			case 5:
 				state = State::COLOR_INDEXED;
