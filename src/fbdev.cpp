@@ -99,6 +99,14 @@ FbDev::FbDev()
 	mBytesPerLine = finfo.line_length;
 	mVMemBase = (u8 *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbdev_fd, 0);
 
+    if (mVMemBase != MAP_FAILED) {
+#ifdef MADV_DONTFORK
+        madvise(mVMemBase, finfo.smem_len, MADV_DONTFORK);
+#endif
+#ifdef MADV_DONTDUMP
+        madvise(mVMemBase, finfo.smem_len, MADV_DONTDUMP);
+#endif
+    }
 
 	if (mRotateType == Rotate0 || mRotateType == Rotate180) {
 		bool ypan = (vinfo.yres_virtual > vinfo.yres && finfo.ypanstep && !(FH(1) % finfo.ypanstep));
