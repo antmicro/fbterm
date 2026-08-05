@@ -31,6 +31,7 @@ add_executable(fbterm
 	src/fbshellman.cpp
 	src/fbterm.cpp
 	src/font.cpp
+	src/idle_timer.cpp
 	src/improxy.cpp
 	src/input.cpp
 	src/mouse.cpp

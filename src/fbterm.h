@@ -23,6 +23,7 @@
 
 #include "type.h"
 #include "instance.h"
+#include "idle_timer.h"
 
 class FbTerm {
 	DECLARE_INSTANCE(FbTerm)
@@ -34,11 +35,13 @@ public:
 	void processSysKey(u32 key);
 	void processSignal(u32 signo);
 	void initChildProcess();
+	void notifyActivity();
 
 private:
 	void init();
 
 	bool mInit, mRun;
+	IdleTimer *mIdleTimer;
 };
 
 #endif

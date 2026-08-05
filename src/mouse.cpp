@@ -35,6 +35,7 @@ DEFINE_INSTANCE(Mouse)
 #include <linux/keyboard.h>
 #include "fbshellman.h"
 #include "fbshell.h"
+#include "fbterm.h"
 #include "screen.h"
 
 static s32 open_gpm(Gpm_Connect *conn)
@@ -101,6 +102,9 @@ Mouse::~Mouse()
 void Mouse::readyRead(s8 *buf, u32 len)
 {
 	if (len % sizeof(Gpm_Event)) return;
+	if (len) {
+		FbTerm::instance()->notifyActivity();
+	}
 
 	FbShell *shell = FbShellManager::instance()->activeShell();
 	if (!shell) return;

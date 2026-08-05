@@ -207,6 +207,11 @@ void Config::checkConfigFile(const s8 *name)
 		"\n"
 		"# treat ambiguous width characters as wide\n"
 		"#ambiguous-wide=yes\n"
+		"\n"
+		"# execute a command after keyboard and mouse inactivity\n"
+		"# timeout is in seconds; 0 disables the inactivity action\n"
+		"idle-timeout=0\n"
+		"idle-command=\n"
 		;
 
 	struct stat cstat;
@@ -242,6 +247,8 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "font-height", required_argument, 0, 'H' },
 		{ "font-baseline", required_argument, 0, 'B' },
 		{ "ambiguous-wide", no_argument, 0, 'a' },
+		{ "idle-timeout", required_argument, 0, 't' },
+		{ "idle-command", required_argument, 0, 'x' },
 #ifdef ENABLE_VESA
 		{ "vesa-mode", required_argument, 0, 0 },
 #endif
@@ -249,7 +256,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 	};
 
 	s32 index;
-	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:c:C:T:G:R:L:W:H:B:a", options, 0)) != -1) {
+	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:c:C:T:G:R:L:W:H:B:at:x:", options, 0)) != -1) {
 		switch (index) {
 		case 'V':
 			printf("FbTerm version " VERSION "\n");
@@ -281,6 +288,8 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"  -G, --margin-bottom=NUM         specify bottom margin in pixels\n"
 				"  -L, --margin-left=NUM           specify left margin in pixels\n"
 				"  -R, --margin-right=NUM          specify right margin in pixels\n"
+				"  -t, --idle-timeout=NUM          specify idle timeout in seconds (0 disables)\n"
+				"  -x, --idle-command=TEXT         specify idle command to run after inactivity\n"
 #ifdef ENABLE_VESA
 				"      --vesa-mode=NUM           f  force VESA video mode\n"
 				"                  list            display available VESA video modes\n"

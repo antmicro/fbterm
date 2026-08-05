@@ -35,6 +35,7 @@
 #include "input.h"
 #include "input_key.h"
 #include "mouse.h"
+#include "idle_timer.h"
 
 #ifndef WAIT_ANY
 #define WAIT_ANY (-1)
@@ -99,6 +100,7 @@ DEFINE_INSTANCE_DEFAULT(FbTerm)
 
 FbTerm::FbTerm()
 {
+	mIdleTimer = nullptr;
 	mInit = false;
 	init();
 }
@@ -148,6 +150,23 @@ void FbTerm::init()
 	signal(SIGPIPE, SIG_IGN);
 
 	Mouse::instance();
+
+	u32 idleTimeout = 0;
+	s8 idleCommand[1024];
+	Config::instance()->getOption("idle-timeout", idleTimeout);
+	Config::instance()->getOption("idle-command", idleCommand, sizeof(idleCommand));
+
+	if (idleTimeout) {
+		if (!idleCommand[0]) {
+			fprintf(stderr, "idle-timeout requires idle-command\n");
+		} else {
+			mIdleTimer = new IdleTimer(idleTimeout, idleCommand);
+			if (!mIdleTimer->valid()) {
+				delete mIdleTimer;
+				mIdleTimer = nullptr;
+			}
+		}
+	}
 	mInit = true;
 }
 
@@ -195,6 +214,9 @@ void FbTerm::processSignal(u32 signo)
 		break;
 
 	case SIGUSR1:
+		if (mIdleTimer) {
+			mIdleTimer->setActive(false);
+		}
 		FbShellManager::instance()->switchVc(false);
 		Screen::instance()->switchVc(false);
 		TtyInput::instance()->switchVc(false);
@@ -207,12 +229,15 @@ void FbTerm::processSignal(u32 signo)
 		TtyInput::instance()->switchVc(true);
 		Screen::instance()->switchVc(true);
 		FbShellManager::instance()->switchVc(true);
+		if (mIdleTimer) {
+			mIdleTimer->setActive(true);
+		}
 		break;
 
 	case SIGCHLD:
 		if (mRun) {
-			s32 pid = waitpid(WAIT_ANY, 0, WNOHANG);
-			if (pid > 0) {
+			s32 pid;
+			while ((pid = waitpid(WAIT_ANY, 0, WNOHANG)) > 0) {
 				FbShellManager::instance()->childProcessExited(pid);
 			}
 		}
@@ -288,6 +313,13 @@ void FbTerm::initChildProcess()
 #endif
 
 	signal(SIGPIPE, SIG_DFL);
+}
+
+void FbTerm::notifyActivity()
+{
+	if (mIdleTimer) {
+		mIdleTimer->activity();
+	}
 }
 
 int main(int argc, char **argv)

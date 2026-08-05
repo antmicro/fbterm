@@ -170,6 +170,10 @@ void TtyInput::setupSysKey(bool restore)
 
 void TtyInput::readyRead(s8 *buf, u32 len)
 {
+	if (len) {
+		FbTerm::instance()->notifyActivity();
+	}
+
 	if (mRawMode) {
 		processRawKeys(buf, len);
 		return;
