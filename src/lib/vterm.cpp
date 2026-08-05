@@ -38,7 +38,7 @@ WindowInfo::~WindowInfo() {
 
 }
 
-VTerm::CharAttr VTerm::default_char_attr = { 0, 0, 1, 0, 0, 0, 0, VTerm::CharAttr::Single };
+VTerm::CharAttr VTerm::default_char_attr = { 0, 0, 1, 0, 0, 0, 0, 0, VTerm::CharAttr::Single };
 
 VTerm::CharAttr VTerm::normal_char_attr()
 {

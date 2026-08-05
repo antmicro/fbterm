@@ -243,7 +243,7 @@ void Screen::eraseMargin(bool top, u16 h)
 	}
 }
 
-void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
+void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st)
 {
 	u32 startx, fw = FW(1);
 
@@ -254,7 +254,7 @@ void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
 		if (*text == 0x20) {
 			if (draw_text) {
 				draw_text = false;
-				drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw);
+				drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw, ul, st);
 			}
 
 			if (!draw_space) {
@@ -280,16 +280,16 @@ void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
 	}
 
 	if (draw_text) {
-		drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw);
+		drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw, ul, st);
 	} else if (draw_space) {
 		fillRect(startx, y, x - startx, FH(1), bc);
 	}
 }
 
-void Screen::drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw)
+void Screen::drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st)
 {
 	for (; num--; text++, dw++) {
-		drawGlyph(x, y, fc, bc, *text, *dw);
+		drawGlyph(x, y, fc, bc, *text, *dw, ul, st);
 		x += *dw ? FW(2) : FW(1);
 	}
 }
@@ -315,7 +315,7 @@ void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color)
 	}
 }
 
-void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw)
+void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, bool st)
 {
 	if (x >= mWidth || y >= mHeight) return;
 
@@ -354,6 +354,8 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw)
 	s32 bot = top + height;
 	if (h > bot) fillRect(x, y + bot, w, h - bot, bc);
 
+	u32 cellx = x, celly = y;
+
 	x += left;
 	y += top;
 	if (x >= mWidth || y >= mHeight || !width || !height) return;
@@ -379,6 +381,9 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw)
 		if ((mScrollType == YWrap) && y > mOffsetMax) y -= mOffsetMax + 1;
 		(this->*draw)(x + mOffsetLeft, y + mOffsetTop, nwidth, fc, bc, pixmap);
 	}
+
+	if (st) fillRect(cellx, celly + h / 2, w, 1, fc);  // strikethrough
+	if (ul) fillRect(cellx, celly + h - 2, w, 1, fc);  // underline
 }
 
 void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)
