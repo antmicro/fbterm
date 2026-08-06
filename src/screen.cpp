@@ -243,7 +243,7 @@ void Screen::eraseMargin(bool top, u16 h)
 	}
 }
 
-void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st)
+void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it)
 {
 	u32 startx, fw = FW(1);
 
@@ -254,7 +254,7 @@ void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, 
 		if (*text == 0x20) {
 			if (draw_text) {
 				draw_text = false;
-				drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw, ul, st);
+				drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw, ul, st, it);
 			}
 
 			if (!draw_space) {
@@ -280,16 +280,16 @@ void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, 
 	}
 
 	if (draw_text) {
-		drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw, ul, st);
+		drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw, ul, st, it);
 	} else if (draw_space) {
 		fillRect(startx, y, x - startx, FH(1), bc);
 	}
 }
 
-void Screen::drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st)
+void Screen::drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it)
 {
 	for (; num--; text++, dw++) {
-		drawGlyph(x, y, fc, bc, *text, *dw, ul, st);
+		drawGlyph(x, y, fc, bc, *text, *dw, ul, st, it);
 		x += *dw ? FW(2) : FW(1);
 	}
 }
@@ -315,7 +315,7 @@ void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color)
 	}
 }
 
-void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, bool st)
+void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, bool st, bool it)
 {
 	if (x >= mWidth || y >= mHeight) return;
 
@@ -323,7 +323,7 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, b
 	if (x + w > mWidth) w = mWidth - x;
 	if (y + h > mHeight) h = mHeight - y;
 
-	Font::Glyph *glyph = (Font::Glyph *)Font::instance()->getGlyph(code);
+	Font::Glyph *glyph = (Font::Glyph *)Font::instance()->getGlyph(code, it);
 	if (!glyph) {
 		fillRect(x, y, w, h, bc);
 		return;

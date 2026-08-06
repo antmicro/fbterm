@@ -21,6 +21,7 @@
 #include <fontconfig/fontconfig.h>
 #include <ft2build.h>
 #include FT_GLYPH_H
+#include FT_OUTLINE_H
 #include "font.h"
 #include "screen.h"
 #include "config.h"
@@ -111,9 +112,9 @@ Font::Font()
 	fontFlags = new u32[fontList->nfont];
 	memset(fontFaces, 0, sizeof(FT_Face) * fontList->nfont);
 
-	glyphCache = new Glyph *[256 * 256];
-	glyphCacheInited = new bool[256];
-	memset(glyphCacheInited, 0, sizeof(bool) * 256);
+	glyphCache = new Glyph *[2 * 256 * 256];
+	glyphCacheInited = new bool[2 * 256];
+	memset(glyphCacheInited, 0, sizeof(bool) * 2 * 256);
 
 	FT_Init_FreeType(&ftlib);
 	openFont(0);
@@ -181,7 +182,7 @@ Font::Font()
 
 Font::~Font()
 {
-	for (u32 i = 0; i < 256; i++) {
+	for (u32 i = 0; i < 2 * 256; i++) {
 		if (!glyphCacheInited[i]) continue;
 
 		for (u32 j = 0; j < 256; j++) {
@@ -288,16 +289,18 @@ static int fontIndex(u32 unicode)
 	return -1;
 }
 
-Font::Glyph *Font::getGlyph(u32 unicode)
+Font::Glyph *Font::getGlyph(u32 unicode, bool italic)
 {
 	if (unicode >= 256 * 256) return 0;
 
-	if (!glyphCacheInited[unicode >> 8]) {
-		glyphCacheInited[unicode >> 8] = true;
-		memset(&glyphCache[unicode & 0xff00], 0, sizeof(Glyph *) * 256);
+	u32 cacheKey = unicode | (italic << 16);
+
+	if (!glyphCacheInited[cacheKey >> 8]) {
+		glyphCacheInited[cacheKey >> 8] = true;
+		memset(&glyphCache[cacheKey & ~0xffU], 0, sizeof(Glyph *) * 256);
 	}
 
-	if (glyphCache[unicode]) return glyphCache[unicode];
+	if (glyphCache[cacheKey]) return glyphCache[cacheKey];
 
 	int i = fontIndex(unicode);
 	if (i == -1) return 0;
@@ -309,7 +312,14 @@ Font::Glyph *Font::getGlyph(u32 unicode)
 	FT_UInt index = FT_Get_Char_Index(face, (FT_ULong)unicode);
 	if (!index) return 0;
 
-	FT_Load_Glyph(face, index, FT_LOAD_RENDER | fontFlags[i]);
+	FT_Load_Glyph(face, index, fontFlags[i]);
+
+	if (italic && face->glyph->format == FT_GLYPH_FORMAT_OUTLINE) {
+		FT_Matrix matrix = { 1 << 16, 1 << 14, 0, 1 << 16 };
+		FT_Outline_Transform(&face->glyph->outline, &matrix);
+	}
+
+	FT_Render_Glyph(face->glyph, FT_LOAD_TARGET_MODE(fontFlags[i]));
 	FT_Bitmap &bitmap = face->glyph->bitmap;
 
 	u32 x, y, w, h, nx, ny, nw, nh;
@@ -342,6 +352,6 @@ Font::Glyph *Font::getGlyph(u32 unicode)
 		}
 	}
 
-	glyphCache[unicode] = glyph;
+	glyphCache[cacheKey] = glyph;
 	return glyph;
 }

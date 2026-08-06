@@ -36,7 +36,7 @@ public:
 		u8 pixmap[0];
 	};
 
-	Glyph *getGlyph(u32 unicode);
+	Glyph *getGlyph(u32 unicode, bool italic = false);
 	u32 width() {
 		return mWidth;
 	}

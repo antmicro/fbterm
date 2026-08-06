@@ -412,7 +412,8 @@ void FbShell::drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars,
 	if (manager->activeShell() != this) return;
 
 	adjustCharAttr(attr);
-	screen->drawText(FW(x), FH(y), attr.fcolor, attr.bcolor, num, chars, dws, attr.underline, attr.strike);
+	screen->drawText(FW(x), FH(y), attr.fcolor, attr.bcolor, num, chars, dws, 
+		attr.underline, attr.strike, attr.italic);
 
 	if (mImProxy) {
 		Rectangle rect = { FW(x), FH(y), FW(w), FH(1) };
@@ -707,7 +708,7 @@ void FbShell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 		u16 code = charCode(x, y);
 
 		if (attr.type == CharAttr::DoubleRight) x--;
-		screen->drawText(FW(x), FH(y), attr.bcolor, attr.fcolor, 1, &code, &dw, attr.underline, attr.strike);
+		screen->drawText(FW(x), FH(y), attr.bcolor, attr.fcolor, 1, &code, &dw, attr.underline, attr.strike, attr.italic);
 
 		mMousePointer.x = x;
 		mMousePointer.y = y;
@@ -747,8 +748,7 @@ void FbShell::expose(u16 x, u16 y, u16 w, u16 h)
 
 void FbShell::adjustCharAttr(CharAttr &attr)
 {
-	if (attr.italic) attr.fcolor = 2; // green
-	else if (attr.intensity == 0) attr.fcolor = 8; // gray
+	if (attr.intensity == 0) attr.fcolor = 8; // gray
 
 	if (attr.blink && attr.bcolor < 8) attr.bcolor ^= 8;
 	if (attr.intensity == 2 && attr.fcolor < 8) attr.fcolor ^= 8;
