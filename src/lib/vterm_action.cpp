@@ -757,10 +757,10 @@ void VTerm::set_charset()
 
 	switch (cur_char) {
 	case '0':
-		m = Lat1Map;
+		m = GrafMap;
 		break;
 	case 'B':
-		m = GrafMap;
+		m = Lat1Map;
 		break;
 	case 'U':
 		m = IbmpcMap;
@@ -771,6 +771,7 @@ void VTerm::set_charset()
 	default:
 		break;
 	}
+	if (g0_is_current == g0_is_active) charset = m;
 }
 
 void VTerm::active_g0()

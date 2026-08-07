@@ -334,7 +334,7 @@ void VTerm::input(const u8 *buf, u32 count)
 		/* Do no translation at all in control states */
 		if (esc_state != ESnormal) {
 			tc = c;
-		} else if (utf8 && (!mode_flags.display_ctrl || c < 0x20)) {
+		} else if (utf8 && charset == Lat1Map && (!mode_flags.display_ctrl || c < 0x20)) {
 			rescan_last_byte:
 			if ((c & 0xc0) == 0x80) {
 				/* Continuation byte received */
