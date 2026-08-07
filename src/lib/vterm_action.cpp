@@ -53,7 +53,7 @@ void VTerm::tab()
 	u16 x = 0;
 
 	for (u16 i=cursor_x + 1; i < width; i++) {
-		s8 a = tab_stops[i/8];
+		s8 a = grid->tab_stops[i/8];
 		if (a && (a & (1 << (i % 8)))) {
 			x = i;
 			break;
@@ -68,7 +68,7 @@ void VTerm::tab()
 
 void VTerm::set_tab()
 {
-	tab_stops[cursor_x / 8] |=  (1 << (cursor_x % 8));
+	grid->tab_stops[cursor_x / 8] |=  (1 << (cursor_x % 8));
 }
 
 // CSI g
@@ -80,9 +80,9 @@ void VTerm::clear_tab()
 	}
 
 	if (param[0] == 3) {
-		memset(tab_stops, 0, max_width / 8 + 1);
+		memset(grid->tab_stops, 0, max_width / 8 + 1);
 	} else if (param[0] == 0) {
-		tab_stops[cursor_x / 8] &= ~(1 << (cursor_x % 8));
+		grid->tab_stops[cursor_x / 8] &= ~(1 << (cursor_x % 8));
 	}
 }
 
@@ -148,13 +148,13 @@ void VTerm::save_cursor()
 		return;
 	}
 
-	s_g0_charset = g0_charset;
-	s_g1_charset = g1_charset;
-	s_g0_is_active = g0_is_active;
+	grid->saved_cursor.g0_charset = g0_charset;
+	grid->saved_cursor.g1_charset = g1_charset;
+	grid->saved_cursor.g0_is_active = g0_is_active;
 
-	s_cursor_x = cursor_x;
-	s_cursor_y = cursor_y;
-	s_char_attr = char_attr;
+	grid->saved_cursor.x = cursor_x;
+	grid->saved_cursor.y = cursor_y;
+	grid->saved_cursor.char_attr = char_attr;
 }
 
 void VTerm::window_ops()
@@ -205,13 +205,13 @@ void VTerm::window_ops()
 
 void VTerm::restore_cursor()
 {
-	g0_charset = s_g0_charset;
-	g1_charset = s_g1_charset;
-	g0_is_active = s_g0_is_active;
+	g0_charset = grid->saved_cursor.g0_charset;
+	g1_charset = grid->saved_cursor.g1_charset;
+	g0_is_active = grid->saved_cursor.g0_is_active;
 	charset = (g0_is_active ? g0_charset : g1_charset);
 
-	char_attr = s_char_attr;
-	move_cursor(s_cursor_x, s_cursor_y);
+	char_attr = grid->saved_cursor.char_attr;
+	move_cursor(grid->saved_cursor.x, grid->saved_cursor.y);
 }
 
 void VTerm::next_line()
@@ -454,12 +454,12 @@ void VTerm::screen_clear()
 void VTerm::screen_align()
 {
 	for (u16 y = 0; y < height; y++) {
-		u32 yp = linenumbers[y] * max_width;
+		u32 yp = grid->linenumbers[y] * max_width;
 		changed_line(y, 0, width - 1);
 
 		for (u16 x = 0; x < width; x++) {
-			text[yp + x] = 'E';
-			attrs[yp + x] = normal_char_attr();
+			grid->text[yp + x] = 'E';
+			grid->attrs[yp + x] = normal_char_attr();
 		}
 	}
 }
@@ -563,6 +563,9 @@ void VTerm::enable_mode(bool enable)
 	case 1025 :
 		mode_flags.cursor_visible = enable;
 		modeChanged(CursorVisible);
+		break;
+	case 2049: // ?1049
+		switchBuffer(enable ? ScreenBufferType::Alternate : ScreenBufferType::Primary);
 		break;
 	case 2000 :
 		mode_flags.mouse_report = (enable ? MouseX11 : MouseNone);

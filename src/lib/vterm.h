@@ -97,6 +97,33 @@ public:
 		VcSwitch, VesaPowerIntervalSet,
 	} RequestType;
 
+	typedef enum {
+		Primary,
+		Alternate
+	} ScreenBufferType;
+
+	typedef enum { Lat1Map = 0, GrafMap, IbmpcMap, UserMap } CharsetMap;
+
+	struct CursorState {
+		u16 x, y;
+		CharAttr char_attr;
+		CharsetMap g0_charset, g1_charset;
+		bool g0_is_active;
+	};
+
+	typedef struct {
+		u16 *text;
+		CharAttr *attrs;
+		s8 *tab_stops;
+		u16 *linenumbers;
+		u16 *dirty_startx, *dirty_endx;
+
+		// live cursor state, stashed here while this buffer isn't active
+		CursorState cursor;
+		// DECSC/DECRC save slot, kept per buffer so alt/primary don't clobber each other
+		CursorState saved_cursor;
+	} GridState;
+
 	VTerm(u16 w = 0, u16 h = 0);
 	virtual ~VTerm();
 
@@ -109,10 +136,12 @@ public:
 	void expose(u16 x, u16 y, u16 w, u16 h);
 	void inverse(u16 sx, u16 sy, u16 ex, u16 ey);
 
-	u16 charCode(u16 x, u16 y) { return text[get_line(y) * max_width + x]; }
-	CharAttr charAttr(u16 x, u16 y) { return attrs[get_line(y) * max_width + x]; }
+	u16 charCode(u16 x, u16 y) { return grid->text[get_line(y) * max_width + x]; }
+	CharAttr charAttr(u16 x, u16 y) { return grid->attrs[get_line(y) * max_width + x]; }
 
 	static s32 charWidth(u32 ucs);
+	void switchBuffer(ScreenBufferType buffer);
+	VTerm::ScreenBufferType getActiveBuffer(void);
 
 protected:
 	virtual void drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars, bool *dws) = 0;
@@ -143,6 +172,7 @@ private:
 	void encode_termcap_number(s8* output, s32 size, s32 value);
 	u16 get_line(u16 y);
 	u16 total_history_lines() { return history_full ? history_lines : history_save_line; }
+	void reset_alt_screen();
 
 	// terminal actions
 	void set_q_mode();
@@ -285,21 +315,16 @@ private:
 
 	//charset
 
-	typedef enum { Lat1Map = 0, GrafMap, IbmpcMap, UserMap } CharsetMap;
-
 	bool utf8;
 	bool g0_is_current;
-	bool g0_is_active, s_g0_is_active;
+	bool g0_is_active;
 	CharsetMap charset;
 	CharsetMap g0_charset, g1_charset;
-	CharsetMap s_g0_charset, s_g1_charset;
 
 	// terminal info
-	u16 *text;
-	CharAttr *attrs;
-	s8 *tab_stops;
-	u16 *linenumbers;
-	u16 *dirty_startx, *dirty_endx;
+	GridState primary_grid;
+	GridState alt_grid;
+	GridState* grid = &primary_grid;
 
 	u16 width, height, max_width, max_height;
 	u16 scroll_top, scroll_bot;
@@ -327,12 +352,13 @@ private:
 		u16 cursor_shape : 3;
 	} mode_flags;
 
-	u16 cursor_x, cursor_y, s_cursor_x, s_cursor_y;
-	CharAttr char_attr, s_char_attr;
+	u16 cursor_x, cursor_y;
+	CharAttr char_attr;
 
 	static CharAttr default_char_attr;
 	u8 cur_fcolor, cur_bcolor;
 	s8 cur_underline_color, cur_halfbright_color;
+	ScreenBufferType active_buffer = Primary;
 
 	// action parameters
 	#define NPAR 16

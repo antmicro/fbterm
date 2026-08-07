@@ -115,12 +115,19 @@ VTerm::VTerm(u16 w, u16 h)
 
 	Config::instance()->getOption("verbose", verbose);
 
-	text = 0;
-	attrs = 0;
-	tab_stops = 0;
-	linenumbers = 0;
-	dirty_startx = 0;
-	dirty_endx = 0;
+	primary_grid.text = nullptr;
+	primary_grid.attrs = nullptr;
+	primary_grid.tab_stops = nullptr;
+	primary_grid.linenumbers = nullptr;
+	primary_grid.dirty_startx = nullptr;
+	primary_grid.dirty_endx = nullptr;
+
+	alt_grid.text = nullptr;
+	alt_grid.attrs = nullptr;
+	alt_grid.tab_stops = nullptr;
+	alt_grid.linenumbers = nullptr;
+	alt_grid.dirty_startx = nullptr;
+	alt_grid.dirty_endx = nullptr;
 
 	width = height = 0;
 	max_width = max_height = 0;
@@ -135,14 +142,19 @@ VTerm::VTerm(u16 w, u16 h)
 
 VTerm::~VTerm()
 {
-	if (!text) return;
+	GridState *grids[2] = {&primary_grid, &alt_grid};
 
-	delete[] text;
-	delete[] attrs;
-	delete[] tab_stops;
-	delete[] linenumbers;
-	delete[] dirty_startx;
-	delete[] dirty_endx;
+	for (u32 i = 0; i < 2; i++) {
+		GridState *g = grids[i];
+		if (!g->text) continue;
+
+		delete[] g->text;
+		delete[] g->attrs;
+		delete[] g->tab_stops;
+		delete[] g->linenumbers;
+		delete[] g->dirty_startx;
+		delete[] g->dirty_endx;
+	}
 }
 
 void VTerm::reset()
@@ -160,17 +172,23 @@ void VTerm::reset()
 	scroll_top = 0;
 	scroll_bot = height ? (height - 1) : 0;
 	cursor_x = cursor_y = 0;
-	s_cursor_x = s_cursor_y = 0;
 
 	mode_flags = ModeFlag();
-	char_attr = s_char_attr = default_char_attr;
+	char_attr = default_char_attr;
 	cur_fcolor = default_char_attr.fcolor;
 	cur_bcolor = default_char_attr.bcolor;
 	cur_underline_color = -1;
 	cur_halfbright_color = -1;
 
-	if (text) {
-		memset(tab_stops, 0, max_width / 8 + 1);
+	GridState *grids[2] = {&primary_grid, &alt_grid};
+	for (u32 i = 0; i < 2; i++) {
+		CursorState blank = {0, 0, default_char_attr, Lat1Map, GrafMap, true};
+		grids[i]->cursor = blank;
+		grids[i]->saved_cursor = blank;
+	}
+
+	if (grid->text) {
+		memset(grid->tab_stops, 0, max_width / 8 + 1);
 		clear_area(0, 0, width - 1, height - 1);
 	}
 
@@ -189,11 +207,11 @@ void VTerm::resize(u16 w, u16 h)
 		s8 *new_tab_stops = new s8[new_max_width / 8 + 1];
 		memset(new_tab_stops, 0, new_max_width / 8 + 1);
 
-		if (tab_stops) {
-			memcpy(new_tab_stops, tab_stops, max_width / 8 + 1);
-			delete[] tab_stops;
+		if (grid->tab_stops) {
+			memcpy(new_tab_stops, grid->tab_stops, max_width / 8 + 1);
+			delete[] grid->tab_stops;
 		}
-		tab_stops = new_tab_stops;
+		grid->tab_stops = new_tab_stops;
 	} else if (w > width) {
 
 	}
@@ -204,35 +222,35 @@ void VTerm::resize(u16 w, u16 h)
 		u16 *new_dirty_endx = new u16[new_max_height];
 
 		for (u16 i = 0; i < new_max_height; i++) {
-			bool orig = (linenumbers && i < height);
-			new_linenumbers[i] = orig ? linenumbers[i] : (history_lines + i);
-			new_dirty_startx[i] = orig ? dirty_startx[i] : w;
-			new_dirty_endx[i] = orig ? dirty_endx[i] : 0;
+			bool orig = (grid->linenumbers && i < height);
+			new_linenumbers[i] = orig ? grid->linenumbers[i] : (history_lines + i);
+			new_dirty_startx[i] = orig ? grid->dirty_startx[i] : w;
+			new_dirty_endx[i] = orig ? grid->dirty_endx[i] : 0;
 		}
 
-		if (linenumbers) {
-			delete[] linenumbers;
-			delete[] dirty_startx;
-			delete[] dirty_endx;
+		if (grid->linenumbers) {
+			delete[] grid->linenumbers;
+			delete[] grid->dirty_startx;
+			delete[] grid->dirty_endx;
 		}
 
-		linenumbers = new_linenumbers;
-		dirty_startx = new_dirty_startx;
-		dirty_endx = new_dirty_endx;
+		grid->linenumbers = new_linenumbers;
+		grid->dirty_startx = new_dirty_startx;
+		grid->dirty_endx = new_dirty_endx;
 	}
 
 	if (new_max_width > max_width || new_max_height > max_height) {
 		u16 *new_text = new u16[new_max_width * (history_lines + new_max_height)];
 		CharAttr *new_attrs = new CharAttr[new_max_width * (history_lines + new_max_height)];
 
-		if (text) {
+		if (grid->text) {
 			u32 start, new_start;
 			u16 history_copy_lines = (history_full ? history_lines : history_save_line);
 			for (u16 i = 0; i < history_copy_lines; i++) {
 				start = i * max_width;
 				new_start = i * new_max_width;
-				memcpy(&new_text[new_start], &text[start], sizeof(*text) * max_width);
-				memcpy(&new_attrs[new_start], &attrs[start], sizeof(*attrs) * max_width);
+				memcpy(&new_text[new_start], &grid->text[start], sizeof(*grid->text) * max_width);
+				memcpy(&new_attrs[new_start], &grid->attrs[start], sizeof(*grid->attrs) * max_width);
 
 				for (u16 j = max_width; j < new_max_width; j++) {
 					new_text[new_start + j] = ' ';
@@ -243,16 +261,16 @@ void VTerm::resize(u16 w, u16 h)
 			for (u16 i = 0; i < max_height; i++) {
 				start = (history_lines + i) * max_width;
 				new_start = (history_lines + i) * new_max_width;
-				memcpy(&new_text[new_start], &text[start], sizeof(*text) * max_width);
-				memcpy(&new_attrs[new_start], &attrs[start], sizeof(*attrs) * max_width);
+				memcpy(&new_text[new_start], &grid->text[start], sizeof(*grid->text) * max_width);
+				memcpy(&new_attrs[new_start], &grid->attrs[start], sizeof(*grid->attrs) * max_width);
 			}
 
-			delete[] text;
-			delete[] attrs;
+			delete[] grid->text;
+			delete[] grid->attrs;
 		}
 
-		text = new_text;
-		attrs = new_attrs;
+		grid->text = new_text;
+		grid->attrs = new_attrs;
 		max_width = new_max_width;
 		max_height = new_max_height;
 	}
@@ -454,15 +472,15 @@ void VTerm::do_normal_char()
 
 	bool dw = (cw == 2);
 
-	u32 yp = linenumbers[cursor_y] * max_width;
+	u32 yp = grid->linenumbers[cursor_y] * max_width;
 	if ((!dw && cursor_x >= width) || (dw && (cursor_x >= width - 1))) {
 		if (mode_flags.auto_wrap) {
 			if (dw && cursor_x == width - 1) {
-				text[yp + cursor_x] = ' ';
-				attrs[yp + cursor_x] = erase_char_attr();
+				grid->text[yp + cursor_x] = ' ';
+				grid->attrs[yp + cursor_x] = erase_char_attr();
 			}
 			next_line();
-			yp = linenumbers[cursor_y] * max_width;
+			yp = grid->linenumbers[cursor_y] * max_width;
 		} else {
 			if (!dw) {
 				cursor_x = width - 1;
@@ -477,24 +495,24 @@ void VTerm::do_normal_char()
 
 		u16 step = dw ? 2 : 1;
 		for (u16 i = width - step - 1; i >= cursor_x; i--) {
-			text[yp + i + step] = text[yp + i];
-			attrs[yp + i + step] = attrs[yp + i];
+			grid->text[yp + i + step] = grid->text[yp + i];
+			grid->attrs[yp + i + step] = grid->attrs[yp + i];
 		}
 	} else {
 		changed_line(cursor_y, cursor_x, cursor_x + (dw ? 1 : 0));
 	}
 
-	text[yp + cursor_x] = cur_char;
-	attrs[yp + cursor_x] = normal_char_attr();
+	grid->text[yp + cursor_x] = cur_char;
+	grid->attrs[yp + cursor_x] = normal_char_attr();
 
 	if (dw) {
-		attrs[yp + cursor_x++].type = CharAttr::DoubleLeft;
+		grid->attrs[yp + cursor_x++].type = CharAttr::DoubleLeft;
 
-		text[yp + cursor_x] = cur_char;
-		attrs[yp + cursor_x] = normal_char_attr();
-		attrs[yp + cursor_x++].type = CharAttr::DoubleRight;
+		grid->text[yp + cursor_x] = cur_char;
+		grid->attrs[yp + cursor_x] = normal_char_attr();
+		grid->attrs[yp + cursor_x++].type = CharAttr::DoubleRight;
 	} else {
-		attrs[yp + cursor_x++].type = CharAttr::Single;
+		grid->attrs[yp + cursor_x++].type = CharAttr::Single;
 	}
 }
 
@@ -547,18 +565,18 @@ void VTerm::update()
 		if (!moveChars(0, sy, 0, dy, width, h)) {
 			for (; h--; dy++) {
 				if (dy >= height) break;
-				dirty_startx[dy] = 0;
-				dirty_endx[dy] = width - 1;
+				grid->dirty_startx[dy] = 0;
+				grid->dirty_endx[dy] = width - 1;
 			}
 		}
 	}
 	pending_scroll = 0;
 
 	for (u16 i = 0; i < height; i++) {
-		if (dirty_endx[i] >= dirty_startx[i]) {
-			requestUpdate(dirty_startx[i], i, dirty_endx[i] - dirty_startx[i] + 1, 1);
-			dirty_startx[i] = width;
-			dirty_endx[i] = 0;
+		if (grid->dirty_endx[i] >= grid->dirty_startx[i]) {
+			requestUpdate(grid->dirty_startx[i], i, grid->dirty_endx[i] - grid->dirty_startx[i] + 1, 1);
+			grid->dirty_startx[i] = width;
+			grid->dirty_endx[i] = 0;
 		}
 	}
 }
@@ -567,12 +585,12 @@ void VTerm::draw_cursor()
 {
 	if (!mode(CursorVisible)) return;
 
-	u32 yp = linenumbers[cursor_y] * max_width + cursor_x;
+	u32 yp = grid->linenumbers[cursor_y] * max_width + cursor_x;
 
-	CharAttr attr = attrs[yp];
+	CharAttr attr = grid->attrs[yp];
 	attr.reverse ^= mode_flags.inverse_screen;
 
-	drawCursor(attr, cursor_x, cursor_y, text[yp]);
+	drawCursor(attr, cursor_x, cursor_y, grid->text[yp]);
 }
 
 void VTerm::encode_termcap_number(s8* output, s32 size, s32 value)
@@ -607,28 +625,28 @@ void VTerm::expose(u16 x, u16 y, u16 w, u16 h)
 		u16 startx = x;
 		u16 endx = x + w - 1;
 
-		if (attrs[yp + startx].type == CharAttr::DoubleRight) startx--;
-		if (attrs[yp + endx].type == CharAttr::DoubleLeft) endx++;
+		if (grid->attrs[yp + startx].type == CharAttr::DoubleRight) startx--;
+		if (grid->attrs[yp + endx].type == CharAttr::DoubleLeft) endx++;
 
-		CharAttr attr = attrs[yp + startx];
+		CharAttr attr = grid->attrs[yp + startx];
 		bool dws[width];
 		u16 codes[width], num = 0;
 		u16 cur, start = startx;
 
 		for (cur = startx; cur <= endx; cur++) {
-			if (attrs[yp + cur].type == CharAttr::DoubleRight) continue;
+			if (grid->attrs[yp + cur].type == CharAttr::DoubleRight) continue;
 
-			if (attrs[yp + cur] != attr) {
+			if (grid->attrs[yp + cur] != attr) {
 				attr.reverse ^= mode_flags.inverse_screen;
 				drawChars(attr, start, y, cur - start, num, codes, dws);
 
 				num = 0;
 				start = cur;
-				attr = attrs[yp + cur];
+				attr = grid->attrs[yp + cur];
 			}
 
-			dws[num] = (attrs[yp + cur].type != CharAttr::Single);
-			codes[num++] = text[yp + cur];
+			dws[num] = (grid->attrs[yp + cur].type != CharAttr::Single);
+			codes[num++] = grid->text[yp + cur];
 		}
 
 		attr.reverse ^= mode_flags.inverse_screen;
@@ -649,7 +667,7 @@ void VTerm::inverse(u16 sx, u16 sy, u16 ex, u16 ey)
 		u16 end = (y == ey) ? ex : (w() - 1);
 
 		for (u16 x = start; x <= end; x++) {
-			attrs[yp + x].reverse ^= 1;
+			grid->attrs[yp + x].reverse ^= 1;
 		}
 	}
 }
@@ -676,10 +694,10 @@ void VTerm::scroll_region(u16 start_y, u16 end_y, s16 num)
 
 	if (fast_scroll) pending_scroll += num;
 
-	memcpy(temp, linenumbers, sizeof(temp));
+	memcpy(temp, grid->linenumbers, sizeof(temp));
 	if (fast_scroll) {
-		memcpy(temp_sx, dirty_startx, sizeof(temp_sx));
-		memcpy(temp_ex, dirty_endx, sizeof(temp_ex));
+		memcpy(temp_sx, grid->dirty_startx, sizeof(temp_sx));
+		memcpy(temp_ex, grid->dirty_endx, sizeof(temp_ex));
 	}
 
 	// move the lines by renumbering where they point to
@@ -690,14 +708,14 @@ void VTerm::scroll_region(u16 start_y, u16 end_y, s16 num)
 			if (takey<start_y) takey = end_y+1-(start_y-takey);
 			if (takey>end_y) takey = start_y-1+(takey-end_y);
 
-			linenumbers[y] = temp[takey];
+			grid->linenumbers[y] = temp[takey];
 
 			if (!fast_scroll || clr) {
-				dirty_startx[y] = 0;
-				dirty_endx[y] = width-1;
+				grid->dirty_startx[y] = 0;
+				grid->dirty_endx[y] = width-1;
 			} else {
-				dirty_startx[y] = temp_sx[takey];
-				dirty_endx[y] = temp_ex[takey];
+				grid->dirty_startx[y] = temp_sx[takey];
+				grid->dirty_endx[y] = temp_ex[takey];
 			}
 
 			if (clr) {
@@ -711,7 +729,7 @@ void VTerm::shift_text(u16 y, u16 start_x, u16 end_x, s16 num)
 {
 	if (!num) return;
 
-	u32 yp = linenumbers[y]*max_width;
+	u32 yp = grid->linenumbers[y]*max_width;
 
 	u16 mx = end_x-start_x+1;
 	if (num>mx)	num = mx;
@@ -719,19 +737,19 @@ void VTerm::shift_text(u16 y, u16 start_x, u16 end_x, s16 num)
 
 	if (num<mx && -num<mx) {
 		if (num<0) {
-			memmove(text+yp+start_x, text+yp+start_x-num, sizeof(*text) * (mx+num));
-			memmove(attrs+yp+start_x, attrs+yp+start_x-num, sizeof(*attrs) * (mx+num));
+			memmove(grid->text+yp+start_x, grid->text+yp+start_x-num, sizeof(*grid->text) * (mx+num));
+			memmove(grid->attrs+yp+start_x, grid->attrs+yp+start_x-num, sizeof(*grid->attrs) * (mx+num));
 		} else {
-			memmove(text+yp+start_x+num, text+yp+start_x, sizeof(*text) * (mx-num));
-			memmove(attrs+yp+start_x+num, attrs+yp+start_x, sizeof(*attrs) * (mx-num));
+			memmove(grid->text+yp+start_x+num, grid->text+yp+start_x, sizeof(*grid->text) * (mx-num));
+			memmove(grid->attrs+yp+start_x+num, grid->attrs+yp+start_x, sizeof(*grid->attrs) * (mx-num));
 		}
 	}
 
 	u16 x = (num < 0) ? (num + end_x + 1) : start_x;
 	if (num < 0) num = -num;
 	for (; num--; x++) {
-		text[yp + x] = ' ';
-		attrs[yp + x] = erase_char_attr();
+		grid->text[yp + x] = ' ';
+		grid->attrs[yp + x] = erase_char_attr();
 	}
 
 	changed_line(y, start_x, end_x);
@@ -747,10 +765,10 @@ void VTerm::clear_area(u16 start_x, u16 start_y, u16 end_x, u16 end_y)
 	u16 x, y;
 	u32 yp;
 	for (y=start_y; y<=end_y; y++) {
-		yp = linenumbers[y]*max_width;
+		yp = grid->linenumbers[y]*max_width;
 		for (x=start_x; x<=end_x; x++) {
-			text[yp+x]= ' ';
-			attrs[yp+x] = erase_char_attr();
+			grid->text[yp+x]= ' ';
+			grid->attrs[yp+x] = erase_char_attr();
 		}
 		changed_line(y, start_x, end_x);
 	}
@@ -763,8 +781,8 @@ void VTerm::changed_line(u16 y, u16 start_x, u16 end_x)
 	if (start_x >= width) start_x = width - 1;
 	if (end_x >= width) end_x = width - 1;
 
-	if (dirty_startx[y] > start_x) dirty_startx[y] = start_x;
-	if (dirty_endx[y] < end_x) dirty_endx[y] = end_x;
+	if (grid->dirty_startx[y] > start_x) grid->dirty_startx[y] = start_x;
+	if (grid->dirty_endx[y] < end_x) grid->dirty_endx[y] = end_x;
 }
 
 void VTerm::move_cursor(u16 x, u16 y)
@@ -813,15 +831,15 @@ void VTerm::history_scroll(u16 num)
 
 	u32 yp, yp_history;
 	for (u16 i = 0; i < num; i++) {
-		yp = linenumbers[i] * max_width;
+		yp = grid->linenumbers[i] * max_width;
 		yp_history = history_save_line * max_width;
-		memcpy(&text[yp_history], &text[yp], sizeof(*text) * width);
-		memcpy(&attrs[yp_history], &attrs[yp], sizeof(*attrs) * width);
+		memcpy(&grid->text[yp_history], &grid->text[yp], sizeof(*grid->text) * width);
+		memcpy(&grid->attrs[yp_history], &grid->attrs[yp], sizeof(*grid->attrs) * width);
 
 		if (width < max_width) {
 			for (u16 i = width; i < max_width; i++) {
-				text[yp_history + i] = ' ';
-				attrs[yp_history + i] = default_char_attr;
+				grid->text[yp_history + i] = ' ';
+				grid->attrs[yp_history + i] = default_char_attr;
 			}
 		}
 
@@ -906,7 +924,66 @@ u16 VTerm::get_line(u16 y)
 	if (y > height) y = height;
 	u16 line = visual_start_line + y;
 
-	if (line >= total_history_lines()) return linenumbers[line - total_history_lines()];
+	if (line >= total_history_lines()) return grid->linenumbers[line - total_history_lines()];
 
 	return ((history_full ? history_save_line : 0) + line) % history_lines;
+}
+
+void VTerm::switchBuffer(ScreenBufferType buffer) {
+	ScreenBufferType previous_buffer = active_buffer;
+	if (buffer == previous_buffer) return;
+	active_buffer = buffer;
+
+	// stash the live cursor state into the buffer we're leaving
+	grid->cursor.x = cursor_x;
+	grid->cursor.y = cursor_y;
+	grid->cursor.char_attr = char_attr;
+	grid->cursor.g0_charset = g0_charset;
+	grid->cursor.g1_charset = g1_charset;
+	grid->cursor.g0_is_active = g0_is_active;
+
+	if (buffer == ScreenBufferType::Primary) {
+		grid = &primary_grid;
+	}
+	else if (buffer == ScreenBufferType::Alternate) {
+		grid = &alt_grid;
+		reset_alt_screen();
+	}
+
+	// resume the cursor state that belongs to the buffer we're entering
+	char_attr = grid->cursor.char_attr;
+	g0_charset = grid->cursor.g0_charset;
+	g1_charset = grid->cursor.g1_charset;
+	g0_is_active = grid->cursor.g0_is_active;
+	charset = (g0_is_active ? g0_charset : g1_charset);
+	move_cursor(grid->cursor.x, grid->cursor.y);
+
+	for (u16 i = 0; i < height; i++) {
+		grid->dirty_startx[i] = 0;
+		grid->dirty_endx[i] = width - 1;
+	}
+}
+
+VTerm::ScreenBufferType VTerm::getActiveBuffer(void) {
+	return active_buffer;
+}
+
+void VTerm::reset_alt_screen() {
+	if (!grid->text) {
+		grid->tab_stops = new s8[max_width / 8 + 1];
+		grid->linenumbers = new u16[max_height];
+		grid->dirty_startx = new u16[max_height];
+		grid->dirty_endx = new u16[max_height];
+		grid->text = new u16[max_width * (history_lines + max_height)];
+		grid->attrs = new CharAttr[max_width * (history_lines + max_height)];
+
+		// alt screen has no scrollback, so live rows start right after the
+		// (unused) history block, same layout resize() uses for fresh rows
+		for (u16 i = 0; i < max_height; i++) {
+			grid->linenumbers[i] = history_lines + i;
+		}
+	}
+
+	memset(grid->tab_stops, 0, max_width / 8 + 1);
+	clear_area(0, 0, width - 1, height - 1);
 }
