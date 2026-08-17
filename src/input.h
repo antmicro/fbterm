@@ -21,17 +21,21 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#include "io.h"
-#include "instance.h"
+#include "input_generic.h"
 
-class TtyInput : public IoPipe {
-	DECLARE_INSTANCE(TtyInput)
+class TtyInput : public KBInput {
+	friend class KBInput;
 public:
-	void switchVc(bool enter);
-	void setRawMode(bool raw, bool force = false);
-	void showInfo(bool verbose);
+	virtual void switchVc(bool enter);
+	virtual void setRawMode(bool raw, bool force = false);
+	virtual void showInfo(bool verbose);
 
 private:
+	static TtyInput *initTtyInput();
+
+	TtyInput();
+	~TtyInput();
+
 	virtual void readyRead(s8 *buf, u32 len);
 	void setupSysKey(bool restore);
 	void processRawKeys(s8* buf, u32 len);

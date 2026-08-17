@@ -39,9 +39,7 @@ static long oldKbMode;
 static bool keymapFailure = false;
 static bool inited = false;
 
-DEFINE_INSTANCE(TtyInput)
-
-TtyInput *TtyInput::createInstance()
+TtyInput *TtyInput::initTtyInput()
 {
 	s8 buf[64];
 	if (ttyname_r(STDIN_FILENO, buf, sizeof(buf))) {

@@ -29,6 +29,9 @@
 #ifdef ENABLE_DRM
 #include "drmdev.h"
 #endif
+#ifdef ENABLE_SDL2
+#include "sdl2.h"
+#endif
 #ifdef ENABLE_VESA
 #include "vesadev.h"
 #endif
@@ -54,6 +57,28 @@ Screen *Screen::createInstance()
 
 	Screen *pScreen = 0;
 
+#if defined(ENABLE_SDL2) && defined(ENABLE_DRM)
+	bool _sdl = false;
+	bool _drm = false;
+	Config::instance()->getOption("use-sdl", _sdl);
+	Config::instance()->getOption("use-drm", _drm);
+	if(_sdl && _drm) {
+		fprintf(stderr, "use-sdl and use-drm cannot be enabled at the same time!\n");
+		return nullptr;
+	}
+#endif
+
+#ifdef ENABLE_SDL2
+	bool use_sdl = false;
+	Config::instance()->getOption("use-sdl", use_sdl);
+	if(use_sdl) {
+		pScreen = Sdl2Dev::initSdl2Dev();
+		if (!pScreen) {
+			fprintf(stderr, "init SDL2 error!\n");
+			return nullptr;
+		}
+	}
+#endif
 #ifdef ENABLE_DRM
 	bool use_drm = false;
 	Config::instance()->getOption("use-drm", use_drm);

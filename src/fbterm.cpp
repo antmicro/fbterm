@@ -32,7 +32,7 @@
 #include "config.h"
 #include "fbio.h"
 #include "screen.h"
-#include "input.h"
+#include "input_generic.h"
 #include "input_key.h"
 #include "mouse.h"
 #include "idle_timer.h"
@@ -114,7 +114,7 @@ FbTerm::~FbTerm()
 
 void FbTerm::init()
 {
-	if (!TtyInput::instance() || !Screen::instance()) return;
+	if (!KBInput::instance() || !Screen::instance()) return;
 
 	struct vt_mode vtm;
 	vtm.mode = VT_PROCESS;
@@ -174,6 +174,13 @@ void FbTerm::init()
 
 static bool isActiveTerm()
 {
+#ifdef ENABLE_SDL2
+	bool sdl = false;
+	Config::instance()->getOption("use-sdl", sdl);
+	if(sdl)
+		return true;
+#endif
+
 	struct vt_stat vtstat;
 	ioctl(STDIN_FILENO, VT_GETSTATE, &vtstat);
 
@@ -221,14 +228,14 @@ void FbTerm::processSignal(u32 signo)
 		}
 		FbShellManager::instance()->switchVc(false);
 		Screen::instance()->switchVc(false);
-		TtyInput::instance()->switchVc(false);
+		KBInput::instance()->switchVc(false);
 		Mouse::instance()->switchVc(false);
 		ioctl(STDIN_FILENO, VT_RELDISP, 1);
 		break;
 
 	case SIGUSR2:
 		Mouse::instance()->switchVc(true);
-		TtyInput::instance()->switchVc(true);
+		KBInput::instance()->switchVc(true);
 		Screen::instance()->switchVc(true);
 		FbShellManager::instance()->switchVc(true);
 		if (mIdleTimer) {

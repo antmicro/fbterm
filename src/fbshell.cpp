@@ -34,7 +34,7 @@
 #include "improxy.h"
 #include "fbterm.h"
 #include "font.h"
-#include "input.h"
+#include "input_generic.h"
 
 #define screen (Screen::instance())
 #define manager (FbShellManager::instance())
@@ -641,7 +641,7 @@ void FbShell::initShellProcess()
 	bool verbose = false;
 	Config::instance()->getOption("verbose", verbose);
 
-	TtyInput::instance()->showInfo(verbose);
+	KBInput::instance()->showInfo(verbose);
 	Screen::instance()->showInfo(verbose);
 	Font::instance()->showInfo(verbose);
 

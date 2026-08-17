@@ -215,6 +215,8 @@ void Config::checkConfigFile(const s8 *name)
 		"\n"
 		"# use DRM\n"
 		"use-drm=no\n"
+		"# use SDL2\n"
+		"use-sdl=no\n"
 		;
 
 	struct stat cstat;
@@ -229,6 +231,12 @@ void Config::checkConfigFile(const s8 *name)
 
 bool Config::parseArgs(s32 argc, s8 **argv)
 {
+	enum {
+		OPT_WINDOW_WIDTH = 256,
+		OPT_WINDOW_HEIGHT,
+		OPT_VESA_MODE,
+	};
+
 	static const option options[] = {
 		{ "help", no_argument, 0, 'h' },
 		{ "version", no_argument, 0, 'V' },
@@ -253,16 +261,21 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "idle-timeout", required_argument, 0, 't' },
 		{ "idle-command", required_argument, 0, 'x' },
 #ifdef ENABLE_DRM
-		{ "use-drm", no_argument, 0, 0 },
+		{ "use-drm", no_argument, 0, 'D' },
+#endif
+#ifdef ENABLE_SDL2
+		{ "use-sdl", no_argument, 0, 'S' },
+		{ "window-width", required_argument, 0, OPT_WINDOW_WIDTH },
+		{ "window-height", required_argument, 0, OPT_WINDOW_HEIGHT },
 #endif
 #ifdef ENABLE_VESA
-		{ "vesa-mode", required_argument, 0, 0 },
+		{ "vesa-mode", required_argument, 0, OPT_VESA_MODE },
 #endif
 		{ 0, 0, 0, 0 }
 	};
 
 	s32 index;
-	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:c:C:T:G:R:L:W:H:B:at:x:", options, 0)) != -1) {
+	while ((index = getopt_long(argc, argv, "Vvhn:s:f:b:e:r:i:c:C:T:G:R:L:W:H:B:at:x:D:S:", options, 0)) != -1) {
 		switch (index) {
 		case 'V':
 			printf("FbTerm version " VERSION "\n");
@@ -297,7 +310,12 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"  -t, --idle-timeout=NUM          specify idle timeout in seconds (0 disables)\n"
 				"  -x, --idle-command=TEXT         specify idle command to run after inactivity\n"
 #ifdef ENABLE_DRM
-				"      --use-drm                   use DRM graphics instead of fbdev or VESA\n"
+				"  -D  --use-drm                   use DRM graphics instead of fbdev or VESA\n"
+#endif
+#ifdef ENABLE_SDL2
+				"  -S  --use-sdl                   use SDL2 graphics\n"
+				"      --window-width=NUM          specify SDL2 window width\n"
+				"      --window-height=NUM         specify SDL2 window height\n"
 #endif
 #ifdef ENABLE_VESA
 				"      --vesa-mode=NUM           f  force VESA video mode\n"

@@ -8,6 +8,7 @@ find_package(Fontconfig REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBDRM IMPORTED_TARGET libdrm)
+pkg_check_modules(SDL2 IMPORTED_TARGET sdl2)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -37,6 +38,7 @@ add_executable(fbterm
 	src/idle_timer.cpp
 	src/improxy.cpp
 	src/input.cpp
+	src/input_generic.cpp
 	src/mouse.cpp
 	src/screen.cpp
 	src/screen_render.cpp
@@ -72,6 +74,13 @@ if (LIBDRM_FOUND)
 	target_link_libraries(fbterm PRIVATE PkgConfig::LIBDRM)
 	target_compile_definitions(fbterm PRIVATE ENABLE_DRM)
 	message(STATUS "Using DRM")
+endif()
+
+if (SDL2_FOUND)
+	target_sources(fbterm PRIVATE src/sdl2.cpp src/input_sdl2.cpp)
+	target_link_libraries(fbterm PRIVATE PkgConfig::SDL2)
+	target_compile_definitions(fbterm PRIVATE ENABLE_SDL2)
+	message(STATUS "Using SDL2")
 endif()
 
 install(TARGETS fbterm)

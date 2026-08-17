@@ -32,7 +32,7 @@
 #include "fbshellman.h"
 #include "font.h"
 #include "screen.h"
-#include "input.h"
+#include "input_generic.h"
 #include "fbterm.h"
 #include <time.h>
 
@@ -65,7 +65,7 @@ ImProxy::~ImProxy()
 	if (!mConnected) return;
 
 	if (FbShellManager::instance()->activeShell() == mShell) {
-		TtyInput::instance()->setRawMode(false);
+		KBInput::instance()->setRawMode(false);
 	}
 
 	sendDisconnect();
@@ -129,7 +129,7 @@ void ImProxy::toggleActive()
 	if (!mConnected) return;
 
 	mActive ^= true;
-	TtyInput::instance()->setRawMode(mRawInput && mActive);
+	KBInput::instance()->setRawMode(mRawInput && mActive);
 
 	Message msg;
 	msg.type = (mActive ? Active : Deactive);
@@ -168,7 +168,7 @@ void ImProxy::switchVt(bool enter, ImProxy *peer)
 {
 	if (!mConnected || !mActive) return;
 
-	TtyInput::instance()->setRawMode(enter && mRawInput);
+	KBInput::instance()->setRawMode(enter && mRawInput);
 
 	Message msg;
 	msg.type = (enter ? ShowUI : HideUI);
