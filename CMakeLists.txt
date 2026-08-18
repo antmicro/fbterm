@@ -6,7 +6,10 @@ include(CheckIncludeFile)
 find_package(Freetype REQUIRED)
 find_package(Fontconfig REQUIRED)
 
-set(CMAKE_CXX_STANDARD 11)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBDRM IMPORTED_TARGET libdrm)
+
+set(CMAKE_CXX_STANDARD 17)
 
 check_include_file("sys/epoll.h" HAS_EPOLL)
 check_include_file("sys/signalfd.h" HAS_SIGNALFD)
@@ -62,6 +65,13 @@ if (HAS_GPM)
 	target_link_libraries(fbterm PRIVATE gpm)
 	target_compile_definitions(fbterm PRIVATE ENABLE_GPM)
 	message(STATUS "Using GPM")
+endif()
+
+if (LIBDRM_FOUND)
+	target_sources(fbterm PRIVATE src/drmdev.cpp)
+	target_link_libraries(fbterm PRIVATE PkgConfig::LIBDRM)
+	target_compile_definitions(fbterm PRIVATE ENABLE_DRM)
+	message(STATUS "Using DRM")
 endif()
 
 install(TARGETS fbterm)

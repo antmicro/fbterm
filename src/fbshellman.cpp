@@ -83,6 +83,7 @@ void FbShellManager::drawCursor()
 {
 	if (mActiveShell) {
 		mActiveShell->updateCursor();
+		screen->present();
 	}
 }
 
@@ -90,6 +91,7 @@ void FbShellManager::historyScroll(bool down)
 {
 	if (mActiveShell) {
 		mActiveShell->historyDisplay(false, down ? mActiveShell->h() : -mActiveShell->h());
+		screen->present();
 	}
 }
 
@@ -164,6 +166,7 @@ void FbShellManager::redraw(u16 x, u16 y, u16 w, u16 h)
 	} else {
 		screen->fillRect(FW(x), FH(y), FW(w), FH(h), 0);
 	}
+	screen->present();
 }
 
 void FbShellManager::childProcessExited(s32 pid)

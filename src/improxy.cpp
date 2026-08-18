@@ -282,6 +282,7 @@ void ImProxy::readyRead(s8 *buf, u32 len)
 			break;
 		}
 	}
+	Screen::instance()->present();
 }
 
 typedef enum { Intersect, Inside, Outside } IntersectState;

@@ -79,6 +79,7 @@ public :
 
 	virtual void setSize(int w, int h);
 	virtual void setOffset(int x, int y);
+	virtual void present();
 
 protected:
 	u32 mBitsPerPixel, mBytesPerLine;

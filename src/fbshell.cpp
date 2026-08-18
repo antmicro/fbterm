@@ -716,12 +716,14 @@ void FbShell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 	}
 
 	Shell::mouseInput(x, y, type, buttons);
+	screen->present();
 }
 
 void FbShell::readyRead(s8 *buf, u32 len)
 {
 	clearMousePointer();
 	Shell::readyRead(buf, len);
+	screen->present();
 }
 
 WindowInfo* FbShell::getWindowInfo() {
@@ -799,6 +801,7 @@ void FbShell::toggleIm()
 		reportCursor();
 		reportMode();
 	}
+	screen->present();
 }
 
 void FbShell::imInput(s8 *buf, u32 len)

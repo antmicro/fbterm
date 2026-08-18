@@ -1,0 +1,487 @@
+#include "drmdev.h"
+#include "io.h"
+
+#include <filesystem>
+#include <vector>
+#include <string>
+
+#include <drm_mode.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <sys/timerfd.h>
+#include <time.h>
+
+#include <libdrm/drm.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+#include <libdrm/drm_fourcc.h>
+
+#ifdef DRM_DEBUG
+#define LOG(fmt, args...) fprintf(stderr, "[drm] " fmt "\n", ##args)
+#else
+#define LOG(fmt, args...)
+#endif
+
+// Picks which encoder actually serves a connector - prefers whatever's
+// already actively bound (conn->encoder_id) over any other candidate.
+static drmModeEncoder *findEncoderForConnector(s32 fd, drmModeConnector *conn)
+{
+	if (conn->encoder_id) {
+		drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
+		if (enc) return enc;
+	}
+
+	for (int i = 0; i < conn->count_encoders; i++) {
+		drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoders[i]);
+		if (enc) return enc;
+	}
+
+	return nullptr;
+}
+
+// Picks which CRTC to use for a given encoder - prefers whatever it's
+// already bound to over any other CRTC it could theoretically reach.
+static bool findCrtcForEncoder(drmModeRes *res, drmModeEncoder *enc, u32 *crtcId)
+{
+	if (enc->crtc_id) {
+		*crtcId = enc->crtc_id;
+		return true;
+	}
+
+	for (int i = 0; i < res->count_crtcs; i++) {
+		if (enc->possible_crtcs & (1 << i)) {
+			*crtcId = res->crtcs[i];
+			return true;
+		}
+	}
+
+	return false;
+}
+
+// Finds a connector by its type name (e.g. "HDMI-A-2", "eDP-1", "DisplayPort-1", etc.)
+static bool findConnectorByName(s32 fd, drmModeRes *res, const char *name, drmModeConnector **outConn)
+{
+	for (int i = 0; i < res->count_connectors; i++) {
+		drmModeConnector *conn = drmModeGetConnector(fd, res->connectors[i]);
+		if (!conn) continue;
+
+		char connName[32];
+		snprintf(connName, sizeof(connName), "%s-%d", drmModeGetConnectorTypeName(conn->connector_type), conn->connector_type_id);
+
+		if (!strcmp(connName, name)) {
+			*outConn = conn;
+			return true;
+		}
+
+		drmModeFreeConnector(conn);
+	}
+
+	return false;
+}
+
+static bool isEmbeddedConnector(s32 connector_type)
+{
+	return connector_type == DRM_MODE_CONNECTOR_LVDS ||
+		   connector_type == DRM_MODE_CONNECTOR_eDP  ||
+		   connector_type == DRM_MODE_CONNECTOR_DSI;
+}
+
+static bool isConnectorUsable(drmModeConnectorPtr conn)
+{
+	// Only use connected connectors with at least one mode
+	return (conn->connection == DRM_MODE_CONNECTED && conn->count_modes > 0);
+}
+
+static bool findTheBestConnector(s32 fd, drmModeRes *res, drmModeConnector **outConn)
+{
+	drmModeConnector *bestConn = nullptr;
+
+	for (int i = 0; i < res->count_connectors; i++) {
+		drmModeConnector *conn = drmModeGetConnector(fd, res->connectors[i]);
+		if (!conn) continue;
+
+		if (!isConnectorUsable(conn)) {
+			drmModeFreeConnector(conn);
+			continue;
+		}
+
+		if(!bestConn) { // mark first as best
+			bestConn = conn;
+		} else {
+			// New connector is external - pick it
+			if(isEmbeddedConnector(bestConn->connector_type) && !isEmbeddedConnector(conn->connector_type)) {
+				drmModeFreeConnector(bestConn);
+				bestConn = conn;
+			} else {
+				drmModeFreeConnector(conn);
+			}
+		}
+	}
+
+	if (bestConn) {
+		*outConn = bestConn;
+		return true;
+	}
+
+	return false;
+}
+
+struct DrmCandidate {
+	s32 fd = -1;
+	drmModeRes *res = nullptr;
+	drmModeConnector *conn = nullptr;
+};
+
+static void freeCandidate(DrmCandidate *c)
+{
+	if (c->conn) drmModeFreeConnector(c->conn);
+	if (c->res) drmModeFreeResources(c->res);
+	if (c->fd >= 0) {
+		drmDropMaster(c->fd);
+		close(c->fd);
+	}
+	*c = DrmCandidate();
+}
+
+// Tries one /dev/dri/cardN device and finds the best connector on it.
+// If 'wanted' is provided, and isn't matched exactly the function fails.
+static bool tryDevice(const char *path, const char *wanted, DrmCandidate *out)
+{
+	std::filesystem::path file(path);
+	if (!std::filesystem::is_character_file(file)) return false;
+
+	s32 fd = open(path, O_RDWR | O_CLOEXEC);
+	if (fd < 0) {
+		LOG("open %s: %s", path, strerror(errno));
+		return false;
+	}
+
+	// Grabbing master forced DRM to reprobe the connectors and ensures that data is up-to-date.
+	if (drmSetMaster(fd)) {
+		LOG("drmSetMaster %s: %s (another process may hold master)", path, strerror(errno));
+		close(fd);
+		return false;
+	}
+
+	drmModeRes *res = drmModeGetResources(fd);
+	if (!res) {
+		LOG("drmModeGetResources %s: %s", path, strerror(errno));
+		drmDropMaster(fd);
+		close(fd);
+		return false;
+	}
+
+	drmModeConnector *conn = nullptr;
+	if (wanted) {
+		if (!findConnectorByName(fd, res, wanted, &conn)) {
+			LOG("%s: connector %s not found", path, wanted);
+		} else if (!isConnectorUsable(conn)) {
+			LOG("%s: connector %s is not usable", path, wanted);
+			drmModeFreeConnector(conn);
+			conn = nullptr;
+		}
+	} else if (!findTheBestConnector(fd, res, &conn)) {
+		LOG("%s: no usable connector", path);
+	}
+
+	if (!conn) {
+		drmModeFreeResources(res);
+		drmDropMaster(fd);
+		close(fd);
+		return false;
+	}
+
+	out->fd = fd;
+	out->res = res;
+	out->conn = conn;
+	return true;
+}
+
+std::vector<std::filesystem::path> listDrmDevices() {
+	std::vector<std::filesystem::path> devices;
+	std::filesystem::path dri_path("/dev/dri/");
+	if (std::filesystem::exists(dri_path) && std::filesystem::is_directory(dri_path)) {
+		for(auto entry : std::filesystem::directory_iterator(dri_path)) {
+			if(!entry.is_character_file())
+				continue;
+
+			auto path = entry.path();
+			if(path.filename().string().rfind("card") == 0) {
+				devices.push_back(path);
+			}
+		}
+	}
+	return devices;
+}
+
+// Picks which device+connector pair to use. If the user requests DRM_DEVICE and/or
+// DRM_CONNECTOR, that preference must be satisfied exactly. Otherwise the function
+// will pick the best pair by enumerating over cards and conns (preferring external connectors).
+static bool selectDrmDeviceAndConnector(DrmCandidate *chosen)
+{
+	char *devpath = getenv("DRM_DEVICE");
+	char *wanted = getenv("DRM_CONNECTOR");
+	if (wanted) LOG("DRM_CONNECTOR=%s", wanted);
+
+	if (devpath) {
+		LOG("DRM_DEVICE=%s", devpath);
+		if (!tryDevice(devpath, wanted, chosen)) {
+			LOG("%s: not usable", devpath);
+			return false;
+		}
+		return true;
+	}
+
+	auto devices = listDrmDevices();
+	if(devices.empty()) {
+		LOG("No /dev/dri/card* devices found");
+		return false;
+	}
+
+	bool found = false;
+	for (auto device : devices) {
+		DrmCandidate cand;
+		if (!tryDevice(device.c_str(), wanted, &cand)) continue;
+
+		if (wanted) {
+			*chosen = cand;
+			found = true;
+			break;
+		}
+
+		if (!found) {
+			*chosen = cand;
+			found = true;
+		} else if (isEmbeddedConnector(chosen->conn->connector_type) &&
+			   !isEmbeddedConnector(cand.conn->connector_type)) {
+			freeCandidate(chosen);
+			*chosen = cand;
+		} else {
+			freeCandidate(&cand);
+		}
+	}
+
+	if (!found) LOG("no usable DRI device/connector found");
+	return found;
+}
+
+void DrmDev::cleanup()
+{
+	if (drm_saved_crtc) {
+		// switchVc(false) may have already dropped master by the time we get here
+		if (drmSetMaster(drm_fd)) {
+			fprintf(stderr, "Could not reacquire master to restore CRTC %u: %s\n", drm_saved_crtc->crtc_id, strerror(errno));
+		} else {
+			int ret = drmModeSetCrtc(drm_fd, drm_saved_crtc->crtc_id, drm_saved_crtc->buffer_id,
+				drm_saved_crtc->x, drm_saved_crtc->y, &drm_connector_id, 1, &drm_saved_crtc->mode);
+			if(ret) {
+				fprintf(stderr, "Could not restore saved CRTC %u: %s\n", drm_saved_crtc->crtc_id, strerror(errno));
+			}
+		}
+		drmModeFreeCrtc(drm_saved_crtc);
+		drm_saved_crtc = 0;
+	}
+
+	if (drm_fb_id) {
+		drmModeRmFB(drm_fd, drm_fb_id);
+		drm_fb_id = 0;
+	}
+
+	if (drm_handle) {
+		struct drm_mode_destroy_dumb dreq;
+		memset(&dreq, 0, sizeof(dreq));
+		dreq.handle = drm_handle;
+		ioctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
+		drm_handle = 0;
+	}
+
+	if (drm_fd >= 0) {
+		drmDropMaster(drm_fd);
+		close(drm_fd);
+		drm_fd = -1;
+	}
+
+	if (drm_map && drm_map != MAP_FAILED) {
+		munmap(drm_map, drm_size);
+		drm_map = nullptr;
+	}
+}
+
+bool DrmDev::setup() {
+	LOG("probing DRM/KMS backend");
+
+	DrmCandidate chosen;
+	if (!selectDrmDeviceAndConnector(&chosen)) {
+		return false;
+	}
+
+	drm_fd = chosen.fd;
+	drmModeRes *res = chosen.res;
+	drmModeConnector *conn = chosen.conn;
+
+	// tryDevice() already grabbed master on this fd, don't need to do it again.
+	// cleanup() will drop master on failure path
+	LOG("using connector %s-%d", drmModeGetConnectorTypeName(conn->connector_type), conn->connector_type_id);
+
+	drmModeEncoder *enc = findEncoderForConnector(drm_fd, conn);
+	if (!enc || !findCrtcForEncoder(res, enc, &drm_crtc_id)) {
+		LOG("no usable crtc for connector %u", conn->connector_id);
+		if (enc) drmModeFreeEncoder(enc);
+		drmModeFreeConnector(conn);
+		drmModeFreeResources(res);
+		cleanup();
+		return false;
+	}
+	drmModeFreeEncoder(enc);
+
+	drm_connector_id = conn->connector_id;
+	drm_mode = conn->modes[0];
+
+	LOG("using connector %u, crtc %u, mode %s %ux%u@%uHz",
+		conn->connector_id, drm_crtc_id, conn->modes[0].name,
+		conn->modes[0].hdisplay, conn->modes[0].vdisplay, conn->modes[0].vrefresh);
+
+	struct drm_mode_create_dumb creq = {0};
+	creq.width = drm_mode.hdisplay;
+	creq.height = drm_mode.vdisplay;
+	creq.bpp = 32; // ARGB
+
+	if (ioctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq) < 0) {
+		LOG("create dumb buffer: %s", strerror(errno));
+		drmModeFreeConnector(conn);
+		drmModeFreeResources(res);
+		cleanup();
+		return false;
+	}
+	drm_handle = creq.handle;
+
+	if(drmModeAddFB(drm_fd, drm_mode.hdisplay, drm_mode.vdisplay, 24, 32, creq.pitch, creq.handle, &drm_fb_id)) {
+		LOG("drmModeAddFB: %s", strerror(errno));
+		drmModeFreeConnector(conn);
+		drmModeFreeResources(res);
+		cleanup();
+		return false;
+	}
+	LOG("created dumb buffer: handle=%u, pitch=%u, size=%llu", drm_handle, creq.pitch, (unsigned long long)creq.size);
+	drm_pitch = creq.pitch;
+
+	// MEMORY MAPPING
+	// Mapping GPU-side
+	struct drm_mode_map_dumb mreq = {0};
+	mreq.handle = creq.handle;
+	if(ioctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq) < 0) {
+		LOG("map dumb buffer: %s", strerror(errno));
+		drmModeFreeConnector(conn);
+		drmModeFreeResources(res);
+		cleanup();
+		return false;
+	}
+
+	// Mapping fbterm-side
+	drm_size = creq.size;
+	drm_map = (u8*)mmap(0, drm_size, PROT_READ | PROT_WRITE, MAP_SHARED, drm_fd, mreq.offset);
+	if (drm_map == MAP_FAILED) {
+		drm_map = nullptr;
+		LOG("mmap: %s", strerror(errno));
+		drmModeFreeConnector(conn);
+		drmModeFreeResources(res);
+		cleanup();
+		return false;
+	}
+	LOG("mapped dumb buffer to %p", drm_map);
+
+	drm_saved_crtc = drmModeGetCrtc(drm_fd, drm_crtc_id);
+
+	int result = drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_id, 0, 0, &drm_connector_id, 1, &drm_mode);
+
+	if(result) {
+		LOG("drmModeSetCrtc: %s", strerror(errno));
+		drmModeFreeConnector(conn);
+		drmModeFreeResources(res);
+		cleanup();
+		return false;
+	}
+
+	LOG("set CRTC %u to use FB %u", drm_crtc_id, drm_fb_id);
+
+	drmModeFreeConnector(conn);
+	drmModeFreeResources(res);
+
+	LOG("DRM/KMS backend initialized successfully");
+
+	mScreenHeight = drm_mode.vdisplay;
+	mScreenWidth = drm_mode.hdisplay;
+	mWidth = drm_mode.hdisplay;
+	mHeight = drm_mode.vdisplay;
+	mBytesPerLine = drm_pitch;
+	mVMemBase = (u8*)drm_map;
+
+	return true;
+}
+
+DrmDev *DrmDev::initDrmDev()
+{
+	DrmDev* dev = new DrmDev();
+	bool ok = dev->setup();
+
+	if(!ok) {
+		delete dev;
+		dev = nullptr;
+	}
+
+	return dev;
+}
+
+DrmDev::DrmDev()
+{
+	mBitsPerPixel = 32; // ARGB
+	mOffsetLeft = 0;
+	mOffsetTop = 0;
+}
+
+DrmDev::~DrmDev()
+{
+	LOG("shutting down DRM/KMS backend");
+	cleanup();
+}
+
+const s8 *DrmDev::drvId()
+{
+	return (const s8 *)"drm";
+}
+
+void DrmDev::setupOffset()
+{
+}
+
+void DrmDev::setupPalette(bool restore)
+{
+}
+
+void DrmDev::switchVc(bool enter) {
+	int status = 0;
+	if(enter) {
+		if( (status = drmSetMaster(drm_fd)) == 0) {
+			drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_id, 0, 0, &drm_connector_id, 1, &drm_mode);
+		} else {
+			fprintf(stderr, "Could not set DRM master, status: %d", status);
+		}
+	} else {
+		if( (status = drmDropMaster(drm_fd)) == 0) {
+		} else {
+			fprintf(stderr, "Could not drop DRM master, status: %d", status);
+		}
+	}
+}
+
+void DrmDev::present() {
+		if (drmModePageFlip(drm_fd, drm_crtc_id, drm_fb_id, 0, nullptr) && errno != EBUSY) {
+			LOG("drmModePageFlip: %s", strerror(errno));
+		}
+}

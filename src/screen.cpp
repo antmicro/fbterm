@@ -26,6 +26,9 @@
 #include "fbshellman.h"
 #include "config.h"
 #include "fbdev.h"
+#ifdef ENABLE_DRM
+#include "drmdev.h"
+#endif
 #ifdef ENABLE_VESA
 #include "vesadev.h"
 #endif
@@ -51,6 +54,13 @@ Screen *Screen::createInstance()
 
 	Screen *pScreen = 0;
 
+#ifdef ENABLE_DRM
+	bool use_drm = false;
+	Config::instance()->getOption("use-drm", use_drm);
+	if(use_drm)
+		pScreen = DrmDev::initDrmDev();
+#endif
+
 #ifdef ENABLE_VESA
 	s8 buf[16];
 	Config::instance()->getOption("vesa-mode", buf, sizeof(buf));
@@ -62,10 +72,11 @@ Screen *Screen::createInstance()
 	u32 mode = 0;
 	Config::instance()->getOption("vesa-mode", mode);
 
-	if (!mode) pScreen = FbDev::initFbDev();
+	if (!mode && !pScreen) pScreen = FbDev::initFbDev();
 	if (!pScreen) pScreen = VesaDev::initVesaDev(mode);
 #else
-	pScreen = FbDev::initFbDev();
+	if(!pScreen)
+		pScreen = FbDev::initFbDev();
 #endif
 
 	if (!pScreen) return 0;
@@ -444,4 +455,8 @@ void Screen::rotatePoint(u32 W, u32 H, u32 &x, u32 &y)
 		x = tmp;
 		break;
 	}
+}
+
+void Screen::present() {
+	return;
 }

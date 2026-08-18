@@ -212,6 +212,9 @@ void Config::checkConfigFile(const s8 *name)
 		"# timeout is in seconds; 0 disables the inactivity action\n"
 		"idle-timeout=0\n"
 		"idle-command=\n"
+		"\n"
+		"# use DRM\n"
+		"use-drm=no\n"
 		;
 
 	struct stat cstat;
@@ -249,6 +252,9 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "ambiguous-wide", no_argument, 0, 'a' },
 		{ "idle-timeout", required_argument, 0, 't' },
 		{ "idle-command", required_argument, 0, 'x' },
+#ifdef ENABLE_DRM
+		{ "use-drm", no_argument, 0, 0 },
+#endif
 #ifdef ENABLE_VESA
 		{ "vesa-mode", required_argument, 0, 0 },
 #endif
@@ -290,6 +296,9 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"  -R, --margin-right=NUM          specify right margin in pixels\n"
 				"  -t, --idle-timeout=NUM          specify idle timeout in seconds (0 disables)\n"
 				"  -x, --idle-command=TEXT         specify idle command to run after inactivity\n"
+#ifdef ENABLE_DRM
+				"      --use-drm                   use DRM graphics instead of fbdev or VESA\n"
+#endif
 #ifdef ENABLE_VESA
 				"      --vesa-mode=NUM           f  force VESA video mode\n"
 				"                  list            display available VESA video modes\n"
