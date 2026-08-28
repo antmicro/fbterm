@@ -357,7 +357,11 @@ private:
 
 	static CharAttr default_char_attr;
 	u8 cur_fcolor, cur_bcolor;
-	s8 cur_underline_color, cur_halfbright_color;
+	// Not s8: that typedef resolves to plain char, whose signedness is
+	// implementation-defined. On targets where char is unsigned (ARM,
+	// AArch64, PowerPC, s390x) the -1 sentinel below reads back as 255 and
+	// every `!= -1` guard in normal_char_attr() fires unconditionally.
+	s16 cur_underline_color, cur_halfbright_color;
 	ScreenBufferType active_buffer = Primary;
 
 	// action parameters
