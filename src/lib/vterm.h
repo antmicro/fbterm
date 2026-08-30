@@ -267,7 +267,12 @@ private:
 		ESdcs     = 8,
 		EStermcap = 9,
 		ESst      = 10,
-		ESkeep    = 11
+		EScsiInter = 11,
+		// ESkeep is a sentinel meaning "leave the state unchanged", not a state
+		// of its own. NR_STATES is defined as its value and sizes escape_map[],
+		// and init_state() stops walking escape_sequences[] once the section
+		// counter reaches it. It must therefore stay last: add new states above.
+		ESkeep    = 12
 	} EscapeState;
 
 	static inline const char* EscapeStateToString(EscapeState state) {
@@ -283,6 +288,7 @@ private:
 			case ESdcs:     return "DCS";
 			case EStermcap: return "DCS + q";
 			case ESst:      return "ST";
+			case EScsiInter: return "CSI + intermediate";
 			case ESkeep:    return "<previous>";
 		}
 
