@@ -9,12 +9,13 @@ find_package(Fontconfig REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBDRM IMPORTED_TARGET libdrm)
 pkg_check_modules(SDL2 IMPORTED_TARGET sdl2)
+pkg_check_modules(LIBINPUT IMPORTED_TARGET libinput>=1.19)
+pkg_check_modules(LIBUDEV IMPORTED_TARGET libudev)
 
 set(CMAKE_CXX_STANDARD 17)
 
 check_include_file("sys/epoll.h" HAS_EPOLL)
 check_include_file("sys/signalfd.h" HAS_SIGNALFD)
-check_include_file("gpm.h" HAS_GPM)
 
 add_executable(fbterm
 	src/lib/charsetmap.cpp
@@ -63,10 +64,10 @@ if (HAS_SIGNALFD)
 	message(STATUS "Using SIGNALFD")
 endif()
 
-if (HAS_GPM)
-	target_link_libraries(fbterm PRIVATE gpm)
-	target_compile_definitions(fbterm PRIVATE ENABLE_GPM)
-	message(STATUS "Using GPM")
+if (LIBINPUT_FOUND AND LIBUDEV_FOUND)
+	target_link_libraries(fbterm PRIVATE PkgConfig::LIBINPUT PkgConfig::LIBUDEV)
+	target_compile_definitions(fbterm PRIVATE ENABLE_LIBINPUT)
+	message(STATUS "Using libinput")
 endif()
 
 if (LIBDRM_FOUND)

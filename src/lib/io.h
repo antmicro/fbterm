@@ -30,7 +30,7 @@ public:
 	virtual ~IoPipe();
 
 	s32 fd() { return mFd; }
-	void ready(bool isread);
+	virtual void ready(bool isread);
 
 	static const s8 *localCodec();
 

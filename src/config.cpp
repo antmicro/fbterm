@@ -213,6 +213,9 @@ void Config::checkConfigFile(const s8 *name)
 		"idle-timeout=0\n"
 		"idle-command=\n"
 		"\n"
+		"# enable mouse input through libinput\n"
+		"use-mouse=no\n"
+		"\n"
 		"# use DRM\n"
 		"use-drm=no\n"
 		"# use SDL2\n"
@@ -235,6 +238,7 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		OPT_WINDOW_WIDTH = 256,
 		OPT_WINDOW_HEIGHT,
 		OPT_VESA_MODE,
+		OPT_USE_MOUSE,
 	};
 
 	static const option options[] = {
@@ -260,6 +264,9 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 		{ "ambiguous-wide", no_argument, 0, 'a' },
 		{ "idle-timeout", required_argument, 0, 't' },
 		{ "idle-command", required_argument, 0, 'x' },
+#ifdef ENABLE_LIBINPUT
+		{ "use-mouse", no_argument, 0, OPT_USE_MOUSE },
+#endif
 #ifdef ENABLE_DRM
 		{ "use-drm", no_argument, 0, 'D' },
 #endif
@@ -309,6 +316,9 @@ bool Config::parseArgs(s32 argc, s8 **argv)
 				"  -R, --margin-right=NUM          specify right margin in pixels\n"
 				"  -t, --idle-timeout=NUM          specify idle timeout in seconds (0 disables)\n"
 				"  -x, --idle-command=TEXT         specify idle command to run after inactivity\n"
+#ifdef ENABLE_LIBINPUT
+				"      --use-mouse                 enable mouse input through libinput\n"
+#endif
 #ifdef ENABLE_DRM
 				"  -D  --use-drm                   use DRM graphics instead of fbdev or VESA\n"
 #endif
