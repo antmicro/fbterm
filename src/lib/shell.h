@@ -45,7 +45,8 @@ class Shell : public IoPipe, public VTerm {
 public:
 	void keyInput(s8 *buf, u32 len);
 	void mouseInput(u16 x, u16 y, s32 type, s32 buttons);
-
+	void historyDisplay(bool absolute, s32 num);
+	
 protected:
 	Shell();
 	~Shell();

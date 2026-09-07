@@ -698,6 +698,15 @@ void FbShell::keyInput(s8 *buf, u32 len)
 
 void FbShell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 {
+	if (type == Wheel && mode(MouseReport) == MouseNone) {
+		clearMousePointer();
+
+		const s32 lines = 3;
+		historyDisplay(false, (buttons & WheelDown) ? lines : -lines);
+		screen->present();
+		return;
+	}
+
 	if (type == Move) {
 		clearMousePointer();
 

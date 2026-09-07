@@ -160,7 +160,7 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 	s32 modifies = buttons & ModifyButtonMask;
 	u16 rtype = mode(MouseReport);
 
-	if (btn && rtype != Wheel && (rtype == MouseNone || (modifies & ShiftButton))) {
+	if (btn && type != Wheel && (rtype == MouseNone || (modifies & ShiftButton))) {
 		textSelect(x, y, type, btn);
 		return;
 	}
@@ -198,6 +198,12 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 	if (val != -1) {
 		sendBack("\e[M%c%c%c", ' ' + val, ' ' + x + 1, ' ' + y + 1);
 	}
+}
+
+void Shell::historyDisplay(bool absolute, s32 num)
+{
+	resetTextSelect();
+	VTerm::historyDisplay(absolute, num);
 }
 
 void Shell::textSelect(u16 x, u16 y, s32 type, s32 btn)
