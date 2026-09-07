@@ -34,6 +34,10 @@ struct Color {
 	{
 		return (color.red == red) && (color.green == green) && (color.blue == blue);
 	}
+	constexpr bool operator !=(Color color) const
+	{
+		return (color.red != red) || (color.green != green) || (color.blue != blue);
+	}
 
 	constexpr u32 pack() const
 	{
@@ -70,8 +74,10 @@ public :
 	void rotateRect(u32 &x, u32 &y, u32 &w, u32 &h);
 	void rotatePoint(u32 w, u32 h, u32 &x, u32 &y);
 
-	void drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it);
+	void drawText(u32 x, u32 y, Color fc, Color bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it);
 	void fillRect(u32 x, u32 y, u32 w, u32 h, u8 color);
+	void fillRect(u32 x, u32 y, u32 w, u32 h, Color color);
+	u32 getFromPalette(u8 index);
 
 	bool move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h);
 	void setPalette(const Color *palette);
@@ -108,8 +114,8 @@ private:
 	virtual const s8 *drvId() = 0;
 
 	void eraseMargin(bool top, u16 h);
-	void drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it);
-	void drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, bool st, bool it);
+	void drawGlyphs(u32 x, u32 y, Color fc, Color bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it);
+	void drawGlyph(u32 x, u32 y, Color fc, Color bc, u16 code, bool dw, bool ul, bool st, bool it);
 	void adjustOffset(u32 &x, u32 &y);
 
 	void initFillDraw();
@@ -117,10 +123,16 @@ private:
 
 	void fillX(u32 x, u32 y, u32 w, u8 color);
 	void fillXBg(u32 x, u32 y, u32 w, u8 color);
+	void fillXRGB(u32 x, u32 y, u32 w, Color color);
 	void draw8(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
 	void draw15(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
 	void draw16(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
 	void draw32(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
+	u8 colorToIndex(Color color);
+	void draw8RGB(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap);
+	void draw15RGB(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap);
+	void draw16RGB(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap);
+	void draw32RGB(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap);
 	void draw8Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
 	void draw15Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
 	void draw16Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
@@ -128,9 +140,11 @@ private:
 
 	typedef void (Screen::*fillFun)(u32 x, u32 y, u32 w, u8 color);
 	typedef void (Screen::*drawFun)(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
+	typedef void (Screen::*drawFunRGB)(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap);
 
 	fillFun fill;
 	drawFun draw;
+	drawFunRGB drawRGB;
 	bool mScrollEnable;
 };
 #endif

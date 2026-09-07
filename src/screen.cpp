@@ -279,7 +279,7 @@ void Screen::eraseMargin(bool top, u16 h)
 	}
 }
 
-void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it)
+void Screen::drawText(u32 x, u32 y, Color fc, Color bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it)
 {
 	u32 startx, fw = FW(1);
 
@@ -322,12 +322,16 @@ void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, 
 	}
 }
 
-void Screen::drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it)
+void Screen::drawGlyphs(u32 x, u32 y, Color fc, Color bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it)
 {
 	for (; num--; text++, dw++) {
 		drawGlyph(x, y, fc, bc, *text, *dw, ul, st, it);
 		x += *dw ? FW(2) : FW(1);
 	}
+}
+
+u32 Screen::getFromPalette(u8 index) {
+	return mPalette[index].pack();
 }
 
 void Screen::adjustOffset(u32 &x, u32 &y)
@@ -351,7 +355,22 @@ void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, u8 color)
 	}
 }
 
-void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, bool st, bool it)
+void Screen::fillRect(u32 x, u32 y, u32 w, u32 h, Color color)
+{
+	if (x >= mWidth || y >= mHeight || !w || !h) return;
+	if (x + w > mWidth) w = mWidth - x;
+	if (y + h > mHeight) h = mHeight - y;
+
+	rotateRect(x, y, w, h);
+	adjustOffset(x, y);
+
+	for (; h--;) {
+		if (mScrollType == YWrap && y > mOffsetMax) y -= mOffsetMax + 1;
+		fillXRGB(x + mOffsetLeft, y++ + mOffsetTop, w, color);
+	}
+}
+
+void Screen::drawGlyph(u32 x, u32 y, Color fc, Color bc, u16 code, bool dw, bool ul, bool st, bool it)
 {
 	if (x >= mWidth || y >= mHeight) return;
 
@@ -415,7 +434,7 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, b
 	adjustOffset(x, y);
 	for (; nheight--; y++, pixmap += glyph->pitch) {
 		if ((mScrollType == YWrap) && y > mOffsetMax) y -= mOffsetMax + 1;
-		(this->*draw)(x + mOffsetLeft, y + mOffsetTop, nwidth, fc, bc, pixmap);
+		(this->*drawRGB)(x + mOffsetLeft, y + mOffsetTop, nwidth, fc, bc, pixmap);
 	}
 
 	if (st) fillRect(cellx, celly + h / 2, w, 1, fc);  // strikethrough

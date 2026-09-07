@@ -412,7 +412,7 @@ void FbShell::drawChars(CharAttr attr, u16 x, u16 y, u16 w, u16 num, u16 *chars,
 	if (manager->activeShell() != this) return;
 
 	adjustCharAttr(attr);
-	screen->drawText(FW(x), FH(y), attr.fcolor, attr.bcolor, num, chars, dws, 
+	screen->drawText(FW(x), FH(y), Color::unpack(attr.fcolor_rgb), Color::unpack(attr.bcolor_rgb), num, chars, dws, 
 		attr.underline, attr.strike, attr.italic);
 
 	if (mImProxy) {
@@ -717,7 +717,7 @@ void FbShell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 		u16 code = charCode(x, y);
 
 		if (attr.type == CharAttr::DoubleRight) x--;
-		screen->drawText(FW(x), FH(y), attr.bcolor, attr.fcolor, 1, &code, &dw, attr.underline, attr.strike, attr.italic);
+		screen->drawText(FW(x), FH(y), Color::unpack(attr.bcolor_rgb), Color::unpack(attr.fcolor_rgb), 1, &code, &dw, attr.underline, attr.strike, attr.italic);
 
 		mMousePointer.x = x;
 		mMousePointer.y = y;
@@ -768,9 +768,18 @@ void FbShell::adjustCharAttr(CharAttr &attr)
 		u16 temp = attr.bcolor;
 		attr.bcolor = attr.fcolor;
 		attr.fcolor = temp;
+		u32 temprgb = attr.bcolor_rgb;
+		attr.bcolor_rgb = attr.fcolor_rgb;
+		attr.fcolor_rgb = temp;
 
 		if (attr.bcolor > 8 && attr.bcolor < 16) attr.bcolor -= 8;
 	}
+
+	// Overwrite rgb colors only on palete lookup, otherwise keep the rgb values set by the application.
+	if(!attr.fcolor_use_rgb)
+		attr.fcolor_rgb = screen->getFromPalette(attr.fcolor);
+	if(!attr.bcolor_use_rgb)
+		attr.bcolor_rgb = screen->getFromPalette(attr.bcolor);
 }
 
 void FbShell::changeMode(ModeType type, u16 val)

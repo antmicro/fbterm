@@ -427,7 +427,10 @@ void ImProxy::doDrawText(Message *m)
 		dws[i] = (VTerm::charWidth(utf16[i]) == 2);
 	}
 
-	Screen::instance()->drawText(m->drawText.x, m->drawText.y, m->drawText.fc, m->drawText.bc, len, utf16, dws, false, false, false);
+	Screen::instance()->drawText(m->drawText.x, m->drawText.y,
+		Color::unpack(Screen::instance()->getFromPalette(m->drawText.fc)),
+		Color::unpack(Screen::instance()->getFromPalette(m->drawText.bc)),
+		len, utf16, dws, false, false, false);
 }
 
 void ImProxy::waitImMessage(u32 type)

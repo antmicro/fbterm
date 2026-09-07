@@ -22,6 +22,7 @@
 #include <string.h>
 #include "screen.h"
 #include "config.h"
+#include "type.h"
 
 #define writeb(addr, val) (*(volatile u8 *)(addr) = (val))
 #define writew(addr, val) (*(volatile u16 *)(addr) = (val))
@@ -91,15 +92,19 @@ void Screen::initFillDraw()
 	switch (mBitsPerPixel) {
 	case 8:
 		draw = bg ? &Screen::draw8Bg : &Screen::draw8;
+		drawRGB = &Screen::draw8RGB;
 		break;
 	case 15:
 		draw = bg ? &Screen::draw15Bg : &Screen::draw15;
+		drawRGB = &Screen::draw15RGB;
 		break;
 	case 16:
 		draw = bg ? &Screen::draw16Bg : &Screen::draw16;
+		drawRGB = &Screen::draw16RGB;
 		break;
 	case 32:
 		draw = bg ? &Screen::draw32Bg : &Screen::draw32;
+		drawRGB = &Screen::draw32RGB;
 		break;
 	}
 }
@@ -112,6 +117,44 @@ void Screen::endFillDraw()
 void Screen::fillX(u32 x, u32 y, u32 w, u8 color)
 {
 	u32 c = fillColors[color];
+	u8 *dst = mVMemBase + y * mBytesPerLine + x * bytes_per_pixel;
+
+	// get better performance if write-combining not enabled for video memory
+	for (u32 i = w / ppl; i--; dst += 4) {
+		writel(dst, c);
+	}
+
+	if (w & ppw) {
+		writew(dst, c);
+		dst += 2;
+	}
+
+	if (w & ppb) {
+		writeb(dst, c);
+	}
+}
+
+void Screen::fillXRGB(u32 x, u32 y, u32 w, Color color)
+{
+	u32 c;
+	switch (mBitsPerPixel) {
+	case 8: {
+		u8 idx = colorToIndex(color);
+		c = (idx << 24) | (idx << 16) | (idx << 8) | idx;
+		break;
+	}
+	case 15:
+		c = ((color.red >> 3) << 10) | ((color.green >> 3) << 5) | (color.blue >> 3);
+		c |= c << 16;
+		break;
+	case 16:
+		c = ((color.red >> 3) << 11) | ((color.green >> 2) << 5) | (color.blue >> 3);
+		c |= c << 16;
+		break;
+	default:
+		c = color.pack();
+		break;
+	}
 	u8 *dst = mVMemBase + y * mBytesPerLine + x * bytes_per_pixel;
 
 	// get better performance if write-combining not enabled for video memory
@@ -148,6 +191,35 @@ void Screen::draw8(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap)
 		isfg = (*pixmap & 0x80);
 		writeb(dst, fillColors[isfg ? fc : bc]);
 	}
+}
+
+// Maps arbitrary color to nearest color in palette and returns its index
+// This is a private helper, used to that draw8RGB can have the same signature as draw15RGB, draw16RGB and draw32RGB
+u8 Screen::colorToIndex(Color color)
+{
+	u8 best = 0;
+	s32 bestDist = -1;
+
+	for (u32 i = 0; i < NR_COLORS; i++) {
+		if (mPalette[i] == color) return i;
+
+		s32 dr = (s32)mPalette[i].red - color.red;
+		s32 dg = (s32)mPalette[i].green - color.green;
+		s32 db = (s32)mPalette[i].blue - color.blue;
+		s32 dist = dr * dr + dg * dg + db * db;
+
+		if (bestDist < 0 || dist < bestDist) {
+			bestDist = dist;
+			best = i;
+		}
+	}
+
+	return best;
+}
+
+void Screen::draw8RGB(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap)
+{
+	draw8(x, y, w, colorToIndex(fc), colorToIndex(bc), pixmap);
 }
 
 void Screen::draw8Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap)
@@ -196,6 +268,37 @@ void Screen::draw##bits(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap) \
 drawX(15, 5, 5, 5, u16, writew)
 drawX(16, 5, 6, 5, u16, writew)
 drawX(32, 8, 8, 8, u32, writel)
+
+#define drawXRGB(bits, lred, lgreen, lblue, type, fbwrite) \
+ \
+void Screen::draw##bits##RGB(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap) \
+{ \
+	u8 red, green, blue; \
+	u8 pixel; \
+	type color; \
+	type *dst = (type *)(mVMemBase + y * mBytesPerLine + x * bytes_per_pixel); \
+	u32 fcp = (fc.red >> (8 - lred) << (lgreen + lblue)) | (fc.green >> (8 - lgreen) << lblue) | (fc.blue >> (8 - lblue)); \
+	u32 bcp = (bc.red >> (8 - lred) << (lgreen + lblue)) | (bc.green >> (8 - lgreen) << lblue) | (bc.blue >> (8 - lblue)); \
+ \
+	for (; w--; pixmap++, dst++) { \
+		pixel = *pixmap; \
+ \
+		if (!pixel) fbwrite(dst, bcp); \
+		else if (pixel == 0xff) fbwrite(dst, fcp); \
+		else { \
+			red = bc.red + (((fc.red - bc.red) * pixel) >> 8); \
+			green = bc.green + (((fc.green - bc.green) * pixel) >> 8); \
+			blue = bc.blue + (((fc.blue - bc.blue) * pixel) >> 8); \
+ \
+			color = ((red >> (8 - lred) << (lgreen + lblue)) | (green >> (8 - lgreen) << lblue) | (blue >> (8 - lblue))); \
+			fbwrite(dst, color); \
+		} \
+	} \
+}
+
+drawXRGB(15, 5, 5, 5, u16, writew);
+drawXRGB(16, 5, 6, 5, u16, writew);
+drawXRGB(32, 8, 8, 8, u32, writel);
 
 #define drawXBg(bits, lred, lgreen, lblue, type, fbwrite) \
  \

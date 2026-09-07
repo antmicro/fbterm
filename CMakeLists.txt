@@ -8,10 +8,14 @@ find_package(Fontconfig REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBDRM IMPORTED_TARGET libdrm)
-pkg_check_modules(SDL2 IMPORTED_TARGET sdl2)
 pkg_check_modules(LIBINPUT IMPORTED_TARGET libinput>=1.19)
 pkg_check_modules(LIBUDEV IMPORTED_TARGET libudev)
 pkg_check_modules(LIBDBUS IMPORTED_TARGET dbus-1)
+
+option(USE_SDL2 "Enable optional SDL2 backend (dev-only, off by default)" OFF)
+if (USE_SDL2)
+	pkg_check_modules(SDL2 IMPORTED_TARGET sdl2)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 

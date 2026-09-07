@@ -170,5 +170,12 @@ void Sdl2Dev::setupOffset()
 
 void Sdl2Dev::setupPalette(bool restore)
 {
+	if (!restore && !mPalette) return;
+
+	SDL_Color colors[NR_COLORS];
+	for (u32 i = 0; i < NR_COLORS; i++) {
+		colors[i] = { mPalette[i].red, mPalette[i].green, mPalette[i].blue, 255 };
+	}
+	SDL_SetPaletteColors(sdlDrawSurface->format->palette, colors, 0, NR_COLORS);
 }
 

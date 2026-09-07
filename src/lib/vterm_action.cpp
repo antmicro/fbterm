@@ -651,12 +651,15 @@ void VTerm::set_display_attr()
 
 	for (u16 n = 0; n <= npar; n++) {
 		const u16 code = param[n];
+		u32 color = 0;
 
 		if (state == State::COLOR_INDEXED) {
 			if (background) {
 				char_attr.bcolor = code;
+				char_attr.bcolor_use_rgb = false;
 			} else {
 				char_attr.fcolor = code;
+				char_attr.fcolor_use_rgb = false;
 			}
 
 			state = State::DEFAULT;
@@ -666,8 +669,19 @@ void VTerm::set_display_attr()
 		if (state == State::COLOR_PREFIX) {
 			switch (code) {
 			case 2:
-				if (verbose) printf("[vterm] Received unsupported direct-color sequence!\n");
-				n += 3; // if truecolor, skip the next three params
+				if (n + 3 > npar) {
+					state = State::DEFAULT;
+					break;
+				}
+				color = Color::from(param[n+1], param[n+2], param[n+3]).pack();
+				if(background) {
+					char_attr.bcolor_rgb = color;
+					char_attr.bcolor_use_rgb = true;
+				} else {
+					char_attr.fcolor_rgb = color;
+					char_attr.fcolor_use_rgb = true;
+				}
+				n += 3;
 				state = State::DEFAULT;
 				break;
 			case 5:
@@ -742,9 +756,11 @@ void VTerm::set_display_attr()
 				break;
 			case 30 ... 37:
 				char_attr.fcolor = code % 10;
+				char_attr.fcolor_use_rgb = false;
 				break;
 			case 90 ... 97:
 				char_attr.fcolor = code % 10 + 0x08;
+				char_attr.fcolor_use_rgb = false;
 				break;
 			case 38:
 				background = false;
@@ -752,12 +768,15 @@ void VTerm::set_display_attr()
 				break;
 			case 39:
 				char_attr.fcolor = cur_fcolor;
+				char_attr.fcolor_use_rgb = false;
 				break;
 			case 40 ... 47:
 				char_attr.bcolor = code % 10;
+				char_attr.bcolor_use_rgb = false;
 				break;
 			case 100 ... 107:
 				char_attr.bcolor = code % 10 + 0x08;
+				char_attr.bcolor_use_rgb = false;
 				break;
 			case 48:
 				background = true;
@@ -765,6 +784,7 @@ void VTerm::set_display_attr()
 				break;
 			case 49:
 				char_attr.bcolor = cur_bcolor;
+				char_attr.bcolor_use_rgb = false;
 				break;
 			}
 			continue;

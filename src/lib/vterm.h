@@ -56,7 +56,9 @@ public:
 
 		bool operator != (const CharAttr a) {
 			return fcolor != a.fcolor || bcolor != a.bcolor || intensity != a.intensity
-				|| italic != a.italic || underline != a.underline || blink != a.blink || reverse != a.reverse || strike != a.strike;
+				|| italic != a.italic || underline != a.underline || blink != a.blink || reverse != a.reverse || strike != a.strike
+				|| fcolor_use_rgb != a.fcolor_use_rgb || bcolor_use_rgb != a.bcolor_use_rgb
+				|| fcolor_rgb != a.fcolor_rgb || bcolor_rgb != a.bcolor_rgb;
 		}
 
 		u16 fcolor : 8;
@@ -68,6 +70,10 @@ public:
 		u16 reverse : 1;
 		u16 strike: 1;
 		u16 type : 2;
+		u16 fcolor_use_rgb : 1; // When true, use fcolor_rgb instead of fcolor for foreground color
+		u16 bcolor_use_rgb : 1; // When true, use bcolor_rgb instead of bcolor for background color
+		u32 fcolor_rgb; // ARGB value for foreground color
+		u32 bcolor_rgb;	// ARGB value for background color
 	};
 
 	typedef enum {
