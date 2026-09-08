@@ -231,6 +231,32 @@ void VTerm::index_up()
 	else scroll_region(scroll_top, scroll_bot, -1);
 }
 
+void VTerm::scroll_up()
+{
+	if (q_mode || npar) return;
+
+	u16 n = param[0];
+	if (n < 1) n = 1;
+
+	u16 mx = scroll_bot - scroll_top + 1;
+	if (n > mx) n = mx;
+
+	scroll_region(scroll_top, scroll_bot, n);
+}
+
+void VTerm::scroll_down()
+{
+	if (q_mode || npar) return;
+
+	u16 n = param[0];
+	if (n < 1) n = 1;
+
+	u16 mx = scroll_bot - scroll_top + 1;
+	if (n > mx) n = mx;
+
+	scroll_region(scroll_top, scroll_bot, -n);
+}
+
 void VTerm::cursor_left()
 {
 	u16 n, x;
@@ -522,57 +548,75 @@ void VTerm::keypad_application()
 
 void VTerm::enable_mode(bool enable)
 {
-	switch (param[0] + 1000 * q_mode) {
-	case 3:
-		mode_flags.display_ctrl = enable;
-		break;
-	case 4:
-		mode_flags.insert_mode = enable;
-		break;
-	case 20: // auto echo cr with lf
-		mode_flags.crlf = enable;
-		modeChanged(CRWithLF);
-		break;
-	case 1001 :
-		mode_flags.cursorkey_esco = enable;
-		modeChanged(CursorKeyEscO);
-		break;
-	case 1003 :
-		mode_flags.col_132 = enable;
-		break;
-	case 1005 :
-		mode_flags.inverse_screen = enable;
-		for (u16 i = 0; i < height; i++) {
-			changed_line(i, 0, width - 1);
+	for (u32 n = 0; n <= npar; n++) {
+		u32 code = param[n] + 1000 * q_mode;
+
+		switch (code) {
+		case 3:
+			mode_flags.display_ctrl = enable;
+			break;
+		case 4:
+			mode_flags.insert_mode = enable;
+			break;
+		case 20: // auto echo cr with lf
+			mode_flags.crlf = enable;
+			modeChanged(CRWithLF);
+			break;
+		case 1001 :
+			mode_flags.cursorkey_esco = enable;
+			modeChanged(CursorKeyEscO);
+			break;
+		case 1003 :
+			mode_flags.col_132 = enable;
+			break;
+		case 1005 :
+			mode_flags.inverse_screen = enable;
+			for (u16 i = 0; i < height; i++) {
+				changed_line(i, 0, width - 1);
+			}
+			break;
+		case 1006 :
+			mode_flags.cursor_relative = enable;
+			break;
+		case 1007 :
+			mode_flags.auto_wrap = enable;
+			break;
+		case 1008 :
+			mode_flags.autorepeat_key = enable;
+			modeChanged(AutoRepeatKey);
+			break;
+		case 1009 :
+		case 2000 :
+		case 2002 :
+		case 2003 : {
+			u16 report = MouseX10;
+			if (code == 2000) report = MouseX11;
+			else if (code == 2002) report = MouseButtonEvent;
+			else if (code == 2003) report = MouseAnyEvent;
+
+			if (enable) {
+				mode_flags.mouse_report = (mode_flags.mouse_report & MouseSGR) | report;
+			} else if ((mode_flags.mouse_report & MouseTrackingMask) == report) {
+				mode_flags.mouse_report &= MouseSGR;
+			}
+			modeChanged(MouseReport);
+			break;
 		}
-		break;
-	case 1006 :
-		mode_flags.cursor_relative = enable;
-		break;
-	case 1007 :
-		mode_flags.auto_wrap = enable;
-		break;
-	case 1008 :
-		mode_flags.autorepeat_key = enable;
-		modeChanged(AutoRepeatKey);
-		break;
-	case 1009 :
-		mode_flags.mouse_report = (enable ? MouseX10 : MouseNone);
-		modeChanged(MouseReport);
-		break;
-	case 1025 :
-		mode_flags.cursor_visible = enable;
-		modeChanged(CursorVisible);
-		break;
-	case 2049: // ?1049
-		switchBuffer(enable ? ScreenBufferType::Alternate : ScreenBufferType::Primary);
-		break;
-	case 2000 :
-		mode_flags.mouse_report = (enable ? MouseX11 : MouseNone);
-		modeChanged(MouseReport);
-		break;
-	default:
-		break;
+		case 1025 :
+			mode_flags.cursor_visible = enable;
+			modeChanged(CursorVisible);
+			break;
+		case 2049: // ?1049
+			switchBuffer(enable ? ScreenBufferType::Alternate : ScreenBufferType::Primary);
+			break;
+		case 2006 :
+			if (enable) mode_flags.mouse_report |= MouseSGR;
+			else mode_flags.mouse_report &= MouseTrackingMask;
+			modeChanged(MouseReport);
+			break;
+		default:
+			break;
+		}
 	}
 }
 

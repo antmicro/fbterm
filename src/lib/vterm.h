@@ -71,7 +71,13 @@ public:
 	};
 
 	typedef enum {
-		MouseNone, MouseX11, MouseX10,
+		MouseNone = 0,
+		MouseX11,
+		MouseX10,
+		MouseButtonEvent,
+		MouseAnyEvent,
+		MouseTrackingMask = 0x0f,
+		MouseSGR = 0x10,
 	} MouseReportType;
 
 	typedef enum {
@@ -197,6 +203,8 @@ private:
 	void clear_tab();
 	void index_down();
 	void index_up();
+	void scroll_up();
+	void scroll_down();
 	void next_line();
 	void cursor_left();
 	void cursor_right();
@@ -348,7 +356,7 @@ private:
 		u16 applic_keypad : 1;
 		u16 autorepeat_key : 1;
 		u16 cursorkey_esco : 1;
-		u16 mouse_report : 2;
+		u16 mouse_report : 5;
 		u16 cursor_shape : 3;
 	} mode_flags;
 

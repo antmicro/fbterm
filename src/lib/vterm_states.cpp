@@ -93,6 +93,8 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	{ 'L', &VTerm::insert_line, ESnormal },
 	{ 'M', &VTerm::delete_line,	ESnormal },
 	{ 'P', &VTerm::delete_char,	ESnormal },
+	{ 'S', &VTerm::scroll_up,	ESnormal },
+	{ 'T', &VTerm::scroll_down,	ESnormal },
 	{ 'X', &VTerm::erase_char,	ESnormal },
 	{ 'a', &VTerm::cursor_right,ESnormal },
 	{ 'c', &VTerm::set_cursor_type,	ESnormal },

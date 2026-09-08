@@ -158,7 +158,9 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 
 	s32 btn = buttons & MouseButtonMask;
 	s32 modifies = buttons & ModifyButtonMask;
-	u16 rtype = mode(MouseReport);
+	u16 report = mode(MouseReport);
+	u16 rtype = report & MouseTrackingMask;
+	bool sgr = report & MouseSGR;
 
 	if (btn && type != Wheel && (rtype == MouseNone || (modifies & ShiftButton))) {
 		textSelect(x, y, type, btn);
@@ -168,6 +170,7 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 	if (rtype == MouseNone) return;
 
 	s32 val = -1;
+	bool release = false;
 
 	switch (type) {
 	case Press:
@@ -177,10 +180,30 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 		else if (btn & RightButton) val = 2;
 		break;
 	case Release:
-		if (rtype == MouseX11) val = 3;
+		if (rtype != MouseX10) {
+			if (sgr) {
+				if (btn & LeftButton) val = 0;
+				else if (btn & MidButton) val = 1;
+				else if (btn & RightButton) val = 2;
+				release = (val != -1);
+			} else {
+				val = 3;
+			}
+		}
+		break;
+	case Move:
+		if (rtype == MouseButtonEvent || rtype == MouseAnyEvent) {
+			if (rtype == MouseButtonEvent && !btn) break;
+
+			if (btn & LeftButton) val = 0;
+			else if (btn & MidButton) val = 1;
+			else if (btn & RightButton) val = 2;
+			else val = 3;
+			val |= 32;
+		}
 		break;
 	case Wheel:
-		if (rtype == MouseX11) {
+		if (rtype != MouseX10) {
 			val = 64;
 			if (btn & WheelDown) val |= 1;
 		}
@@ -189,14 +212,18 @@ void Shell::mouseInput(u16 x, u16 y, s32 type, s32 buttons)
 		break;
 	}
 
-	if (rtype == MouseX11 && val != -1) {
-		if (modifies & ShiftButton)	val |= 4;
+	if (rtype != MouseX10 && val != -1) {
+		if (modifies & ShiftButton) val |= 4;
 		if (modifies & AltButton) val |= 8;
 		if (modifies & ControlButton) val |= 16;
 	}
 
 	if (val != -1) {
-		sendBack("\e[M%c%c%c", ' ' + val, ' ' + x + 1, ' ' + y + 1);
+		if (sgr) {
+			sendBack("\e[<%d;%d;%d%c", val, x + 1, y + 1, release ? 'm' : 'M');
+		} else {
+			sendBack("\e[M%c%c%c", ' ' + val, ' ' + x + 1, ' ' + y + 1);
+		}
 	}
 }
 
