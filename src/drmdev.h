@@ -11,6 +11,7 @@
 class DrmDev : public Screen {
 public:
 	bool acquireLease(int &lease_fd);
+	DrmDev *getDrmDev() override { return this; }
 private:
 	friend class Screen;
 	static DrmDev *initDrmDev();

@@ -18,6 +18,7 @@
  *
  */
 
+#include <memory>
 #include <unistd.h>
 #include <stdio.h>
 #include <signal.h>
@@ -107,6 +108,9 @@ FbTerm::FbTerm()
 
 FbTerm::~FbTerm()
 {
+#ifdef ENABLE_DRM
+	mDbus.reset();
+#endif
 	IoDispatcher::uninstance();
 	FbShellManager::uninstance();
 	Screen::uninstance();
@@ -169,6 +173,16 @@ void FbTerm::init()
 			}
 		}
 	}
+
+#ifdef ENABLE_DRM
+	if (auto *drm = Screen::instance()->getDrmDev()) {
+		mDbus = std::make_unique<FbTermDbus>(*drm);
+		if (!mDbus->valid()) {
+			fprintf(stderr, "DBus init failed!\n");
+		}
+	}
+#endif
+
 	mInit = true;
 }
 

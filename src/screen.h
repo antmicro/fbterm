@@ -53,6 +53,10 @@ struct Color {
 
 typedef enum { Rotate0 = 0, Rotate90, Rotate180, Rotate270 } RotateType;
 
+#ifdef ENABLE_DRM
+class DrmDev;
+#endif
+
 class Screen : public WindowInfo
 {
 	DECLARE_INSTANCE(Screen)
@@ -80,6 +84,10 @@ public :
 	virtual void setSize(int w, int h);
 	virtual void setOffset(int x, int y);
 	virtual void present();
+
+#ifdef ENABLE_DRM
+	virtual DrmDev *getDrmDev() { return nullptr; }
+#endif
 
 protected:
 	u32 mBitsPerPixel, mBytesPerLine;

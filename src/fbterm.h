@@ -24,6 +24,9 @@
 #include "type.h"
 #include "instance.h"
 #include "idle_timer.h"
+#ifdef ENABLE_DRM
+#include "dbus.h"
+#endif
 
 class FbTerm {
 	DECLARE_INSTANCE(FbTerm)
@@ -42,6 +45,9 @@ private:
 
 	bool mInit, mRun;
 	IdleTimer *mIdleTimer;
+#ifdef ENABLE_DRM
+	std::unique_ptr<FbTermDbus> mDbus;
+#endif
 };
 
 #endif
