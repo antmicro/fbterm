@@ -9,6 +9,8 @@
 #include <libdrm/drm_fourcc.h>
 
 class DrmDev : public Screen {
+public:
+	bool acquireLease(int &lease_fd);
 private:
 	friend class Screen;
 	static DrmDev *initDrmDev();

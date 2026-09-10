@@ -588,3 +588,49 @@ void DrmDev::present() {
 			LOG("drmModePageFlip: %s", strerror(errno));
 		}
 }
+
+bool DrmDev::acquireLease(int &lease_fd)
+{
+	lease_fd = -1;
+
+	if (drm_fd < 0 || drm_connector_id == 0 ||
+			drm_crtc_id == 0 ||
+			drm_primary_plane_id == 0 ||
+			drm_cursor_plane_id == 0) {
+		return false;
+	}
+
+	const u32 objects[] = {
+		drm_primary_plane_id,
+		drm_cursor_plane_id,
+		drm_crtc_id,
+		drm_connector_id,
+	};
+
+	u32 lessee_id = 0;
+
+	int fd = drmModeCreateLease(
+			drm_fd, objects, 4, O_CLOEXEC, &lessee_id);
+
+	if (fd < 0) {
+		fprintf(stderr,
+				"drmModeCreateLease failed: %s\n",
+				strerror(errno));
+		return false;
+	}
+
+
+	int ret = drmSetClientCap(
+			fd,
+			DRM_CLIENT_CAP_UNIVERSAL_PLANES,
+			1);
+	if (ret != 0) {
+		fprintf(stderr, "drmSetClientCap failed: %s\n",
+				strerror(errno));
+		close(fd);
+		return false;
+	}
+
+	lease_fd = fd;
+	return true;
+}
