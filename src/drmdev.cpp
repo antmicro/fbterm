@@ -47,16 +47,25 @@ static drmModeEncoder *findEncoderForConnector(s32 fd, drmModeConnector *conn)
 
 // Picks which CRTC to use for a given encoder - prefers whatever it's
 // already bound to over any other CRTC it could theoretically reach.
-static bool findCrtcForEncoder(drmModeRes *res, drmModeEncoder *enc, u32 *crtcId)
+static bool findCrtcForEncoder(drmModeRes *res, drmModeEncoder *enc, u32 *crtcId, u32 *crtcIdx)
 {
 	if (enc->crtc_id) {
 		*crtcId = enc->crtc_id;
-		return true;
+
+		for (int i = 0; i < res->count_crtcs; i++) {
+			if (res->crtcs[i] == enc->crtc_id) {
+				*crtcIdx = i;
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	for (int i = 0; i < res->count_crtcs; i++) {
 		if (enc->possible_crtcs & (1 << i)) {
 			*crtcId = res->crtcs[i];
+			*crtcIdx = i;
 			return true;
 		}
 	}
@@ -83,6 +92,84 @@ static bool findConnectorByName(s32 fd, drmModeRes *res, const char *name, drmMo
 	}
 
 	return false;
+}
+
+uint32_t GetPropertyId(s32 fd, uint32_t obj_id, uint32_t obj_type, const char* name)
+{
+    uint32_t prop_id = 0;
+
+    drmModeObjectProperties *props = drmModeObjectGetProperties(fd, obj_id, obj_type);
+    if (!props) return 0;
+
+    for (uint32_t i = 0; i < props->count_props; i++) {
+        drmModePropertyRes *prop = drmModeGetProperty(fd, props->props[i]);
+        if (!prop) continue;
+
+        if (strcmp(prop->name, name) == 0) {
+            prop_id = prop->prop_id;
+            drmModeFreeProperty(prop);
+            break;
+        }
+        drmModeFreeProperty(prop);
+    }
+
+    drmModeFreeObjectProperties(props);
+    return prop_id;
+}
+
+uint32_t GetPlaneType(s32 fd, uint32_t plane_id)
+{
+    drmModeObjectProperties *props =
+        drmModeObjectGetProperties(fd, plane_id, DRM_MODE_OBJECT_PLANE);
+    if (!props) {
+        fprintf(stderr, "Failed to get properties for DRM plane %u!", plane_id);
+        return uint32_t(-1);
+    }
+
+    uint32_t type_prop_id =
+        GetPropertyId(fd, plane_id, DRM_MODE_OBJECT_PLANE, "type");
+
+    for (uint32_t i = 0; i < props->count_props; i++) {
+        if (props->props[i] == type_prop_id) {
+            uint32_t type_val = (uint32_t)props->prop_values[i];
+            drmModeFreeObjectProperties(props);
+            return type_val;
+        }
+    }
+
+    drmModeFreeObjectProperties(props);
+    return uint32_t(-1);
+}
+
+uint32_t FindPlaneByType(s32 fd, u32 crtc_idx, uint32_t planeType)
+{
+	drmModePlaneRes *planes = drmModeGetPlaneResources(fd);
+	if (!planes)
+		return 0;
+
+	uint32_t planeId = 0;
+
+	for (u32 i = 0; i < planes->count_planes; ++i) {
+		u32 id = planes->planes[i];
+
+		if (GetPlaneType(fd, id) != planeType)
+			continue;
+
+		drmModePlane *plane = drmModeGetPlane(fd, id);
+		if (!plane)
+			continue;
+
+		if (plane->possible_crtcs & (1U << crtc_idx)) {
+			planeId = id;
+			drmModeFreePlane(plane);
+			break;
+		}
+
+		drmModeFreePlane(plane);
+	}
+
+	drmModeFreePlaneResources(planes);
+	return planeId;
 }
 
 static bool isEmbeddedConnector(s32 connector_type)
@@ -330,7 +417,7 @@ bool DrmDev::setup() {
 	LOG("using connector %s-%d", drmModeGetConnectorTypeName(conn->connector_type), conn->connector_type_id);
 
 	drmModeEncoder *enc = findEncoderForConnector(drm_fd, conn);
-	if (!enc || !findCrtcForEncoder(res, enc, &drm_crtc_id)) {
+	if (!enc || !findCrtcForEncoder(res, enc, &drm_crtc_id, &drm_crtc_index)) {
 		LOG("no usable crtc for connector %u", conn->connector_id);
 		if (enc) drmModeFreeEncoder(enc);
 		drmModeFreeConnector(conn);
@@ -346,6 +433,22 @@ bool DrmDev::setup() {
 	LOG("using connector %u, crtc %u, mode %s %ux%u@%uHz",
 		conn->connector_id, drm_crtc_id, conn->modes[0].name,
 		conn->modes[0].hdisplay, conn->modes[0].vdisplay, conn->modes[0].vrefresh);
+
+	if (drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) != 0) {
+		fprintf(stderr, "Failed to enable universal planes: %s\n", strerror(errno));
+	}
+
+	drm_primary_plane_id = FindPlaneByType(drm_fd, drm_crtc_index, DRM_PLANE_TYPE_PRIMARY);
+	if (!drm_primary_plane_id) {
+		fprintf(stderr, "Failed to find primary DRM plane\n");
+		return false;
+	}
+
+	drm_cursor_plane_id = FindPlaneByType(drm_fd, drm_crtc_index, DRM_PLANE_TYPE_CURSOR);
+	if (!drm_cursor_plane_id) {
+		fprintf(stderr, "Failed to find cursor DRM plane\n");
+		return false;
+	}
 
 	struct drm_mode_create_dumb creq = {0};
 	creq.width = drm_mode.hdisplay;

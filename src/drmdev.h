@@ -25,9 +25,16 @@ private:
 	bool setup(void);
 	void cleanup(void);
 
+	bool findPrimaryPlane();
+	bool findCursorPlane();
+
 	s32 drm_fd = -1;
 	u32 drm_crtc_id = 0;
+	u32 drm_crtc_index = 0;
 	u32 drm_connector_id = 0;
+	u32 drm_encoder_id = 0;
+	u32 drm_primary_plane_id = 0;
+	u32 drm_cursor_plane_id = 0;
 	u32 drm_fb_id = 0;
 	u32 drm_handle = 0;
 	u32 drm_pitch = 0;
