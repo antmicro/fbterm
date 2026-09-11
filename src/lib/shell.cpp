@@ -34,6 +34,7 @@
 #include <stdarg.h>
 #include <string>
 #include <inttypes.h>
+#include "font.h"
 
 void waitChildProcessExit(s32 pid)
 {
@@ -158,8 +159,8 @@ void Shell::resize(u16 w, u16 h)
 	VTerm::resize(w, h);
 
 	struct winsize size;
-	size.ws_xpixel = 0;
-	size.ws_ypixel = 0;
+	size.ws_xpixel = FW(w);
+	size.ws_ypixel = FH(h);
 	size.ws_col = w;
 	size.ws_row = h;
 	ioctl(fd(), TIOCSWINSZ, &size);

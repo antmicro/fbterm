@@ -597,6 +597,17 @@ void FbShell::request(RequestType type,  u32 val)
 	}
 }
 
+void FbShell::drawImage(int x, int y, u32 w, u32 h, u8* image) {
+	if (manager->activeShell() != this) return;
+
+	screen->drawImage(FW(x), FH(y), w, h, image);
+
+	if (mImProxy) {
+		Rectangle rect = { FW(x), FH(y), w, h };
+		mImProxy->redrawImWin(rect);
+	}
+}
+
 static s32 tty0_fd = -1;
 
 void FbShell::switchVt(bool enter, FbShell *peer)

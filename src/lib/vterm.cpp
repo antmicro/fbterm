@@ -24,6 +24,7 @@
 #include "../fbshellman.h"
 #include "io.h"
 #include "../config.h"
+#include "font.h"
 
 #include <asm/termbits.h>
 #include <sys/ioctl.h>
@@ -301,8 +302,8 @@ void VTerm::resize(u16 w, u16 h)
 	height = h;
 
 	struct winsize ws;
-	ws.ws_xpixel = 0;
-	ws.ws_ypixel = 0;
+	ws.ws_xpixel = FW(width);
+	ws.ws_ypixel = FH(height);
 	ws.ws_row = height;
 	ws.ws_col = width;
 
@@ -627,6 +628,9 @@ void VTerm::expose(u16 x, u16 y, u16 w, u16 h)
 	if (x + w > width) w = width - x;
 	if (y + h > height) h = height - y;
 
+	u16 start_y = y;
+	u16 start_h = h;
+
 	for (; h--; y++) {
 		u32 yp = get_line(y) * max_width;
 
@@ -659,6 +663,16 @@ void VTerm::expose(u16 x, u16 y, u16 w, u16 h)
 
 		attr.reverse ^= mode_flags.inverse_screen;
 		drawChars(attr, start, y, cur - start, num, codes, dws);
+	}
+
+	for (auto& image : grid->images) {
+		if (!image.printed) continue;
+
+		int image_y = image.pos_row - visual_start_line;
+		if (image_y + image.size_rows - 1 < start_y || image_y > start_y + start_h - 1) continue;
+		if (image.pos_col + image.size_cols - 1 < x || image.pos_col > x + w - 1) continue;
+
+		drawImage(image);
 	}
 }
 
@@ -706,6 +720,14 @@ void VTerm::scroll_region(u16 start_y, u16 end_y, s16 num)
 	if (fast_scroll) {
 		memcpy(temp_sx, grid->dirty_startx, sizeof(temp_sx));
 		memcpy(temp_ex, grid->dirty_endx, sizeof(temp_ex));
+	}
+
+	for (auto it = grid->images.begin(); it != grid->images.end();) {
+		auto& image = *it;
+
+		if (image.pos_row + image.size_rows < 0) {
+			it = grid->images.erase(it);
+		} else it++;
 	}
 
 	// move the lines by renumbering where they point to
@@ -781,6 +803,44 @@ void VTerm::clear_grid_area(GridState *g, u16 start_x, u16 start_y, u16 end_x, u
 
 		if (g == grid) changed_line(y, start_x, end_x);
 	}
+
+	for (auto it = g->images.begin(); it != g->images.end(); it++) {
+		auto& image = *it;
+		if (!image.printed) continue;
+
+		int ax, ay, bx, by;
+		ax = image.pos_col;
+		ay = image.pos_row - visual_start_line;
+		bx = ax + image.size_cols - 1;
+		by = ay + image.size_rows - 1;
+
+		if (end_x < ax || start_x > bx) continue;
+		if (end_y < ay || start_y > by) continue;
+
+		// special case, we can remove the image
+		if (start_x <= ax && end_x >= bx && start_y <= ay && end_y >= by) {
+			it = g->images.erase(it);
+			it--;
+			continue;
+		}
+
+		int img_start_x = FW(start_x - ax);
+		if (img_start_x < 0) img_start_x = 0;
+
+		int img_end_x = FW(end_x - image.pos_col + 1);
+		if (img_end_x >= image.width) img_end_x = image.width - 1;
+
+		int img_start_y = FH(start_y - ay);
+		if (img_start_y < 0) img_start_y = 0;
+
+		int img_end_y = FH(end_y - image.pos_row + 1);
+		if (img_end_y >= image.height) img_end_y = image.height - 1;
+
+		for (int i = img_start_y; i <= img_end_y; i++) {
+			u8* dst = image.pixels.data() + (i * image.width + img_start_x) * 4;
+			memset(dst, 0, (img_end_x - img_start_x) * 4);
+		}
+	}
 }
 
 void VTerm::clear_area(u16 start_x, u16 start_y, u16 end_x, u16 end_y)
@@ -843,6 +903,10 @@ void VTerm::history_scroll(u16 num)
 {
 	if (!history_lines) return;
 
+	if (history_full) {
+		for (auto& image : grid->images) image.pos_row -= num;
+	}
+
 	u32 yp, yp_history;
 	for (u16 i = 0; i < num; i++) {
 		yp = grid->linenumbers[i] * max_width;
@@ -860,7 +924,10 @@ void VTerm::history_scroll(u16 num)
 		history_save_line++;
 		if (history_save_line == history_lines) {
 			history_save_line = 0;
-			if (!history_full) history_full = true;
+			if (!history_full) {
+				history_full = true;
+				for (auto& image : grid->images) image.pos_row -= num - i - 1;
+			}
 		}
 	}
 
@@ -1006,4 +1073,29 @@ void VTerm::reset_alt_screen() {
 
 	memset(grid->tab_stops, 0, max_width / 8 + 1);
 	clear_area(0, 0, width - 1, height - 1);
+}
+
+void VTerm::drawImage(VTermImage& image) {
+	int image_start_y = image.pos_row;
+	int image_end_y = image.pos_row + image.size_rows - 1;
+	int screen_start_y = visual_start_line;
+	int screen_end_y = visual_start_line + height - 1;
+
+	if (image_end_y < screen_start_y) return;
+	if (image_start_y > screen_end_y) return;
+
+	drawImage(image.pos_col, image.pos_row - visual_start_line, image.width, image.height, image.pixels.data());
+}
+
+void VTerm::add_image(VTermImage& image) {
+	for (auto it = grid->images.begin(); it != grid->images.end();) {
+		auto& other = *it;
+		if(image.pos_row <= other.pos_row && image.pos_col <= other.pos_col &&
+			image.pos_row+image.size_rows >= other.pos_row+other.size_rows &&
+			image.pos_row+image.size_rows >= other.pos_row+other.size_rows
+		) {
+			it = grid->images.erase(it);
+		} else it++;
+	}
+	grid->images.push_back(image);
 }

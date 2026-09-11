@@ -24,6 +24,9 @@
 #define VTERM_H
 
 #include "type.h"
+#include <string>
+#include <vector>
+#include <list>
 
 struct WindowPlacement {
 
@@ -123,6 +126,18 @@ public:
 		bool g0_is_active;
 	};
 
+	struct VTermImage {
+		std::vector<u8> pixels;
+		u32 width;
+		u32 height;
+
+		int pos_row;
+		int pos_col;
+		int size_rows;
+		int size_cols;
+		bool printed;
+	};
+
 	typedef struct {
 		u16 *text;
 		CharAttr *attrs;
@@ -134,6 +149,8 @@ public:
 		CursorState cursor;
 		// DECSC/DECRC save slot, kept per buffer so alt/primary don't clobber each other
 		CursorState saved_cursor;
+
+		std::list<VTermImage> images;
 	} GridState;
 
 	VTerm(u16 w = 0, u16 h = 0);
@@ -164,6 +181,8 @@ protected:
 	virtual void historyChanged(u32 cur, u32 total) {}
 	virtual void request(RequestType type, u32 val = 0) {}
 	virtual void requestUpdate(u16 x, u16 y, u16 w, u16 h);
+	virtual void drawImage(VTermImage& image);
+	virtual void drawImage(int x, int y, u32 w, u32 h, u8* image) {}
 	virtual WindowInfo* getWindowInfo();
 
 	WindowPlacement window;
@@ -261,6 +280,12 @@ private:
 	void get_key_modifier();
 	void osc_end();
 
+	// sixel
+	void begin_sixel();
+	void end_sixel();
+	void sixel_char();
+	void add_image(VTermImage& image);
+
 	CharAttr normal_char_attr();
 	CharAttr erase_char_attr();
 
@@ -283,9 +308,11 @@ private:
 		EShash    = 6,
 		ESgreater = 7,
 		ESdcs     = 8,
-		EStermcap = 9,
-		ESst      = 10,
-		ESkeep    = 11
+		ESsixel   = 9,
+		ESpreterm = 10,
+		EStermcap = 11,
+		ESst      = 12,
+		ESkeep    = 13
 	} EscapeState;
 
 	static inline const char* EscapeStateToString(EscapeState state) {
@@ -299,6 +326,7 @@ private:
 			case EShash:    return "ESC #";
 			case ESgreater: return "CSI >";
 			case ESdcs:     return "DCS";
+			case ESsixel:   return "DCS q";
 			case EStermcap: return "DCS + q";
 			case ESst:      return "ST";
 			case ESkeep:    return "<previous>";
@@ -390,6 +418,8 @@ private:
 	static u16 history_lines;
 	bool history_full;
 	u32 history_save_line, visual_start_line;
+
+	std::string sixel_buffer;
 };
 
 #endif

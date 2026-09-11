@@ -363,6 +363,26 @@ void Screen::drawGlyphs(u32 x, u32 y, Color fc, Color bc, u16 num, u16 *text, bo
 	}
 }
 
+void Screen::drawImage(int x, int y, u32 w, u32 h, u8* image) {
+	int startx = MAX(x, 0);
+	int xoffset = startx - x;
+
+	int starty = MAX(y, 0);
+	int yoffset = starty - y;
+
+	int endx = MIN(x + w, this->mWidth);
+	int width = endx - startx;
+
+	int endy = MIN(y + h, MIN(FH(this->mRows), this->mHeight));
+	int height = endy - starty;
+
+	if (startx >= this->mWidth || endx <= 0) return;
+	if (starty >= this->mHeight || endy <= 0) return;
+	if (xoffset >= w || yoffset >= h) return;
+
+	(this->*drawPixels)(startx, starty, width, height, xoffset, yoffset, w, image);
+}
+
 u32 Screen::getFromPalette(u8 index) {
 	return mPalette[index].pack();
 }

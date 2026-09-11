@@ -28,6 +28,9 @@
 #define writew(addr, val) (*(volatile u16 *)(addr) = (val))
 #define writel(addr, val) (*(volatile u32 *)(addr) = (val))
 
+#define MAX(a, b) (((a) > (b) ? (a) : (b)))
+#define MIN(a, b) (((a) < (b) ? (a) : (b)))
+
 static u32 bytes_per_pixel;
 static u32 ppl, ppw, ppb;
 static u32 fillColors[NR_COLORS];
@@ -97,18 +100,22 @@ void Screen::initFillDraw()
 	case 8:
 		draw = bg ? &Screen::draw8Bg : &Screen::draw8;
 		drawRGB = &Screen::draw8RGB;
+		drawPixels = &Screen::draw8Pixels;
 		break;
 	case 15:
 		draw = bg ? &Screen::draw15Bg : &Screen::draw15;
 		drawRGB = &Screen::draw15RGB;
+		drawPixels = &Screen::draw15Pixels;
 		break;
 	case 16:
 		draw = bg ? &Screen::draw16Bg : &Screen::draw16;
 		drawRGB = &Screen::draw16RGB;
+		drawPixels = &Screen::draw16Pixels;
 		break;
 	case 32:
 		draw = bg ? &Screen::draw32Bg : &Screen::draw32;
 		drawRGB = &Screen::draw32RGB;
+		drawPixels = &Screen::draw32Pixels;
 		break;
 	}
 }
@@ -224,6 +231,62 @@ u8 Screen::colorToIndex(Color color)
 void Screen::draw8RGB(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap)
 {
 	draw8(x, y, w, colorToIndex(fc), colorToIndex(bc), pixmap);
+}
+
+void Screen::draw8Pixels(u32 x, u32 y, u32 w, u32 h, u32 xoff, u32 yoff, u32 sw, u8* pixels) {
+	long step;
+	switch(mRotateType) {
+	case Rotate90:
+		step = -sw * 4 - 4;
+		break;
+	case Rotate180:
+		step = -8;
+		break;
+	case Rotate270:
+		step = sw * 4 - 4;
+		break;
+	default:
+		step = 0;
+		break;
+	};
+
+	for (int i = 0; i < h; i++) {
+		u8* dst = mVMemBase + (y + i + mOffsetTop) * mBytesPerLine + (x + mOffsetLeft) * bytes_per_pixel;
+
+		u32 sx, sy;
+		switch(mRotateType) {
+		case Rotate0:
+			sx = xoff;
+			sy = yoff + i;
+			break;
+		case Rotate90:
+			sx = xoff + i;
+			sy = yoff + w - 1;
+			break;
+		case Rotate180:
+			sx = xoff + w - 1;
+			sy = yoff + h - 1 - i;
+			break;
+		case Rotate270:
+			sx = xoff + h - 1 - i;
+			sy = yoff;
+			break;
+		}
+
+		u8* src = &pixels[(sy * sw + sx) * 4];
+		for (int j = 0; j < w; j++) {
+			u8 b = *(src++);
+			u8 g = *(src++);
+			u8 r = *(src++);
+			u8 a = *(src++);
+			src += step;
+
+			if (a == 0) continue;
+			u8 luma = MIN(r * 0.299f + g * 0.587f + b * 0.114f, 255);
+
+			writeb(dst++, luma);
+		}
+	}
 }
 
 void Screen::draw8Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap)
@@ -344,6 +407,73 @@ void Screen::draw##bits##Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap) \
 	} \
 }
 
-drawXBg(15, 5, 5, 5, u16, writew)
-drawXBg(16, 5, 6, 5, u16, writew)
-drawXBg(32, 8, 8, 8, u32, writel)
+drawXBg(15, 5, 5, 5, u16, writew);
+drawXBg(16, 5, 6, 5, u16, writew);
+drawXBg(32, 8, 8, 8, u32, writel);
+
+#define drawXPixels(bits, lred, lgreen, lblue, type, fbwrite) \
+ \
+void Screen::draw##bits##Pixels(u32 x, u32 y, u32 w, u32 h, u32 xoff, u32 yoff, u32 sw, u8 *pixels) \
+{ \
+	u8 red, green, blue, alpha; \
+	type color; \
+ \
+	long step; \
+	switch(mRotateType) { \
+	case Rotate90: \
+		step = -sw * 4 - 4; \
+		break; \
+	case Rotate180: \
+		step = -8; \
+		break; \
+	case Rotate270: \
+		step = sw * 4 - 4; \
+		break; \
+	default: \
+		step = 0; \
+		break; \
+	}; \
+ \
+	rotateRect(x, y, w, h); \
+ \
+	for (int i = 0; i < h; i++) { \
+		type *dst = (type *)(mVMemBase + (y + i + mOffsetTop) * mBytesPerLine + (x + mOffsetLeft) * bytes_per_pixel); \
+ \
+		u32 sx, sy; \
+		switch(mRotateType) { \
+		case Rotate0: \
+			sx = xoff; \
+			sy = yoff + i; \
+			break; \
+		case Rotate90: \
+			sx = xoff + i; \
+			sy = yoff + w - 1; \
+			break; \
+		case Rotate180: \
+			sx = xoff + w - 1; \
+			sy = yoff + h - 1 - i; \
+			break; \
+		case Rotate270: \
+			sx = xoff + h - 1 - i; \
+			sy = yoff; \
+			break; \
+		} \
+ \
+		u8* src = pixels + (sy * sw + sx) * 4; \
+		for (int j = 0; j < w; j++) { \
+			blue = *(src++); \
+			green = *(src++); \
+			red = *(src++); \
+			alpha = *(src++); \
+			src += step; \
+ \
+			if (alpha == 0) continue; \
+			color = ((red >> (8 - lred) << (lgreen + lblue)) | (green >> (8 - lgreen) << lblue) | (blue >> (8 - lblue))); \
+			fbwrite(dst++, color); \
+		} \
+	} \
+}
+
+drawXPixels(15, 5, 5, 5, u16, writew);
+drawXPixels(16, 5, 6, 5, u16, writew);
+drawXPixels(32, 8, 8, 8, u32, writel);

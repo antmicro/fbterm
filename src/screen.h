@@ -82,6 +82,8 @@ public :
 	void fillRect(u32 x, u32 y, u32 w, u32 h, Color color);
 	u32 getFromPalette(u8 index);
 
+	void drawImage(int x, int y, u32 w, u32 h, u8* image);
+
 	bool move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h);
 	void setPalette(const Color *palette);
 	void updatePaletteColor(size_t i);
@@ -149,14 +151,20 @@ private:
 	void draw15Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
 	void draw16Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
 	void draw32Bg(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
+	void draw8Pixels(u32 x, u32 y, u32 w, u32 h, u32 xoff, u32 yoff, u32 sw, u8 *pixels);
+	void draw15Pixels(u32 x, u32 y, u32 w, u32 h, u32 xoff, u32 yoff, u32 sw, u8 *pixels);
+	void draw16Pixels(u32 x, u32 y, u32 w, u32 h, u32 xoff, u32 yoff, u32 sw, u8 *pixels);
+	void draw32Pixels(u32 x, u32 y, u32 w, u32 h, u32 xoff, u32 yoff, u32 sw, u8 *pixels);
 
 	typedef void (Screen::*fillFun)(u32 x, u32 y, u32 w, u8 color);
 	typedef void (Screen::*drawFun)(u32 x, u32 y, u32 w, u8 fc, u8 bc, u8 *pixmap);
 	typedef void (Screen::*drawFunRGB)(u32 x, u32 y, u32 w, Color fc, Color bc, u8 *pixmap);
+	typedef void (Screen::*drawFunPixels)(u32 x, u32 y, u32 w, u32 h, u32 xoff, u32 yoff, u32 sw, u8 *pixels);
 
 	fillFun fill;
 	drawFun draw;
 	drawFunRGB drawRGB;
+	drawFunPixels drawPixels;
 	bool mScrollEnable;
 	bool mStatuslineActive = false;
 };

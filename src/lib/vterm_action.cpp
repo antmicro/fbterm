@@ -25,6 +25,11 @@
 #include "termcap.h"
 #include "screen.h"
 
+#ifdef ENABLE_LIBSIXEL
+#include "font.h"
+#include <sixel/sixel.h>
+#endif
+
 #define screen (Screen::instance())
 
 void VTerm::cr()
@@ -474,6 +479,7 @@ void VTerm::erase_display()
 		clear_area(0, 0, width - 1, height - 1);
 		break;
 	case 3:
+		grid->images.clear();
 		clear_history();
 		break;
 	}
@@ -1040,3 +1046,86 @@ void VTerm::osc_end()
 
 	if (verbose) printf("[vterm] Unknown sequence 'OCS %d'\n", param[0]);
 }
+
+#ifdef ENABLE_LIBSIXEL
+
+void VTerm::begin_sixel()
+{
+	sixel_buffer.clear();
+	sixel_buffer += "\x1BP";
+	for (int i = 0; i < npar; i++) {
+		sixel_buffer += std::to_string(param[0]) + ';';
+	}
+	sixel_buffer += 'q';
+}
+
+void VTerm::end_sixel()
+{
+	sixel_buffer += "\x1B\\";
+
+	u8 *pixels;
+	u8 *palette;
+	int width;
+	int height;
+	int ncolors;
+
+	SIXELSTATUS status = sixel_decode_raw(
+		(unsigned char*)sixel_buffer.data(),
+		sixel_buffer.size(),
+		&pixels,
+		&width,
+		&height,
+		&palette,
+		&ncolors,
+		NULL
+	);
+	if (SIXEL_FAILED(status)) {
+		fprintf(stderr, "Failed to decode sixel: %d\n", status);
+		sixel_buffer.clear();
+		return;
+	}
+
+	VTermImage image;
+	image.pixels = std::vector<u8>(width*height*4);
+	image.width = width;
+	image.height = height;
+	image.pos_row = cursor_y + visual_start_line;
+	image.pos_col = cursor_x;
+	image.size_rows = (height+FH(1)-1)/FH(1);
+	image.size_cols = (width+FW(1)-1)/FW(1);
+	image.printed = false;
+
+	u8 *dst = (u8*)image.pixels.data();
+	for (int i = 0; i < width * height; i++) {
+		*dst++ = *(palette + *(pixels + i) * 3 + 2);
+		*dst++ = *(palette + *(pixels + i) * 3 + 1);
+		*dst++ = *(palette + *(pixels + i) * 3 + 0);
+		*dst++ = 255;
+	}
+
+	free(pixels);
+	free(palette);
+	sixel_buffer.clear();
+
+	add_image(image);
+
+	// it emulates how terminal should behave, kinda
+	for (int i = 0; i < image.size_rows; i++) lf();
+
+	auto& stored_image = grid->images.back();
+	drawImage(stored_image);
+	stored_image.printed = true;
+}
+
+void VTerm::sixel_char()
+{
+	sixel_buffer += cur_char;
+}
+
+#else
+
+void VTerm::begin_sixel() {};
+void VTerm::end_sixel() {};
+void VTerm::sixel_char() {};
+
+#endif

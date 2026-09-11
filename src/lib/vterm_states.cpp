@@ -161,18 +161,32 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	ENDSEQ,
 
 	// ESdcs #9 "ESC P"
-	{ '+', nullptr, ESkeep },
+	{ CSPAN('0', '9'), &VTerm::param_digit, ESkeep },
+	{ ';', &VTerm::next_param,	ESkeep },
+	{ '+', nullptr, ESpreterm },
+	{ 'q', &VTerm::begin_sixel, ESsixel },
+	ENDSEQ,
+
+	// ESsixel #10 ""
+	{ CSPAN(' ', '~'), &VTerm::sixel_char, ESkeep },
+	{ CSPAN(0x00, 0x17), nullptr, ESkeep },
+	{ CSPAN(0x1C, 0x1F), nullptr, ESkeep },
+	{ 0x19, nullptr, ESkeep },
+	{ 0x1B, &VTerm::end_sixel, ESst },
+	ENDSEQ,
+
+	// ESpreterm #11 ""
 	{ 'q', nullptr, EStermcap },
 	ENDSEQ,
 
-	// EStermcap #10 "ESC P + q"
+	// EStermcap #12 "ESC P + q"
 	{ CSPAN('0', '9'), &VTerm::param_hex_digit, ESkeep },
 	{ CSPAN('a', 'f'), &VTerm::param_hex_digit, ESkeep },
 	{ CSPAN('A', 'F'), &VTerm::param_hex_digit, ESkeep },
 	{ 0x1B, &VTerm::request_termcap, ESst },
 	ENDSEQ,
 
-	// ESst #11
+	// ESst #13
 	{ '\\', nullptr, ESnormal },
 	ENDSEQ
 

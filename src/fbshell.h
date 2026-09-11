@@ -62,6 +62,7 @@ private:
 	virtual void drawCursor(CharAttr attr, u16 x, u16 y, u16 c);
 	virtual void modeChanged(ModeType type);
 	virtual void request(RequestType type, u32 val = 0);
+	virtual void drawImage(int x, int y, u32 w, u32 h, u8* image);
 
 	virtual void initShellProcess();
 	virtual void readyRead(s8 *buf, u32 len);

@@ -17,6 +17,11 @@ if (USE_SDL2)
 	pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
 endif()
 
+option(USE_SIXEL "Enable optional sixel support (off by default)" OFF)
+if (USE_SIXEL)
+	pkg_check_modules(LIBSIXEL REQUIRED IMPORTED_TARGET libsixel)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 
 check_include_file("sys/epoll.h" HAS_EPOLL)
@@ -88,6 +93,12 @@ if (SDL2_FOUND)
 	target_link_libraries(fbterm PRIVATE PkgConfig::SDL2)
 	target_compile_definitions(fbterm PRIVATE ENABLE_SDL2)
 	message(STATUS "Using SDL2")
+endif()
+
+if (LIBSIXEL_FOUND)
+	target_link_libraries(fbterm PRIVATE PkgConfig::LIBSIXEL)
+	target_compile_definitions(fbterm PRIVATE ENABLE_LIBSIXEL)
+	message(STATUS "Using libsixel")
 endif()
 
 install(TARGETS fbterm)
