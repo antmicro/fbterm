@@ -17,8 +17,6 @@ public:
 
 	bool valid() const { return mConnection != nullptr; }
 
-	void poll();
-
 	void handleWatch(DBusWatch *watch, unsigned flags);
 
 private:

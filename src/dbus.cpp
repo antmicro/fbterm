@@ -208,14 +208,6 @@ FbTermDbus::~FbTermDbus()
 	dbus_connection_unref(mConnection);
 }
 
-void FbTermDbus::poll()
-{
-	if (!mConnection)
-		return;
-
-	dbus_connection_read_write_dispatch(mConnection, 0);
-}
-
 DBusHandlerResult FbTermDbus::messageHandler(
 		DBusConnection *connection,
 		DBusMessage *message,
