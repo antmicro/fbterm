@@ -301,6 +301,7 @@ void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, 
 			if (draw_space) {
 				draw_space = false;
 				fillRect(startx, y, x - startx, FH(1), bc);
+				drawDecoration(startx, y, x - startx, FH(1), fc, ul, st);
 			}
 
 			if (!draw_text) {
@@ -319,7 +320,20 @@ void Screen::drawText(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, 
 		drawGlyphs(startx, y, fc, bc, startnum - num, starttext, startdw, ul, st, it);
 	} else if (draw_space) {
 		fillRect(startx, y, x - startx, FH(1), bc);
+		drawDecoration(startx, y, x - startx, FH(1), fc, ul, st);
 	}
+}
+
+/*
+ * Underline / strikethrough for one run of cells. Kept in one place so that
+ * glyph runs and space runs cannot drift apart: drawText() splits a line into
+ * both kinds, and a space in the middle of an underlined run must still be
+ * underlined.
+ */
+void Screen::drawDecoration(u32 x, u32 y, u32 w, u32 h, u8 fc, bool ul, bool st)
+{
+	if (st) fillRect(x, y + h / 2, w, 1, fc);
+	if (ul) fillRect(x, y + h - 2, w, 1, fc);
 }
 
 void Screen::drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it)
@@ -418,8 +432,7 @@ void Screen::drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, b
 		(this->*draw)(x + mOffsetLeft, y + mOffsetTop, nwidth, fc, bc, pixmap);
 	}
 
-	if (st) fillRect(cellx, celly + h / 2, w, 1, fc);  // strikethrough
-	if (ul) fillRect(cellx, celly + h - 2, w, 1, fc);  // underline
+	drawDecoration(cellx, celly, w, h, fc, ul, st);
 }
 
 void Screen::rotateRect(u32 &x, u32 &y, u32 &w, u32 &h)

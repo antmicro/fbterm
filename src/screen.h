@@ -110,6 +110,7 @@ private:
 	void eraseMargin(bool top, u16 h);
 	void drawGlyphs(u32 x, u32 y, u8 fc, u8 bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it);
 	void drawGlyph(u32 x, u32 y, u8 fc, u8 bc, u16 code, bool dw, bool ul, bool st, bool it);
+	void drawDecoration(u32 x, u32 y, u32 w, u32 h, u8 fc, bool ul, bool st);
 	void adjustOffset(u32 &x, u32 &y);
 
 	void initFillDraw();
