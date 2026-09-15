@@ -14,7 +14,7 @@ pkg_check_modules(LIBDBUS IMPORTED_TARGET dbus-1)
 
 option(USE_SDL2 "Enable optional SDL2 backend (dev-only, off by default)" OFF)
 if (USE_SDL2)
-	pkg_check_modules(SDL2 IMPORTED_TARGET sdl2)
+	pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
