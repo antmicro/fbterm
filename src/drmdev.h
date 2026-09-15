@@ -11,6 +11,9 @@
 class DrmDev : public Screen {
 public:
 	bool acquireLease(int &lease_fd);
+	bool handleLeaseReleased();
+	bool restoreScanout();
+
 	DrmDev *getDrmDev() override { return this; }
 private:
 	friend class Screen;
@@ -45,5 +48,7 @@ private:
 	drmModeModeInfo drm_mode = {};
 	drmModeCrtc *drm_saved_crtc = nullptr;
 	u8 *drm_map = nullptr;
+	uint32_t drm_lessee_id = 0;
+	bool drm_lease_active = false;
 };
 #endif // DRMDEV_H

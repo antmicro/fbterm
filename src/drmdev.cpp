@@ -400,6 +400,19 @@ void DrmDev::cleanup()
 	}
 }
 
+bool DrmDev::restoreScanout()
+{
+	if (drm_fd < 0 || drm_crtc_id == 0 || drm_fb_id == 0)
+		return false;
+
+	if (drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_id, 0, 0, &drm_connector_id, 1, &drm_mode) != 0) {
+		perror("drmModeSetCrtc");
+		return false;
+	}
+
+	return true;
+}
+
 bool DrmDev::setup() {
 	LOG("probing DRM/KMS backend");
 
@@ -631,6 +644,48 @@ bool DrmDev::acquireLease(int &lease_fd)
 		return false;
 	}
 
+	drm_lessee_id = lessee_id;
+	drm_lease_active = true;
+
 	lease_fd = fd;
 	return true;
+}
+
+bool DrmDev::handleLeaseReleased()
+{
+	if (!drm_lease_active) {
+		return false;
+	}
+
+	drmModeLesseeListPtr list = drmModeListLessees(drm_fd);
+
+	if (!list)
+		return false;
+
+	bool lease_exists = false;
+
+	for (uint32_t i = 0; i < list->count; ++i) {
+		if (list->lessees[i] == drm_lessee_id) {
+			lease_exists = true;
+			break;
+		}
+	}
+
+	drmFree(list);
+
+	if (lease_exists)
+		return false;
+
+	LOG("DRM lease %u disappeared, restoring scanout", drm_lessee_id);
+
+	if(!restoreScanout()) {
+		LOG("Failed to restore scanout after DRM lease release");
+		return false;
+	}
+
+	drm_lessee_id = 0;
+	drm_lease_active = false;
+
+	return true;
+
 }

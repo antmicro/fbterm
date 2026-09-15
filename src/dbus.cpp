@@ -70,6 +70,7 @@ constexpr const char *INTROSPECTION_XML = R"xml(
     <method name="AcquireLease">
       <arg name="lease_fd" type="h" direction="out"/>
     </method>
+    <method name="NotifyLeaseReleased"/>
   </interface>
 </node>
 )xml";
@@ -289,6 +290,37 @@ DBusHandlerResult FbTermDbus::messageHandler(
 		dbus_message_unref(reply);
 
 		close(lease_fd);
+
+		return DBUS_HANDLER_RESULT_HANDLED;
+	}
+
+	if (dbus_message_is_method_call(
+				message,
+				INTERFACE,
+				"NotifyLeaseReleased")) {
+
+		if (!self->mDrm.handleLeaseReleased()) {
+                        fprintf(stderr, "drmdev handleLeaseReleased failed!\n");
+			DBusMessage *reply = dbus_message_new_error(
+					message,
+					DBUS_ERROR_FAILED,
+					"Failed to handle DRM lease release");
+
+			if (!reply)
+				return DBUS_HANDLER_RESULT_NEED_MEMORY;
+
+			dbus_connection_send(connection, reply, nullptr);
+			dbus_message_unref(reply);
+
+			return DBUS_HANDLER_RESULT_HANDLED;
+		}
+
+		DBusMessage *reply = dbus_message_new_method_return(message);
+		if (!reply)
+			return DBUS_HANDLER_RESULT_NEED_MEMORY;
+
+		dbus_connection_send(connection, reply, nullptr);
+		dbus_message_unref(reply);
 
 		return DBUS_HANDLER_RESULT_HANDLED;
 	}
