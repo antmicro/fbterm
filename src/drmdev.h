@@ -17,6 +17,7 @@ public:
 	typedef void (*PageFlipCompletedCallback)(void *user_data);
 
 	bool acquireLease(int &lease_fd);
+	bool releaseLease(int &lease_fd);
 	bool handleLeaseReleased();
 	bool restoreScanout();
 	void handleDrmEvents();
@@ -28,6 +29,8 @@ public:
 	DrmDev *getDrmDev() override { return this; }
 
 	bool pageFlipPending() const;
+	void suspendRendering();
+	void resumeRendering();
 private:
 	friend class DrmDevWatch;
 	friend class Screen;
@@ -77,6 +80,7 @@ private:
 	u8 *drm_map = nullptr;
 	uint32_t drm_lessee_id = 0;
 	bool drm_lease_active = false;
+	bool drm_rendering_enabled = true;
 	bool drm_page_flip_pending = false;
 };
 #endif // DRMDEV_H

@@ -644,6 +644,10 @@ void DrmDev::initDrmWatch()
 
 void DrmDev::present()
 {
+	if (!drm_rendering_enabled) {
+		return;
+	}
+
 	if (drm_page_flip_pending) {
 		return;
 	}
@@ -697,6 +701,16 @@ bool DrmDev::pageFlipPending() const
 	return drm_page_flip_pending;
 }
 
+void DrmDev::suspendRendering()
+{
+	drm_rendering_enabled = false;
+}
+
+void DrmDev::resumeRendering()
+{
+	drm_rendering_enabled = true;
+}
+
 bool DrmDev::acquireLease(int &lease_fd)
 {
 	lease_fd = -1;
@@ -717,6 +731,9 @@ bool DrmDev::acquireLease(int &lease_fd)
 
 	u32 lessee_id = 0;
 
+	bool rendering_enabled = drm_rendering_enabled;
+	drm_rendering_enabled = false;
+
 	int fd = drmModeCreateLease(
 			drm_fd, objects, 4, O_CLOEXEC, &lessee_id);
 
@@ -724,6 +741,7 @@ bool DrmDev::acquireLease(int &lease_fd)
 		fprintf(stderr,
 				"drmModeCreateLease failed: %s\n",
 				strerror(errno));
+		drm_rendering_enabled = rendering_enabled;
 		return false;
 	}
 
@@ -736,6 +754,7 @@ bool DrmDev::acquireLease(int &lease_fd)
 		fprintf(stderr, "drmSetClientCap failed: %s\n",
 				strerror(errno));
 		close(fd);
+		drm_rendering_enabled = rendering_enabled;
 		return false;
 	}
 
@@ -743,6 +762,26 @@ bool DrmDev::acquireLease(int &lease_fd)
 	drm_lease_active = true;
 
 	lease_fd = fd;
+	return true;
+}
+
+bool DrmDev::releaseLease(int &lease_fd)
+{
+	if (!drm_lease_active)
+		return true;
+
+	close(lease_fd);
+	lease_fd = -1;
+
+	drm_lessee_id = 0;
+	drm_lease_active = false;
+
+	if (!restoreScanout()) {
+		LOG("Failed to restore scanout after rolling back DRM lease");
+		return false;
+	}
+
+	drm_rendering_enabled = true;
 	return true;
 }
 
@@ -780,6 +819,7 @@ bool DrmDev::handleLeaseReleased()
 
 	drm_lessee_id = 0;
 	drm_lease_active = false;
+	drm_rendering_enabled = true;
 
 	return true;
 

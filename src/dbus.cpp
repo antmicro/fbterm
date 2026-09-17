@@ -215,6 +215,7 @@ FbTermDbus::~FbTermDbus()
 	if (mPendingLeaseRequest != NULL) {
 		dbus_message_unref(mPendingLeaseRequest);
 		mPendingLeaseRequest = NULL;
+		mDrm.resumeRendering();
 	}
 
 	if (!mConnection) {
@@ -280,6 +281,7 @@ DBusHandlerResult FbTermDbus::messageHandler(
 		}
 
 		if (self->mDrm.pageFlipPending()) {
+			self->mDrm.suspendRendering();
 			self->mPendingLeaseRequest = dbus_message_ref(message);
 
 			return DBUS_HANDLER_RESULT_HANDLED;
@@ -347,7 +349,8 @@ void FbTermDbus::acquireLeaseAndReply(DBusMessage *message)
 	DBusMessage *reply = dbus_message_new_method_return(message);
 	if (reply == NULL) {
 		LOG("Failed to allocate DRM lease reply");
-		close(lease_fd);
+		if (!mDrm.releaseLease(lease_fd))
+			LOG("Failed to roll back DRM lease");
 		return;
 	}
 
@@ -363,11 +366,18 @@ void FbTermDbus::acquireLeaseAndReply(DBusMessage *message)
 				&value)) {
 		LOG("Failed to append DRM lease fd to reply");
 		dbus_message_unref(reply);
-		close(lease_fd);
+		if (!mDrm.releaseLease(lease_fd))
+			LOG("Failed to roll back DRM lease");
 		return;
 	}
 
-	dbus_connection_send(mConnection, reply, NULL);
+	if (!dbus_connection_send(mConnection, reply, NULL)) {
+		dbus_message_unref(reply);
+		if (!mDrm.releaseLease(lease_fd))
+			LOG("Failed to roll back DRM lease");
+		return;
+	}
+
 	dbus_message_unref(reply);
 
 	close(lease_fd);
