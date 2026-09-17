@@ -82,8 +82,13 @@ Screen *Screen::createInstance()
 #ifdef ENABLE_DRM
 	bool use_drm = false;
 	Config::instance()->getOption("use-drm", use_drm);
-	if(use_drm)
+	if(use_drm) {
 		pScreen = DrmDev::initDrmDev();
+		if (pScreen) {
+			DrmDev *drm = static_cast<DrmDev *>(pScreen);
+			drm->initDrmWatch();
+		}
+	}
 #endif
 
 #ifdef ENABLE_VESA

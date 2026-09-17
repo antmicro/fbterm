@@ -8,16 +8,26 @@
 #include <xf86drmMode.h>
 #include <libdrm/drm_fourcc.h>
 
+#include <memory>
+
+class DrmDevWatch;
+
 class DrmDev : public Screen {
 public:
 	bool acquireLease(int &lease_fd);
 	bool handleLeaseReleased();
 	bool restoreScanout();
+	void handleDrmEvents();
+
 
 	DrmDev *getDrmDev() override { return this; }
+
+	bool pageFlipPending() const;
 private:
+	friend class DrmDevWatch;
 	friend class Screen;
 	static DrmDev *initDrmDev();
+	void initDrmWatch();
 
 	DrmDev();
 	~DrmDev();
@@ -33,6 +43,15 @@ private:
 
 	bool findPrimaryPlane();
 	bool findCursorPlane();
+
+	static void pageFlipHandler(
+		int fd,
+		unsigned int sequence,
+		unsigned int tv_sec,
+		unsigned int tv_usec,
+		void *user_data);
+
+	DrmDevWatch* mDrmWatch = nullptr;
 
 	s32 drm_fd = -1;
 	u32 drm_crtc_id = 0;
@@ -50,5 +69,6 @@ private:
 	u8 *drm_map = nullptr;
 	uint32_t drm_lessee_id = 0;
 	bool drm_lease_active = false;
+	bool drm_page_flip_pending = false;
 };
 #endif // DRMDEV_H

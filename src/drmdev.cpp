@@ -2,6 +2,7 @@
 #include "io.h"
 
 #include <filesystem>
+#include <libdrm/drm_mode.h>
 #include <vector>
 #include <string>
 
@@ -27,6 +28,38 @@
 #else
 #define LOG(fmt, args...)
 #endif
+
+class DrmDevWatch : public IoPipe
+{
+public:
+	DrmDevWatch(DrmDev &owner, int fd)
+		: mOwner(owner)
+	{
+		setFd(fd);
+	}
+
+	~DrmDevWatch()
+	{
+		mOwner.mDrmWatch = nullptr;
+	}
+
+	void ready(bool isread) override
+	{
+		if (!isread)
+			return;
+
+		mOwner.handleDrmEvents();
+	}
+
+	// DRM events are dispatched through drmHandleEvent(), not read().
+	void readyRead(s8 *buf, u32 len) override
+	{
+		(void)buf;
+		(void)len;
+	}
+private:
+	DrmDev &mOwner;
+};
 
 // Picks which encoder actually serves a connector - prefers whatever's
 // already actively bound (conn->encoder_id) over any other candidate.
@@ -564,6 +597,7 @@ DrmDev::DrmDev()
 DrmDev::~DrmDev()
 {
 	LOG("shutting down DRM/KMS backend");
+	delete mDrmWatch;
 	cleanup();
 }
 
@@ -596,10 +630,58 @@ void DrmDev::switchVc(bool enter) {
 	}
 }
 
-void DrmDev::present() {
-		if (drmModePageFlip(drm_fd, drm_crtc_id, drm_fb_id, 0, nullptr) && errno != EBUSY) {
+void DrmDev::initDrmWatch()
+{
+	int watch_fd = dup(drm_fd);
+	if (watch_fd == -1) {
+		fprintf(stderr, "failed to duplicate DRM fd: %s", strerror(errno));
+		return;
+	}
+	mDrmWatch = new DrmDevWatch(*this, watch_fd);
+}
+
+void DrmDev::present()
+{
+	if (drm_page_flip_pending) {
+		return;
+	}
+
+	if (drmModePageFlip(drm_fd, drm_crtc_id, drm_fb_id, DRM_MODE_PAGE_FLIP_EVENT, this)) {
+		if (errno != EBUSY) {
 			LOG("drmModePageFlip: %s", strerror(errno));
 		}
+		return;
+	}
+
+	drm_page_flip_pending = true;
+}
+
+void DrmDev::pageFlipHandler(
+        int fd,
+        unsigned int sequence,
+        unsigned int tv_sec,
+        unsigned int tv_usec,
+        void *user_data)
+{
+	auto *self = static_cast<DrmDev *>(user_data);
+	self->drm_page_flip_pending = false;
+}
+
+void DrmDev::handleDrmEvents()
+{
+	drmEventContext context;
+	memset(&context, 0, sizeof(context));
+
+	context.version = DRM_EVENT_CONTEXT_VERSION;
+	context.page_flip_handler = &DrmDev::pageFlipHandler;
+
+	if (drmHandleEvent(drm_fd, &context) != 0)
+		LOG("drmHandleEvent: %s", strerror(errno));
+}
+
+bool DrmDev::pageFlipPending() const
+{
+	return drm_page_flip_pending;
 }
 
 bool DrmDev::acquireLease(int &lease_fd)
