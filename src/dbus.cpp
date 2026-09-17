@@ -5,6 +5,12 @@
 
 #include <memory>
 
+#ifdef DBUS_DEBUG
+#define LOG(fmt, args...) fprintf(stderr, "[dbus] " fmt "\n", ##args)
+#else
+#define LOG(fmt, args...)
+#endif
+
 class FbTermDbusWatch : public IoPipe
 {
 public:
@@ -196,10 +202,21 @@ FbTermDbus::FbTermDbus(DrmDev &drm)
 	dbus_connection_set_exit_on_disconnect(mConnection, false);
 
 	dbus_error_free(&error);
+
+	mDrm.setPageFlipCompletedCallback(
+			&FbTermDbus::pageFlipCompletedCallback,
+			this);
 }
 
 FbTermDbus::~FbTermDbus()
 {
+	mDrm.setPageFlipCompletedCallback(NULL, NULL);
+
+	if (mPendingLeaseRequest != NULL) {
+		dbus_message_unref(mPendingLeaseRequest);
+		mPendingLeaseRequest = NULL;
+	}
+
 	if (!mConnection) {
 		return;
 	}
@@ -247,13 +264,11 @@ DBusHandlerResult FbTermDbus::messageHandler(
 				INTERFACE,
 				"AcquireLease")) {
 
-		int lease_fd = -1;
-
-		if (!self->mDrm.acquireLease(lease_fd)) {
+		if (self->mPendingLeaseRequest != NULL) {
 			DBusMessage *reply = dbus_message_new_error(
 					message,
 					DBUS_ERROR_FAILED,
-					"Failed to create DRM lease");
+					"Another lease request is already pending");
 
 			if (!reply)
 				return DBUS_HANDLER_RESULT_NEED_MEMORY;
@@ -264,32 +279,13 @@ DBusHandlerResult FbTermDbus::messageHandler(
 			return DBUS_HANDLER_RESULT_HANDLED;
 		}
 
-		DBusMessage *reply = dbus_message_new_method_return(message);
-		if (!reply) {
-			close(lease_fd);
-			return DBUS_HANDLER_RESULT_NEED_MEMORY;
+		if (self->mDrm.pageFlipPending()) {
+			self->mPendingLeaseRequest = dbus_message_ref(message);
+
+			return DBUS_HANDLER_RESULT_HANDLED;
 		}
 
-		DBusMessageIter iter;
-		dbus_message_iter_init_append(reply, &iter);
-
-		DBusBasicValue value = {
-			.fd = lease_fd,
-		};
-
-		if (!dbus_message_iter_append_basic(
-					&iter,
-					DBUS_TYPE_UNIX_FD,
-					&value)) {
-			dbus_message_unref(reply);
-			close(lease_fd);
-			return DBUS_HANDLER_RESULT_NEED_MEMORY;
-		}
-
-		dbus_connection_send(connection, reply, nullptr);
-		dbus_message_unref(reply);
-
-		close(lease_fd);
+		self->acquireLeaseAndReply(message);
 
 		return DBUS_HANDLER_RESULT_HANDLED;
 	}
@@ -328,3 +324,69 @@ DBusHandlerResult FbTermDbus::messageHandler(
 	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
+void FbTermDbus::acquireLeaseAndReply(DBusMessage *message)
+{
+	int lease_fd = -1;
+
+	if (!mDrm.acquireLease(lease_fd)) {
+		DBusMessage *reply = dbus_message_new_error(
+				message,
+				DBUS_ERROR_FAILED,
+				"Failed to create DRM lease");
+
+		if (reply != NULL) {
+			dbus_connection_send(mConnection, reply, NULL);
+			dbus_message_unref(reply);
+		} else {
+			LOG("Failed to allocate DRM lease error reply");
+		}
+
+		return;
+	}
+
+	DBusMessage *reply = dbus_message_new_method_return(message);
+	if (reply == NULL) {
+		LOG("Failed to allocate DRM lease reply");
+		close(lease_fd);
+		return;
+	}
+
+	DBusMessageIter iter;
+	dbus_message_iter_init_append(reply, &iter);
+
+	DBusBasicValue value;
+	value.fd = lease_fd;
+
+	if (!dbus_message_iter_append_basic(
+				&iter,
+				DBUS_TYPE_UNIX_FD,
+				&value)) {
+		LOG("Failed to append DRM lease fd to reply");
+		dbus_message_unref(reply);
+		close(lease_fd);
+		return;
+	}
+
+	dbus_connection_send(mConnection, reply, NULL);
+	dbus_message_unref(reply);
+
+	close(lease_fd);
+}
+
+void FbTermDbus::pageFlipCompleted()
+{
+	if (mPendingLeaseRequest == NULL)
+		return;
+
+	DBusMessage *message = mPendingLeaseRequest;
+	mPendingLeaseRequest = NULL;
+
+	acquireLeaseAndReply(message);
+	dbus_message_unref(message);
+}
+
+void FbTermDbus::pageFlipCompletedCallback(void *user_data)
+{
+	FbTermDbus *self = static_cast<FbTermDbus *>(user_data);
+	self->pageFlipCompleted();
+}

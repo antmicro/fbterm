@@ -588,6 +588,8 @@ DrmDev *DrmDev::initDrmDev()
 }
 
 DrmDev::DrmDev()
+	: mPageFlipCompletedCallback(NULL),
+	mPageFlipCompletedUserData(NULL)
 {
 	mBitsPerPixel = 32; // ARGB
 	mOffsetLeft = 0;
@@ -665,6 +667,9 @@ void DrmDev::pageFlipHandler(
 {
 	auto *self = static_cast<DrmDev *>(user_data);
 	self->drm_page_flip_pending = false;
+
+	if (self->mPageFlipCompletedCallback != NULL)
+		self->mPageFlipCompletedCallback(self->mPageFlipCompletedUserData);
 }
 
 void DrmDev::handleDrmEvents()
@@ -677,6 +682,14 @@ void DrmDev::handleDrmEvents()
 
 	if (drmHandleEvent(drm_fd, &context) != 0)
 		LOG("drmHandleEvent: %s", strerror(errno));
+}
+
+void DrmDev::setPageFlipCompletedCallback(
+		PageFlipCompletedCallback callback,
+		void *user_data)
+{
+	mPageFlipCompletedCallback = callback;
+	mPageFlipCompletedUserData = user_data;
 }
 
 bool DrmDev::pageFlipPending() const

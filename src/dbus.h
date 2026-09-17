@@ -48,9 +48,14 @@ private:
 
 	DrmDev &mDrm;
 
+	void acquireLeaseAndReply(DBusMessage *message);
+	static void pageFlipCompletedCallback(void *user_data);
+	void pageFlipCompleted();
+	DBusMessage *mPendingLeaseRequest = NULL;
+
 	DBusConnection *mConnection = nullptr;
 
-  std::map<DBusWatch *, FbTermDbusWatch *> mWatches;
+	std::map<DBusWatch *, FbTermDbusWatch *> mWatches;
 
 	static constexpr const char *BUS_NAME = "com.antmicro.fbterm";
 	static constexpr const char *OBJECT_PATH = "/com/antmicro/fbterm";

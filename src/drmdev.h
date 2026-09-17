@@ -14,11 +14,16 @@ class DrmDevWatch;
 
 class DrmDev : public Screen {
 public:
+	typedef void (*PageFlipCompletedCallback)(void *user_data);
+
 	bool acquireLease(int &lease_fd);
 	bool handleLeaseReleased();
 	bool restoreScanout();
 	void handleDrmEvents();
 
+	void setPageFlipCompletedCallback(
+			PageFlipCompletedCallback callback,
+			void *user_data);
 
 	DrmDev *getDrmDev() override { return this; }
 
@@ -52,6 +57,9 @@ private:
 		void *user_data);
 
 	DrmDevWatch* mDrmWatch = nullptr;
+
+	PageFlipCompletedCallback mPageFlipCompletedCallback;
+	void *mPageFlipCompletedUserData;
 
 	s32 drm_fd = -1;
 	u32 drm_crtc_id = 0;
