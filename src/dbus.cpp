@@ -114,26 +114,26 @@ dbus_bool_t FbTermDbus::AddWatchCallback(
 }
 
 void FbTermDbus::RemoveWatchCallback(
-        DBusWatch *watch,
-        void *data
-        )
+		DBusWatch *watch,
+		void *data
+		)
 {
-        auto *self = static_cast<FbTermDbus *>(data);
-        self->RemoveWatch(watch);
+	auto *self = static_cast<FbTermDbus *>(data);
+	self->RemoveWatch(watch);
 }
 
 void FbTermDbus::ToggleWatchCallback(
-        DBusWatch *watch,
-        void *data
-        )
+		DBusWatch *watch,
+		void *data
+		)
 {
-        auto *self = static_cast<FbTermDbus *>(data);
-        self->ToggleWatch(watch);
+	auto *self = static_cast<FbTermDbus *>(data);
+	self->ToggleWatch(watch);
 }
 
 void FbTermDbus::RemoveWatch(DBusWatch *watch)
 {
-        mWatches.erase(watch);
+	mWatches.erase(watch);
 }
 
 void FbTermDbus::ToggleWatch(DBusWatch *watch)
@@ -298,7 +298,7 @@ DBusHandlerResult FbTermDbus::messageHandler(
 				"NotifyLeaseReleased")) {
 
 		if (!self->mDrm.handleLeaseReleased()) {
-                        fprintf(stderr, "drmdev handleLeaseReleased failed!\n");
+			fprintf(stderr, "drmdev handleLeaseReleased failed!\n");
 			DBusMessage *reply = dbus_message_new_error(
 					message,
 					DBUS_ERROR_FAILED,
