@@ -129,49 +129,49 @@ static bool findConnectorByName(s32 fd, drmModeRes *res, const char *name, drmMo
 
 uint32_t GetPropertyId(s32 fd, uint32_t obj_id, uint32_t obj_type, const char* name)
 {
-    uint32_t prop_id = 0;
+	uint32_t prop_id = 0;
 
-    drmModeObjectProperties *props = drmModeObjectGetProperties(fd, obj_id, obj_type);
-    if (!props) return 0;
+	drmModeObjectProperties *props = drmModeObjectGetProperties(fd, obj_id, obj_type);
+	if (!props) return 0;
 
-    for (uint32_t i = 0; i < props->count_props; i++) {
-        drmModePropertyRes *prop = drmModeGetProperty(fd, props->props[i]);
-        if (!prop) continue;
+	for (uint32_t i = 0; i < props->count_props; i++) {
+		drmModePropertyRes *prop = drmModeGetProperty(fd, props->props[i]);
+		if (!prop) continue;
 
-        if (strcmp(prop->name, name) == 0) {
-            prop_id = prop->prop_id;
-            drmModeFreeProperty(prop);
-            break;
-        }
-        drmModeFreeProperty(prop);
-    }
+		if (strcmp(prop->name, name) == 0) {
+			prop_id = prop->prop_id;
+			drmModeFreeProperty(prop);
+			break;
+		}
+		drmModeFreeProperty(prop);
+	}
 
-    drmModeFreeObjectProperties(props);
-    return prop_id;
+	drmModeFreeObjectProperties(props);
+	return prop_id;
 }
 
 uint32_t GetPlaneType(s32 fd, uint32_t plane_id)
 {
-    drmModeObjectProperties *props =
-        drmModeObjectGetProperties(fd, plane_id, DRM_MODE_OBJECT_PLANE);
-    if (!props) {
-        fprintf(stderr, "Failed to get properties for DRM plane %u!", plane_id);
-        return uint32_t(-1);
-    }
+	drmModeObjectProperties *props =
+		drmModeObjectGetProperties(fd, plane_id, DRM_MODE_OBJECT_PLANE);
+	if (!props) {
+		fprintf(stderr, "Failed to get properties for DRM plane %u!", plane_id);
+		return uint32_t(-1);
+	}
 
-    uint32_t type_prop_id =
-        GetPropertyId(fd, plane_id, DRM_MODE_OBJECT_PLANE, "type");
+	uint32_t type_prop_id =
+		GetPropertyId(fd, plane_id, DRM_MODE_OBJECT_PLANE, "type");
 
-    for (uint32_t i = 0; i < props->count_props; i++) {
-        if (props->props[i] == type_prop_id) {
-            uint32_t type_val = (uint32_t)props->prop_values[i];
-            drmModeFreeObjectProperties(props);
-            return type_val;
-        }
-    }
+	for (uint32_t i = 0; i < props->count_props; i++) {
+		if (props->props[i] == type_prop_id) {
+			uint32_t type_val = (uint32_t)props->prop_values[i];
+			drmModeFreeObjectProperties(props);
+			return type_val;
+		}
+	}
 
-    drmModeFreeObjectProperties(props);
-    return uint32_t(-1);
+	drmModeFreeObjectProperties(props);
+	return uint32_t(-1);
 }
 
 uint32_t FindPlaneByType(s32 fd, u32 crtc_idx, uint32_t planeType)
@@ -663,11 +663,11 @@ void DrmDev::present()
 }
 
 void DrmDev::pageFlipHandler(
-        int fd,
-        unsigned int sequence,
-        unsigned int tv_sec,
-        unsigned int tv_usec,
-        void *user_data)
+		int fd,
+		unsigned int sequence,
+		unsigned int tv_sec,
+		unsigned int tv_usec,
+		void *user_data)
 {
 	auto *self = static_cast<DrmDev *>(user_data);
 	self->drm_page_flip_pending = false;
