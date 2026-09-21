@@ -9,10 +9,11 @@
 #include <memory>
 
 class FbTermDbusWatch;
+class IdleTimer;
 
 class FbTermDbus {
 public:
-	FbTermDbus(DrmDev &drm);
+	FbTermDbus(DrmDev &drm, IdleTimer *idleTimer);
 	~FbTermDbus();
 
 	bool valid() const { return mConnection != nullptr; }
@@ -47,6 +48,7 @@ private:
 	void ToggleWatch(DBusWatch *watch);
 
 	DrmDev &mDrm;
+	IdleTimer *mIdleTimer;
 
 	void acquireLeaseAndReply(DBusMessage *message);
 	static void pageFlipCompletedCallback(void *user_data);

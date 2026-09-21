@@ -1,4 +1,5 @@
 #include "dbus.h"
+#include "idle_timer.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -77,6 +78,12 @@ constexpr const char *INTROSPECTION_XML = R"xml(
       <arg name="lease_fd" type="h" direction="out"/>
     </method>
     <method name="NotifyLeaseReleased"/>
+    <method name="GetIdleTimerState">
+      <arg name="configured" type="b" direction="out"/>
+      <arg name="active" type="b" direction="out"/>
+      <arg name="triggered" type="b" direction="out"/>
+      <arg name="remaining_ms" type="t" direction="out"/>
+    </method>
   </interface>
 </node>
 )xml";
@@ -140,8 +147,8 @@ void FbTermDbus::ToggleWatch(DBusWatch *watch)
 {
 }
 
-FbTermDbus::FbTermDbus(DrmDev &drm)
-	: mDrm(drm)
+FbTermDbus::FbTermDbus(DrmDev &drm, IdleTimer *idleTimer)
+	: mDrm(drm), mIdleTimer(idleTimer)
 {
 	DBusError error;
 	dbus_error_init(&error);
@@ -249,6 +256,65 @@ DBusHandlerResult FbTermDbus::messageHandler(
 					reply,
 					DBUS_TYPE_STRING,
 					&xml,
+					DBUS_TYPE_INVALID)) {
+			dbus_message_unref(reply);
+			return DBUS_HANDLER_RESULT_NEED_MEMORY;
+		}
+
+		dbus_connection_send(connection, reply, nullptr);
+		dbus_message_unref(reply);
+
+		return DBUS_HANDLER_RESULT_HANDLED;
+	}
+
+	if (dbus_message_is_method_call(
+				message,
+				INTERFACE,
+				"GetIdleTimerState")) {
+
+		dbus_bool_t configured = self->mIdleTimer != nullptr;
+		dbus_bool_t active = FALSE;
+		dbus_bool_t triggered = FALSE;
+		dbus_uint64_t remainingMs = 0;
+
+		if (self->mIdleTimer != nullptr) {
+			bool timerActive = false;
+			bool timerTriggered = false;
+			u64 timerRemainingMs = 0;
+
+			if (!self->mIdleTimer->getState(
+						timerActive,
+						timerTriggered,
+						timerRemainingMs)) {
+				DBusMessage *reply = dbus_message_new_error(
+						message,
+						DBUS_ERROR_FAILED,
+						"Failed to query idle timer state");
+
+				if (!reply)
+					return DBUS_HANDLER_RESULT_NEED_MEMORY;
+
+				dbus_connection_send(connection, reply, nullptr);
+				dbus_message_unref(reply);
+
+				return DBUS_HANDLER_RESULT_HANDLED;
+			}
+
+			active = timerActive;
+			triggered = timerTriggered;
+			remainingMs = timerRemainingMs;
+		}
+
+		DBusMessage *reply = dbus_message_new_method_return(message);
+		if (!reply)
+			return DBUS_HANDLER_RESULT_NEED_MEMORY;
+
+		if (!dbus_message_append_args(
+					reply,
+					DBUS_TYPE_BOOLEAN, &configured,
+					DBUS_TYPE_BOOLEAN, &active,
+					DBUS_TYPE_BOOLEAN, &triggered,
+					DBUS_TYPE_UINT64, &remainingMs,
 					DBUS_TYPE_INVALID)) {
 			dbus_message_unref(reply);
 			return DBUS_HANDLER_RESULT_NEED_MEMORY;

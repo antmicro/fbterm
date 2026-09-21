@@ -176,7 +176,7 @@ void FbTerm::init()
 
 #ifdef ENABLE_DRM
 	if (auto *drm = Screen::instance()->getDrmDev()) {
-		mDbus = std::make_unique<FbTermDbus>(*drm);
+		mDbus = std::make_unique<FbTermDbus>(*drm, mIdleTimer);
 		if (!mDbus->valid()) {
 			fprintf(stderr, "DBus init failed!\n");
 		}

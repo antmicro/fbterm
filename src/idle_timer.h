@@ -9,6 +9,7 @@ public:
     virtual ~IdleTimer();
 
     bool valid();
+    bool getState(bool &active, bool &triggered, u64 &remainingMs);
     void setActive(bool active);
     void activity();
 

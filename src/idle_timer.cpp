@@ -31,6 +31,28 @@ bool IdleTimer::valid()
     return fd() != -1;
 }
 
+bool IdleTimer::getState(bool &active, bool &triggered, u64 &remainingMs)
+{
+    active = mActive;
+    triggered = mTriggered;
+    remainingMs = 0;
+
+    if (!mActive || mTriggered) {
+        return true;
+    }
+
+    itimerspec timer = {};
+    if (timerfd_gettime(fd(), &timer) == -1) {
+        perror("timerfd_gettime");
+        return false;
+    }
+
+    remainingMs = timer.it_value.tv_sec * 1000ULL
+        + (timer.it_value.tv_nsec + 999999ULL) / 1000000ULL;
+
+    return true;
+}
+
 void IdleTimer::setActive(bool active)
 {
     mActive = active;
