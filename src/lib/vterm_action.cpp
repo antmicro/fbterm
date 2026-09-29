@@ -467,8 +467,21 @@ void VTerm::erase_display()
 		if (cursor_y > 0) clear_area(0, 0, width - 1, cursor_y - 1);
 		break;
 	case 2:
+		if(active_buffer == ScreenBufferType::Primary)
+			history_scroll(height);
 		clear_area(0, 0, width - 1, height - 1);
 		break;
+	case 3:
+		clear_history();
+		break;
+	}
+}
+
+void VTerm::clear_history() {
+	if(active_buffer == ScreenBufferType::Primary) {
+		history_full = false;
+		history_save_line = 0;
+		visual_start_line = 0;
 	}
 }
 

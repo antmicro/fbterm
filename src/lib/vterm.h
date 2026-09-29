@@ -262,6 +262,7 @@ private:
 	CharAttr erase_char_attr();
 
 	//history
+	void clear_history();
 	void history_scroll(u16 num);
 
 	static void init_state();
