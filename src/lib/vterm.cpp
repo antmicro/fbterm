@@ -195,25 +195,17 @@ void VTerm::reset()
 	modeChanged(AllModes);
 }
 
-void VTerm::resize(u16 w, u16 h)
+void VTerm::resizeGridBuffers(GridState *g, u16 w, u16 new_max_width, u16 new_max_height)
 {
-	if (!w || !h || (w == width && h == height)) return;
-
-	u16 new_max_width = (w > max_width) ? w : max_width;
-	u16 new_max_height = (h > max_height) ? h : max_height;
-	u16 minw = MIN(width, w), minh = MIN(height, h);
-
 	if (new_max_width > max_width) {
 		s8 *new_tab_stops = new s8[new_max_width / 8 + 1];
 		memset(new_tab_stops, 0, new_max_width / 8 + 1);
 
-		if (grid->tab_stops) {
-			memcpy(new_tab_stops, grid->tab_stops, max_width / 8 + 1);
-			delete[] grid->tab_stops;
+		if (g->tab_stops) {
+			memcpy(new_tab_stops, g->tab_stops, max_width / 8 + 1);
+			delete[] g->tab_stops;
 		}
-		grid->tab_stops = new_tab_stops;
-	} else if (w > width) {
-
+		g->tab_stops = new_tab_stops;
 	}
 
 	if (new_max_height > max_height) {
@@ -222,35 +214,35 @@ void VTerm::resize(u16 w, u16 h)
 		u16 *new_dirty_endx = new u16[new_max_height];
 
 		for (u16 i = 0; i < new_max_height; i++) {
-			bool orig = (grid->linenumbers && i < height);
-			new_linenumbers[i] = orig ? grid->linenumbers[i] : (history_lines + i);
-			new_dirty_startx[i] = orig ? grid->dirty_startx[i] : w;
-			new_dirty_endx[i] = orig ? grid->dirty_endx[i] : 0;
+			bool orig = (g->linenumbers && i < height);
+			new_linenumbers[i] = orig ? g->linenumbers[i] : (history_lines + i);
+			new_dirty_startx[i] = orig ? g->dirty_startx[i] : w;
+			new_dirty_endx[i] = orig ? g->dirty_endx[i] : 0;
 		}
 
-		if (grid->linenumbers) {
-			delete[] grid->linenumbers;
-			delete[] grid->dirty_startx;
-			delete[] grid->dirty_endx;
+		if (g->linenumbers) {
+			delete[] g->linenumbers;
+			delete[] g->dirty_startx;
+			delete[] g->dirty_endx;
 		}
 
-		grid->linenumbers = new_linenumbers;
-		grid->dirty_startx = new_dirty_startx;
-		grid->dirty_endx = new_dirty_endx;
+		g->linenumbers = new_linenumbers;
+		g->dirty_startx = new_dirty_startx;
+		g->dirty_endx = new_dirty_endx;
 	}
 
 	if (new_max_width > max_width || new_max_height > max_height) {
 		u16 *new_text = new u16[new_max_width * (history_lines + new_max_height)];
 		CharAttr *new_attrs = new CharAttr[new_max_width * (history_lines + new_max_height)];
 
-		if (grid->text) {
+		if (g->text) {
 			u32 start, new_start;
 			u16 history_copy_lines = (history_full ? history_lines : history_save_line);
 			for (u16 i = 0; i < history_copy_lines; i++) {
 				start = i * max_width;
 				new_start = i * new_max_width;
-				memcpy(&new_text[new_start], &grid->text[start], sizeof(*grid->text) * max_width);
-				memcpy(&new_attrs[new_start], &grid->attrs[start], sizeof(*grid->attrs) * max_width);
+				memcpy(&new_text[new_start], &g->text[start], sizeof(*g->text) * max_width);
+				memcpy(&new_attrs[new_start], &g->attrs[start], sizeof(*g->attrs) * max_width);
 
 				for (u16 j = max_width; j < new_max_width; j++) {
 					new_text[new_start + j] = ' ';
@@ -261,19 +253,32 @@ void VTerm::resize(u16 w, u16 h)
 			for (u16 i = 0; i < max_height; i++) {
 				start = (history_lines + i) * max_width;
 				new_start = (history_lines + i) * new_max_width;
-				memcpy(&new_text[new_start], &grid->text[start], sizeof(*grid->text) * max_width);
-				memcpy(&new_attrs[new_start], &grid->attrs[start], sizeof(*grid->attrs) * max_width);
+				memcpy(&new_text[new_start], &g->text[start], sizeof(*g->text) * max_width);
+				memcpy(&new_attrs[new_start], &g->attrs[start], sizeof(*g->attrs) * max_width);
 			}
 
-			delete[] grid->text;
-			delete[] grid->attrs;
+			delete[] g->text;
+			delete[] g->attrs;
 		}
 
-		grid->text = new_text;
-		grid->attrs = new_attrs;
-		max_width = new_max_width;
-		max_height = new_max_height;
+		g->text = new_text;
+		g->attrs = new_attrs;
 	}
+}
+
+void VTerm::resize(u16 w, u16 h)
+{
+	if (!w || !h || (w == width && h == height)) return;
+
+	u16 new_max_width = (w > max_width) ? w : max_width;
+	u16 new_max_height = (h > max_height) ? h : max_height;
+	u16 minw = MIN(width, w), minh = MIN(height, h);
+
+	resizeGridBuffers(&primary_grid, w, new_max_width, new_max_height);
+	resizeGridBuffers(&alt_grid, w, new_max_width, new_max_height);
+
+	max_width = new_max_width;
+	max_height = new_max_height;
 
 	bool h_changed = false;
 
@@ -317,13 +322,16 @@ void VTerm::resize(u16 w, u16 h)
 	if (scroll_top >= height) scroll_top = 0;
 
 	if (minw < w) {
-		clear_area(minw, 0, w - 1, h - 1);
+		clear_grid_area(&primary_grid, minw, 0, w - 1, h - 1);
+		clear_grid_area(&alt_grid, minw, 0, w - 1, h - 1);
 	}
 
 	if (minh < h) {
-		clear_area(0, minh, minw, h - 1);
+		clear_grid_area(&primary_grid, 0, minh, minw, h - 1);
+		clear_grid_area(&alt_grid, 0, minh, minw, h - 1);
 	}
 
+	move_cursor(0, 0);
 }
 
 void VTerm::input(const u8 *buf, u32 count)
@@ -755,7 +763,7 @@ void VTerm::shift_text(u16 y, u16 start_x, u16 end_x, s16 num)
 	changed_line(y, start_x, end_x);
 }
 
-void VTerm::clear_area(u16 start_x, u16 start_y, u16 end_x, u16 end_y)
+void VTerm::clear_grid_area(GridState *g, u16 start_x, u16 start_y, u16 end_x, u16 end_y)
 {
 	if (start_x >= width || start_y >= height) return;
 	if (end_x >= width) end_x = width - 1;
@@ -765,13 +773,19 @@ void VTerm::clear_area(u16 start_x, u16 start_y, u16 end_x, u16 end_y)
 	u16 x, y;
 	u32 yp;
 	for (y=start_y; y<=end_y; y++) {
-		yp = grid->linenumbers[y]*max_width;
+		yp = g->linenumbers[y]*max_width;
 		for (x=start_x; x<=end_x; x++) {
-			grid->text[yp+x]= ' ';
-			grid->attrs[yp+x] = erase_char_attr();
+			g->text[yp+x]= ' ';
+			g->attrs[yp+x] = erase_char_attr();
 		}
-		changed_line(y, start_x, end_x);
+
+		if (g == grid) changed_line(y, start_x, end_x);
 	}
+}
+
+void VTerm::clear_area(u16 start_x, u16 start_y, u16 end_x, u16 end_y)
+{
+	clear_grid_area(grid, start_x, start_y, end_x, end_y);
 }
 
 void VTerm::changed_line(u16 y, u16 start_x, u16 end_x)
@@ -914,7 +928,9 @@ void VTerm::updateWindow() {
 	info->setOffset(window.x, window.y);
 
 	if (info->mCols != width || info->mRows != height) {
-		reset();
+		if(active_buffer == ScreenBufferType::Primary)
+			history_scroll(height);
+		clear_area(0, 0, width - 1, height - 1);
 	}
 	resize(info->mCols, info->mRows);
 }

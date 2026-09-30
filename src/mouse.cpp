@@ -25,8 +25,6 @@
 #include "fbterm.h"
 #include "screen.h"
 
-DEFINE_INSTANCE(Mouse)
-
 #ifdef ENABLE_LIBINPUT
 
 #include <errno.h>
@@ -58,12 +56,12 @@ static const struct libinput_interface libinput_interface = {
 
 #endif
 
-Mouse *Mouse::createInstance()
+LibinputMouse *LibinputMouse::initLibinputMouse()
 {
-	return new Mouse();
+	return new LibinputMouse();
 }
 
-Mouse::Mouse()
+LibinputMouse::LibinputMouse()
 	: mEnabled(false)
 #ifdef ENABLE_LIBINPUT
 	, mLibinput(0)
@@ -125,7 +123,7 @@ Mouse::Mouse()
 #endif
 }
 
-Mouse::~Mouse()
+LibinputMouse::~LibinputMouse()
 {
 #ifdef ENABLE_LIBINPUT
 	if (mLibinput) libinput_unref(mLibinput);
@@ -133,12 +131,12 @@ Mouse::~Mouse()
 #endif
 }
 
-void Mouse::readyRead(s8 *buf, u32 len)
+void LibinputMouse::readyRead(s8 *buf, u32 len)
 {
-	// libinput owns reads from its fd; Mouse::ready() dispatches it directly.
+	// libinput owns reads from its fd; LibinputMouse::ready() dispatches it directly.
 }
 
-void Mouse::ready(bool isread)
+void LibinputMouse::ready(bool isread)
 {
 #ifdef ENABLE_LIBINPUT
 	if (!isread || !mEnabled || !mLibinput || mSuspended) return;
@@ -154,7 +152,7 @@ void Mouse::ready(bool isread)
 #endif
 }
 
-void Mouse::switchVc(bool enter)
+void LibinputMouse::switchVc(bool enter)
 {
 #ifdef ENABLE_LIBINPUT
 	if (!mEnabled || !mLibinput) return;
@@ -177,7 +175,7 @@ void Mouse::switchVc(bool enter)
 
 #ifdef ENABLE_LIBINPUT
 
-void Mouse::processEvent(struct libinput_event *event)
+void LibinputMouse::processEvent(struct libinput_event *event)
 {
 	s32 type = libinput_event_get_type(event);
 	struct libinput_event_pointer *pointer;
@@ -218,7 +216,7 @@ void Mouse::processEvent(struct libinput_event *event)
 	}
 }
 
-void Mouse::clampPosition()
+void LibinputMouse::clampPosition()
 {
 	Screen *screen = Screen::instance();
 	double maxX = screen->width() ? screen->width() - 1 : 0;
@@ -231,7 +229,7 @@ void Mouse::clampPosition()
 	else if (mY > maxY) mY = maxY;
 }
 
-void Mouse::currentCell(u16 &x, u16 &y) const
+void LibinputMouse::currentCell(u16 &x, u16 &y) const
 {
 	Screen *screen = Screen::instance();
 	u32 width = screen->width();
@@ -250,7 +248,7 @@ void Mouse::currentCell(u16 &x, u16 &y) const
 	if (y >= rows) y = rows - 1;
 }
 
-void Mouse::handleMotion(struct libinput_event_pointer *event, bool absolute)
+void LibinputMouse::handleMotion(struct libinput_event_pointer *event, bool absolute)
 {
 	u16 oldX, oldY, newX, newY;
 	currentCell(oldX, oldY);
@@ -272,7 +270,7 @@ void Mouse::handleMotion(struct libinput_event_pointer *event, bool absolute)
 	sendEvent(Move, mButtons);
 }
 
-void Mouse::handleButton(struct libinput_event_pointer *event)
+void LibinputMouse::handleButton(struct libinput_event_pointer *event)
 {
 	u32 code = libinput_event_pointer_get_button(event);
 	s32 button;
@@ -319,7 +317,7 @@ void Mouse::handleButton(struct libinput_event_pointer *event)
 	}
 }
 
-void Mouse::handleScroll(struct libinput_event_pointer *event, s32 eventType)
+void LibinputMouse::handleScroll(struct libinput_event_pointer *event, s32 eventType)
 {
 	if (!libinput_event_pointer_has_axis(event, LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL)) return;
 
@@ -356,7 +354,7 @@ void Mouse::handleScroll(struct libinput_event_pointer *event, s32 eventType)
 	}
 }
 
-s32 Mouse::modifierState() const
+s32 LibinputMouse::modifierState() const
 {
 	u8 state = TIOCL_GETSHIFTSTATE;
 	if (ioctl(STDIN_FILENO, TIOCLINUX, &state) == -1) return 0;
@@ -368,7 +366,7 @@ s32 Mouse::modifierState() const
 	return modifiers;
 }
 
-void Mouse::sendEvent(s32 type, s32 buttons)
+void LibinputMouse::sendEvent(s32 type, s32 buttons)
 {
 	FbShell *shell = FbShellManager::instance()->activeShell();
 	if (!shell) return;

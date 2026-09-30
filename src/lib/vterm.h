@@ -172,10 +172,12 @@ protected:
 
 private:
 	// utility functions
+	void resizeGridBuffers(GridState *g, u16 w, u16 new_max_width, u16 new_max_height);
 	void do_normal_char();
 	void do_control_char();
 	void scroll_region(u16 start_y, u16 end_y, s16 num);	// does clear
 	void shift_text(u16 y, u16 start_x, u16 end_x, s16 num); // ditto
+	void clear_grid_area(GridState *g, u16 start_x, u16 start_y, u16 end_x, u16 end_y);
 	void clear_area(u16 start_x, u16 start_y, u16 end_x, u16 end_y);
 	void changed_line(u16 y, u16 start_x, u16 end_x);
 	void move_cursor(u16 x, u16 y);

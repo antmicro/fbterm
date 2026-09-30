@@ -49,6 +49,10 @@ enum Keys {
 	CTRL_ALT_F4,
 	CTRL_ALT_F5,
 	CTRL_ALT_F6,
+#ifdef ENABLE_SDL2
+	SHIFT_CTRL_C,
+	SHIFT_CTRL_V,
+#endif
 	CTRL_ALT_K,
 	AC_END = CTRL_ALT_K
 };

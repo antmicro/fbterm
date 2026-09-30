@@ -24,6 +24,7 @@
 #include "type.h"
 #include "instance.h"
 #include "vterm.h"
+#include <string>
 
 #define NR_COLORS 256
 
@@ -90,6 +91,8 @@ public :
 	virtual void setSize(int w, int h);
 	virtual void setOffset(int x, int y);
 	virtual void present();
+	virtual void copySelection(char* text) {}
+	virtual std::string getClipboardText() { return {}; }
 
 #ifdef ENABLE_DRM
 	virtual DrmDev *getDrmDev() { return nullptr; }

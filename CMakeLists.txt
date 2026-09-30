@@ -46,6 +46,7 @@ add_executable(fbterm
 	src/input.cpp
 	src/input_generic.cpp
 	src/mouse.cpp
+	src/mouse_generic.cpp
 	src/screen.cpp
 	src/screen_render.cpp
 	src/vesadev.cpp
@@ -83,7 +84,7 @@ if (LIBDRM_FOUND AND LIBDBUS_FOUND)
 endif()
 
 if (SDL2_FOUND)
-	target_sources(fbterm PRIVATE src/sdl2.cpp src/input_sdl2.cpp)
+	target_sources(fbterm PRIVATE src/sdl2.cpp src/input_sdl2.cpp src/mouse_sdl2.cpp)
 	target_link_libraries(fbterm PRIVATE PkgConfig::SDL2)
 	target_compile_definitions(fbterm PRIVATE ENABLE_SDL2)
 	message(STATUS "Using SDL2")

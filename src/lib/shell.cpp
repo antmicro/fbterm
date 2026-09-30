@@ -32,6 +32,8 @@
 #include <sys/wait.h>
 #include "shell.h"
 #include <stdarg.h>
+#include <string>
+#include <inttypes.h>
 
 void waitChildProcessExit(s32 pid)
 {
@@ -126,6 +128,24 @@ void Shell::sendBack(const s8* format, ...)
 	}
 
 	write(buffer, bytes);
+
+	va_end(args);
+}
+
+void Shell::nSendBack(size_t size, const s8* format, ...) {
+	va_list args;
+	va_start(args, format);
+
+	s8* buffer = new s8[size]();
+	int bytes = vsnprintf(buffer, size, format, args);
+
+	if (bytes > size) {
+		bytes = size;
+	}
+
+	write(buffer, bytes);
+
+	delete[] buffer;
 
 	va_end(args);
 }
@@ -313,6 +333,35 @@ void Shell::middleTextSelect(u16 x, u16 y)
 	}
 }
 
+// Strip sequences of CR + whitespaces until first non-whitespace character or \n (true line ending).
+// A bare \n (no preceding \r) is a line-ending marker, emitted as \r.
+static size_t strip_line_ending_padding(size_t size, u16 *str) {
+  size_t is = 0, id = 0;
+  bool is_padding = false; // are we iterating over padding bytes
+  while (id < size && is < size) {
+    if (!is_padding) {
+      u16 c = str[is++];
+      if (c == '\r') {
+        str[id++] = c;
+        is_padding = true;
+      } else if (c == '\n') {
+        str[id++] = '\r';
+      } else {
+        str[id++] = c;
+      }
+    } else {
+      if (str[is] == ' ') {
+        is++;
+      } else {
+        if (str[is] == '\n')
+          is++; // discard the end-of-line marker itself
+        is_padding = false;
+      }
+    }
+  }
+  return id;
+}
+
 static void utf16_to_utf8(u16 *buf16, u32 num, s8 *buf8)
 {
 	u16 code;
@@ -348,8 +397,16 @@ void Shell::endTextSelect()
 	SWAP(start, end);
 
 	u32 len = end - start + 1;
-	u16 buf[len];
-	s8 *text = new s8[len * 3];
+
+	u16 *buf = new u16[len];
+	if(!buf)
+		return;
+
+	s8 *text = new s8[len * 3 + 1];
+	if(!text) {
+		delete[] buf;
+		return;
+	}
 
 	u16 sx, sy, ex, ey;
 	sx = start % w(), sy = start / w();
@@ -357,15 +414,37 @@ void Shell::endTextSelect()
 
 	u32 index = 0;
 	for (u16 y = sy; y <= ey; y++) {
-		u16 x = (y == sy ? sx : 0);
+		size_t line_start_idx = index;
+		u16 ix = (y == sy ? sx : 0), x = ix;
 		u16 end = (y == ey ? ex : (w() -1));
 		for (; x <= end; x++) {
 			buf[index++] = charCode(x, y);
 			if (charAttr(x, y).type == CharAttr::DoubleLeft) x++;
 		}
+
+		// Before goin to the next line, mark the character following last non-whitespace
+		if(buf[index-1] != ' ' || y == ey)
+			continue;
+
+		size_t pad_start = line_start_idx;
+		for(s64 rev_idx = index - 1; rev_idx >= (s64)line_start_idx; rev_idx--) {
+			if(buf[rev_idx] == ' ') {
+				// do nothing
+			} else {
+				pad_start = rev_idx + 1;
+				break;
+			}
+		}
+
+		buf[pad_start] = '\r';
+		buf[index - 1] = '\n';
 	}
 
-	utf16_to_utf8(buf, index, text);
+	size_t chars_to_convert = strip_line_ending_padding(index, buf);
+	utf16_to_utf8(buf, chars_to_convert, text);
+
+	delete[] buf;
+
 	mSelText.setText(text);
 }
 
@@ -447,7 +526,8 @@ void Shell::autoTextSelect(u16 x, u16 y)
 void Shell::putSelectedText()
 {
 	if (mSelText.text) {
-		sendBack(mSelText.text);
+		size_t size = strlen(mSelText.text);
+		nSendBack(size + 1, "%s", mSelText.text);
 	}
 }
 

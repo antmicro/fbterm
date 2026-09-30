@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <algorithm>
 #include <signal.h>
 #include <termios.h>
 #include <fcntl.h>
@@ -382,6 +383,7 @@ FbShell::FbShell()
 	Config::instance()->getOption("margin-bottom", config.bottom);
 	Config::instance()->getOption("margin-left", config.left);
 	Config::instance()->getOption("margin-right", config.right);
+	mMargins = config;
 
 	WindowInfo* info = getWindowInfo();
 	if (info == NULL) {
@@ -739,6 +741,23 @@ WindowInfo* FbShell::getWindowInfo() {
 	return screen;
 }
 
+void FbShell::screenResized()
+{
+	WindowInfo *info = getWindowInfo();
+	if (info == NULL) return;
+
+	// the screen is now a different size, so the window placement derived
+	// from it in the constructor is stale
+	window.w = std::max<s32>(0, (s32)info->mScreenWidth - (s32)mMargins.width());
+	window.h = std::max<s32>(0, (s32)info->mScreenHeight - (s32)mMargins.height());
+
+	updateWindow();
+
+	if (manager->activeShell() == this) {
+		expose(0, 0, w(), h());
+	}
+}
+
 void FbShell::clearMousePointer()
 {
 	if (mMousePointer.drawed) {
@@ -841,4 +860,15 @@ bool FbShell::childProcessExited(s32 pid)
 	}
 
 	return false;
+}
+
+void FbShell::copySelection() {
+	screen->copySelection(mSelText.text);
+}
+
+void FbShell::pasteFromClipboard() {
+	auto text = screen->getClipboardText();
+	if(!text.empty()) {
+		nSendBack(text.length() + 1, "%s", text.c_str());
+	}
 }

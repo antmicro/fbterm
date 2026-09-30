@@ -1,5 +1,6 @@
 #include "sdl2.h"
 
+#include <SDL_video.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,9 +10,13 @@
 
 #include <SDL2/SDL.h>
 
+#include "fbshell.h"
+#include "fbshellman.h"
 #include "io.h"
 #include "input_generic.h"
 #include "input_sdl2.h"
+#include "mouse_generic.h"
+#include "mouse_sdl2.h"
 #include "fbterm.h"
 #include "config.h"
 
@@ -65,8 +70,9 @@ bool Sdl2Dev::setup() {
 	Config::instance()->getOption("window-width", width);
 	Config::instance()->getOption("window-height", height);
 
+	// SDL_Window_flags 
 	sdlWindow = SDL_CreateWindow("fbterm", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		width, height, 0);
+		width, height, SDL_WINDOW_RESIZABLE);
 	if (!sdlWindow) {
 		LOG("SDL_CreateWindow failed: %s", SDL_GetError());
 		SDL_Quit();
@@ -144,6 +150,7 @@ Sdl2Dev::~Sdl2Dev()
 void Sdl2Dev::present()
 {
 	Sdl2Input *input = static_cast<Sdl2Input *>(KBInput::instance());
+	Sdl2Mouse *mouse = static_cast<Sdl2Mouse *>(GenericMouse::instance());
 
 	SDL_Event ev;
 	while (SDL_PollEvent(&ev)) {
@@ -152,11 +159,50 @@ void Sdl2Dev::present()
 			FbTerm::instance()->exit();
 		}
 		if (input) input->processEvent(ev);
-		// TODO: mouse events
+		if (mouse) mouse->processEvent(ev);
+		if (ev.type == SDL_WINDOWEVENT) {
+			switch (ev.window.event) {
+			case SDL_WINDOWEVENT_SIZE_CHANGED:
+				handleResize(ev.window.data1, ev.window.data2);
+				break;
+			case SDL_WINDOWEVENT_EXPOSED:
+				LOG("window exposed");
+				present();
+				break;
+			}
+		}
 	}
 
 	SDL_BlitSurface(sdlDrawSurface, 0, sdlWinSurface, 0);
 	SDL_UpdateWindowSurface(sdlWindow);
+}
+
+void Sdl2Dev::handleResize(int w, int h)
+{
+	if (w <= 0 || h <= 0) return;
+	if ((u32)w == mScreenWidth && (u32)h == mScreenHeight) return;
+
+	LOG("window resized to %dx%d", w, h);
+
+	// SDL invalidates the window surface when the window changes size, the
+	// old pointer must not be used again.
+	sdlWinSurface = SDL_GetWindowSurface(sdlWindow);
+
+	SDL_Surface *drawSurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_XRGB8888);
+	if (!drawSurface) {
+		LOG("SDL_CreateRGBSurfaceWithFormat failed: %s", SDL_GetError());
+		return;
+	}
+
+	SDL_FreeSurface(sdlDrawSurface);
+	sdlDrawSurface = drawSurface;
+
+	mScreenWidth = mWidth = w;
+	mScreenHeight = mHeight = h;
+	mBytesPerLine = sdlDrawSurface->pitch;
+	mVMemBase = (u8 *)sdlDrawSurface->pixels;
+
+	FbShellManager::instance()->screenResized();
 }
 
 const s8 *Sdl2Dev::drvId()
@@ -179,3 +225,19 @@ void Sdl2Dev::setupPalette(bool restore)
 	SDL_SetPaletteColors(sdlDrawSurface->format->palette, colors, 0, NR_COLORS);
 }
 
+void Sdl2Dev::copySelection(char* text) {
+	if (!text) return;
+
+	SDL_SetClipboardText(text);
+}
+
+std::string Sdl2Dev::getClipboardText() {
+	char* clipText = SDL_GetClipboardText();
+	std::string clip{};
+	if (clipText) {
+		clip = clipText;
+		SDL_free(clipText);
+	}
+
+	return clip;
+}

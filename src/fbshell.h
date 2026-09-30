@@ -48,6 +48,9 @@ public:
 	void imInput(s8 *buf, u32 len);
 	void ImExited() { mImProxy = 0; }
 	bool childProcessExited(s32 pid);
+	void copySelection(void);
+	void pasteFromClipboard(void);
+	void screenResized();
 
 private:
 	friend class FbShellManager;
@@ -93,6 +96,7 @@ private:
 		bool drawed;
 	} mMousePointer;
 
+	MarginConfig mMargins;
 	bool mPaletteChanged;
 	struct Color *mPalette;
 	class ImProxy *mImProxy;

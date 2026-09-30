@@ -43,6 +43,7 @@ public:
 	void historyScroll(bool down);
 	void redraw(u16 x, u16 y, u16 w, u16 h);
 	void switchVc(bool enter);
+	void screenResized();
 	void childProcessExited(s32 pid);
 
 private:

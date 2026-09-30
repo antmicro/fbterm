@@ -23,6 +23,7 @@
 
 #include "io.h"
 #include "vterm.h"
+#include <string.h>
 
 enum MouseType { Press = 0, Release, DblClick, Move, Wheel };
 
@@ -58,21 +59,6 @@ protected:
 	virtual void initShellProcess() {}
 	virtual void readyRead(s8 *buf, u32 len);
 
-private:
-	static void initWordChars(s8 *buf, u32 len);
-	virtual void sendBack(const s8* format, ...);
-
-	void textSelect(u16 x, u16 y, s32 type, s32 buttons);
-	void startTextSelect(u16 x, u16 y);
-	void middleTextSelect(u16 x, u16 y);
-	void endTextSelect();
-	void resetTextSelect();
-	void autoTextSelect(u16 x, u16 y);
-	void putSelectedText();
-	void inverseTextColor(u32 start, u32 end);
-
-	s32 mPid;
-
 	static struct SelectedText {
 		SelectedText() {
 			text = 0;
@@ -87,6 +73,23 @@ private:
 
 		s8 *text;
 	} mSelText;
+
+	virtual void sendBack(const s8* format, ...);
+	void nSendBack(size_t n, const s8* format, ...);
+private:
+	static void initWordChars(s8 *buf, u32 len);
+
+	void textSelect(u16 x, u16 y, s32 type, s32 buttons);
+	void startTextSelect(u16 x, u16 y);
+	void middleTextSelect(u16 x, u16 y);
+	void endTextSelect();
+	void resetTextSelect();
+	void autoTextSelect(u16 x, u16 y);
+	void putSelectedText();
+	void inverseTextColor(u32 start, u32 end);
+
+	s32 mPid;
+
 
 	struct TextSelection {
 		TextSelection() {

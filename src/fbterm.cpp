@@ -35,7 +35,7 @@
 #include "screen.h"
 #include "input_generic.h"
 #include "input_key.h"
-#include "mouse.h"
+#include "mouse_generic.h"
 #include "idle_timer.h"
 
 #ifndef WAIT_ANY
@@ -155,7 +155,7 @@ void FbTerm::init()
 #endif
 	signal(SIGPIPE, SIG_IGN);
 
-	Mouse::instance();
+	GenericMouse::instance();
 
 	u32 idleTimeout = 0;
 	s8 idleCommand[1024];
@@ -243,12 +243,12 @@ void FbTerm::processSignal(u32 signo)
 		FbShellManager::instance()->switchVc(false);
 		Screen::instance()->switchVc(false);
 		KBInput::instance()->switchVc(false);
-		Mouse::instance()->switchVc(false);
+		GenericMouse::instance()->switchVc(false);
 		ioctl(STDIN_FILENO, VT_RELDISP, 1);
 		break;
 
 	case SIGUSR2:
-		Mouse::instance()->switchVc(true);
+		GenericMouse::instance()->switchVc(true);
 		KBInput::instance()->switchVc(true);
 		Screen::instance()->switchVc(true);
 		FbShellManager::instance()->switchVc(true);
@@ -327,7 +327,19 @@ void FbTerm::processSysKey(u32 key)
 		if (manager->activeShell()) {
 			manager->activeShell()->killIm();
 		}
-
+		break;
+#ifdef ENABLE_SDL2
+	case SHIFT_CTRL_C:
+		if(manager->activeShell()) {
+			manager->activeShell()->copySelection();
+		}
+		break;
+	case SHIFT_CTRL_V:
+		if(manager->activeShell()) {
+			manager->activeShell()->pasteFromClipboard();
+		}
+		break;
+#endif
 	default:
 		break;
 	}

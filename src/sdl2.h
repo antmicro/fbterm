@@ -3,8 +3,12 @@
 
 #include "screen.h"
 #include <SDL2/SDL.h>
+#include <string>
 
 class Sdl2Dev : public Screen {
+public:
+		virtual void copySelection(char* text);
+		virtual std::string getClipboardText();
 private:
 	friend class Screen;
 	static Sdl2Dev *initSdl2Dev();
@@ -18,6 +22,7 @@ private:
 
 	friend class Sdl2Presenter;
 	void present();
+	void handleResize(int w, int h);
 
 	SDL_Window *sdlWindow = nullptr;
 	SDL_Surface *sdlWinSurface = nullptr;

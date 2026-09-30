@@ -21,8 +21,7 @@
 #ifndef MOUSE_H
 #define MOUSE_H
 
-#include "io.h"
-#include "instance.h"
+#include "mouse_generic.h"
 
 #ifdef ENABLE_LIBINPUT
 struct libinput;
@@ -31,11 +30,16 @@ struct libinput_event_pointer;
 struct udev;
 #endif
 
-class Mouse : public IoPipe {
-	DECLARE_INSTANCE(Mouse)
+class LibinputMouse : public GenericMouse {
+	friend class GenericMouse;
 public:
-	void switchVc(bool enter);
+	virtual void switchVc(bool enter);
 private:
+	static LibinputMouse *initLibinputMouse();
+
+	LibinputMouse();
+	~LibinputMouse();
+
 	virtual void ready(bool isread);
 	virtual void readyRead(s8 *buf, u32 len);
 

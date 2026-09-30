@@ -169,6 +169,13 @@ void FbShellManager::redraw(u16 x, u16 y, u16 w, u16 h)
 	screen->present();
 }
 
+void FbShellManager::screenResized()
+{
+	for (u32 i = 0; i < NR_SHELLS; i++) {
+		if (mShellList[i]) mShellList[i]->screenResized();
+	}
+}
+
 void FbShellManager::childProcessExited(s32 pid)
 {
 	for (u32 i = 0; i < NR_SHELLS; i++) {
