@@ -627,6 +627,8 @@ void VTerm::enable_mode(bool enable)
 			else mode_flags.mouse_report &= MouseTrackingMask;
 			modeChanged(MouseReport);
 			break;
+		case (2004 + 1000):
+			mode_flags.bracketed_paste = enable;
 		default:
 			break;
 		}

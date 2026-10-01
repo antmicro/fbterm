@@ -526,9 +526,24 @@ void Shell::autoTextSelect(u16 x, u16 y)
 void Shell::putSelectedText()
 {
 	if (mSelText.text) {
-		size_t size = strlen(mSelText.text);
-		nSendBack(size + 1, "%s", mSelText.text);
+		pasteText(mSelText.text);
 	}
+}
+
+void Shell::pasteText(std::string buf)
+{
+	if (isInBracketedPaste()) {
+		std::string pastedTextBegin = "\e[200~";
+		nSendBack(pastedTextBegin.length() + 1, "%s", pastedTextBegin.c_str());
+	} 
+	
+	size_t size = buf.length();
+	nSendBack(size + 1, "%s", buf.c_str());
+	
+	if (isInBracketedPaste()) {
+		std::string pastedTextEnd = "\e[201~";
+		nSendBack(pastedTextEnd.length() + 1, "%s", pastedTextEnd.c_str());
+	} 
 }
 
 void Shell::inverseTextColor(u32 start, u32 end)

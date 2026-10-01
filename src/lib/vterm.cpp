@@ -935,6 +935,10 @@ void VTerm::updateWindow() {
 	resize(info->mCols, info->mRows);
 }
 
+bool VTerm::isInBracketedPaste() {
+	return mode_flags.bracketed_paste;
+}
+
 u16 VTerm::get_line(u16 y)
 {
 	if (y > height) y = height;

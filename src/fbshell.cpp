@@ -869,6 +869,6 @@ void FbShell::copySelection() {
 void FbShell::pasteFromClipboard() {
 	auto text = screen->getClipboardText();
 	if(!text.empty()) {
-		nSendBack(text.length() + 1, "%s", text.c_str());
+		pasteText(text);
 	}
 }

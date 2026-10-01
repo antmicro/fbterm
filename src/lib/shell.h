@@ -24,6 +24,7 @@
 #include "io.h"
 #include "vterm.h"
 #include <string.h>
+#include <string>
 
 enum MouseType { Press = 0, Release, DblClick, Move, Wheel };
 
@@ -76,6 +77,7 @@ protected:
 
 	virtual void sendBack(const s8* format, ...);
 	void nSendBack(size_t n, const s8* format, ...);
+	void pasteText(std::string text);
 private:
 	static void initWordChars(s8 *buf, u32 len);
 

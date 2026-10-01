@@ -169,6 +169,7 @@ protected:
 	WindowPlacement window;
 
 	void updateWindow();
+	bool isInBracketedPaste();
 
 private:
 	// utility functions
@@ -367,6 +368,7 @@ private:
 		u16 cursorkey_esco : 1;
 		u16 mouse_report : 5;
 		u16 cursor_shape : 3;
+		u16 bracketed_paste : 1;
 	} mode_flags;
 
 	u16 cursor_x, cursor_y;
