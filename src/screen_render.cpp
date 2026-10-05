@@ -41,26 +41,30 @@ void Screen::setPalette(const Color *palette)
 	mPalette = palette;
 
 	for (u32 i = 0; i < NR_COLORS; i++) {
-		switch (mBitsPerPixel) {
-		case 8:
-			fillColors[i] = (i << 24) | (i << 16) | (i << 8) | i;
-			break;
-		case 15:
-			fillColors[i] = ((palette[i].red >> 3) << 10) | ((palette[i].green >> 3) << 5) | (palette[i].blue >> 3);
-			fillColors[i] |= fillColors[i] << 16;
-			break;
-		case 16:
-			fillColors[i] = ((palette[i].red >> 3) << 11) | ((palette[i].green >> 2) << 5) | (palette[i].blue >> 3);
-			fillColors[i] |= fillColors[i] << 16;
-			break;
-		case 32:
-			fillColors[i] = (palette[i].red << 16) | (palette[i].green << 8) | palette[i].blue;
-			break;
-		}
+		updatePaletteColor(i);
 	}
 
 	setupPalette(false);
 	eraseMargin(true, mRows);
+}
+
+void Screen::updatePaletteColor(size_t i) {
+	switch (mBitsPerPixel) {
+	case 8:
+		fillColors[i] = (i << 24) | (i << 16) | (i << 8) | i;
+		break;
+	case 15:
+		fillColors[i] = ((mPalette[i].red >> 3) << 10) | ((mPalette[i].green >> 3) << 5) | (mPalette[i].blue >> 3);
+		fillColors[i] |= fillColors[i] << 16;
+		break;
+	case 16:
+		fillColors[i] = ((mPalette[i].red >> 3) << 11) | ((mPalette[i].green >> 2) << 5) | (mPalette[i].blue >> 3);
+		fillColors[i] |= fillColors[i] << 16;
+		break;
+	case 32:
+		fillColors[i] = (mPalette[i].red << 16) | (mPalette[i].green << 8) | mPalette[i].blue;
+		break;
+	}
 }
 
 void Screen::initFillDraw()

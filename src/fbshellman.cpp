@@ -49,6 +49,11 @@ void FbShellManager::createShell()
 	if (mShellCount == NR_SHELLS) return;
 	mShellCount++;
 
+	if (mShellCount > 1) {
+		screen->activateStatusline(true);
+		screenResized();
+	}
+
 	u32 index = getIndex(0, true, false);
 	mShellList[index] = new FbShell();
 	switchShell(index);
@@ -77,6 +82,7 @@ void FbShellManager::switchShell(u32 num)
 	if (mVcCurrent && setActive(mShellList[mCurShell])) {
 		redraw(0, 0, screen->cols(), screen->rows());
 	}
+	screen->drawStatusline();
 }
 
 void FbShellManager::drawCursor()
@@ -119,6 +125,11 @@ void FbShellManager::shellExited(FbShell *shell)
 	if (!--mShellCount) {
 		FbTerm::instance()->exit();
 	}
+
+	if (mShellCount == 1 && mShellList[0]) {
+		screen->activateStatusline(false);
+		screenResized();
+	}
 }
 
 u32 FbShellManager::getIndex(FbShell *shell, bool forward,  bool stepfirst)
@@ -152,11 +163,51 @@ bool FbShellManager::setActive(FbShell *shell)
 	FbShell *oldActiveShell = mActiveShell;
 	mActiveShell = shell;
 
+	bool wasActive = screen->isStatuslineActive();
+	screen->activateStatusline(mCurShell != 0 || mShellCount > 1 || !mShellList[0]);
+	if (wasActive != screen->isStatuslineActive()) {
+		screenResized();
+	}
+
 	if (mActiveShell) {
 		mActiveShell->switchVt(true, oldActiveShell);
 	}
 
 	return true;
+}
+
+void FbShellManager::drawStatusline(int y) {
+	u16 ones, tens, textbuf[2];
+	bool dw = false;
+	int len;
+	Color c;
+
+	Color statusExitedColor   = Color::unpack(Screen::instance()->getFromPalette(7));
+	Color statusActiveColor   = Color::unpack(Screen::instance()->getFromPalette(1));
+	Color statusInactiveColor = Color::unpack(Screen::instance()->getFromPalette(231));
+	Color colorbg             = Color::unpack(Screen::instance()->getFromPalette(0));
+
+	for (int i = 0; i < NR_SHELLS; i++)  {
+		ones = (i+1) % 10 + '0';
+		tens = (i+1) / 10 + '0';
+		textbuf[0] = ones;
+
+		if (tens > '0') {
+			textbuf[0] = tens;
+			textbuf[1] = ones;
+		}
+
+		if (mCurShell == i) {
+			c = statusActiveColor;
+		} else if (mShellList[i]) {
+			c = statusInactiveColor;
+		} else {
+			c = statusExitedColor;
+		}
+
+		screen->drawText(FW(1+((i)*2)), y, c, colorbg, tens > '0' ? 2 : 1, textbuf,
+							 &dw, false, false, false);
+	}
 }
 
 void FbShellManager::redraw(u16 x, u16 y, u16 w, u16 h)
@@ -166,14 +217,17 @@ void FbShellManager::redraw(u16 x, u16 y, u16 w, u16 h)
 	} else {
 		screen->fillRect(FW(x), FH(y), FW(w), FH(h), 0);
 	}
+	screen->drawStatusline();
 	screen->present();
 }
 
 void FbShellManager::screenResized()
 {
-	for (u32 i = 0; i < NR_SHELLS; i++) {
-		if (mShellList[i]) mShellList[i]->screenResized();
+	if (mShellList[mCurShell]) {
+		mShellList[mCurShell]->screenResized();
 	}
+	screen->eraseMargin(true, screen->mRows);
+	screen->drawStatusline();
 }
 
 void FbShellManager::childProcessExited(s32 pid)

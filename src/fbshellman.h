@@ -23,6 +23,7 @@
 
 #include "type.h"
 #include "instance.h"
+#include "screen.h"
 
 class FbShell;
 
@@ -40,6 +41,7 @@ public:
 	void prevShell();
 
 	void drawCursor();
+	void drawStatusline(int y);
 	void historyScroll(bool down);
 	void redraw(u16 x, u16 y, u16 w, u16 h);
 	void switchVc(bool enter);

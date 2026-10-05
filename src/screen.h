@@ -22,9 +22,11 @@
 #define SCREEN_H
 
 #include "type.h"
+#include "font.h"
 #include "instance.h"
 #include "vterm.h"
 #include <string>
+#include <functional>
 
 #define NR_COLORS 256
 
@@ -82,10 +84,17 @@ public :
 
 	bool move(u16 scol, u16 srow, u16 dcol, u16 drow, u16 w, u16 h);
 	void setPalette(const Color *palette);
+	void updatePaletteColor(size_t i);
 
 	void enableScroll(bool enable) { mScrollEnable = enable; }
 
+	void activateStatusline(bool activate);
+	bool isStatuslineActive() { return mStatuslineActive; };
+	int statuslineMargin() { return mStatuslineActive ? FH(1) : FH(0); };
+	void drawStatusline();
+
 	void showInfo(bool verbose);
+	void eraseMargin(bool top, u16 h);
 	virtual void switchVc(bool enter);
 
 	virtual void setSize(int w, int h);
@@ -116,7 +125,7 @@ private:
 	virtual void setupPalette(bool restore) {}
 	virtual const s8 *drvId() = 0;
 
-	void eraseMargin(bool top, u16 h);
+	void marginDraw(std::function<void(void)> drawFn);
 	void drawGlyphs(u32 x, u32 y, Color fc, Color bc, u16 num, u16 *text, bool *dw, bool ul, bool st, bool it);
 	void drawGlyph(u32 x, u32 y, Color fc, Color bc, u16 code, bool dw, bool ul, bool st, bool it);
 	void adjustOffset(u32 &x, u32 &y);
@@ -149,5 +158,6 @@ private:
 	drawFun draw;
 	drawFunRGB drawRGB;
 	bool mScrollEnable;
+	bool mStatuslineActive = false;
 };
 #endif

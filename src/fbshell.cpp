@@ -329,7 +329,7 @@ u32 MarginConfig::width() const
 
 u32 MarginConfig::height() const
 {
-	return bottom + top;
+	return bottom + top + screen->statuslineMargin();
 }
 
 static bool firstShell = true;
@@ -569,11 +569,13 @@ void FbShell::request(RequestType type,  u32 val)
 			memcpy(mPalette, defaultPalette, sizeof(defaultPalette));
 		}
 
-		mPalette[val >> 24] = Color::unpack(val);
-
 		if (active) {
 			screen->setPalette(mPalette);
 		}
+
+		mPalette[val >> 24] = Color::unpack(val);
+		screen->updatePaletteColor(val >> 24);
+
 		break;
 
 	case PaletteClear:
@@ -621,7 +623,7 @@ void FbShell::switchVt(bool enter, FbShell *peer)
 		reportCursor();
 
 		// restore margins
-		updateWindow();
+		screenResized();
 	} else if (!peer) {
 		changeMode(CursorKeyEscO, false);
 		changeMode(ApplicKeypad, false);

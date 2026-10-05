@@ -163,6 +163,34 @@ Screen::~Screen()
 	ret = write(STDIN_FILENO, clear_screen, sizeof(clear_screen) - 1);
 }
 
+void Screen::activateStatusline(bool activate)
+{
+	if (mStatuslineActive && !activate) {
+		setSize(mWidth, mHeight + FH(1));
+	} else if (!mStatuslineActive && activate) {
+		setSize(mWidth, mHeight - FH(1));
+	}
+	mStatuslineActive = activate;
+}
+
+void Screen::marginDraw(std::function<void(void)> drawFn) {
+	auto savedHeight = mHeight, savedWidth = mWidth;
+	setSize(mScreenWidth, mScreenHeight);
+	drawFn();
+	setSize(savedWidth, savedHeight);
+}
+
+void Screen::drawStatusline() {
+	if (mStatuslineActive) {
+		auto bottomMargin = mHeight;
+		auto bottomWidth = mWidth;
+		marginDraw([&](){
+			fillRect(0, bottomMargin, bottomWidth, FH(1), 0);
+			FbShellManager::instance()->drawStatusline(bottomMargin);
+		});
+	}
+}
+
 void Screen::setSize(int w, int h)
 {
 

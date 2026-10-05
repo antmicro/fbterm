@@ -25,6 +25,8 @@
 #include "termcap.h"
 #include "screen.h"
 
+#define screen (Screen::instance())
+
 void VTerm::cr()
 {
 	move_cursor(0, cursor_y);
@@ -475,6 +477,9 @@ void VTerm::erase_display()
 		clear_history();
 		break;
 	}
+
+	screen->eraseMargin(true, screen->mHeight);
+	screen->drawStatusline();
 }
 
 void VTerm::clear_history() {
