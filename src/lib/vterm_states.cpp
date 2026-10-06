@@ -79,6 +79,13 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	{ CSPAN('0', '9'), &VTerm::param_digit, ESkeep },
 	{ ';', &VTerm::next_param, ESkeep },
 	{ ':', &VTerm::next_param, ESkeep }, // some codes use ':' instead of ';' as the argument separator
+	// ECMA-48 5.4 defines a control sequence as "CSI P...P I...I F", where the
+	// Intermediate Bytes I (02/00 to 02/15) "together with the Final Byte F
+	// identify the control function". They therefore cannot be skipped: e.g.
+	// "CSI 2 SP q" (DECSCUSR) is a different function from "CSI 2 q" (DECLL).
+	// Track them in a separate state so the final byte is consumed as part of
+	// the sequence instead of falling through and being printed as text.
+	{ CSPAN(' ', '/'), nullptr, EScsiInter },
 	{ '@', &VTerm::insert_char,	ESnormal },
 	{ 'A', &VTerm::cursor_up,	ESnormal },
 	{ 'B', &VTerm::cursor_down,	ESnormal },
@@ -114,7 +121,6 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	{ '`', &VTerm::cursor_position_col,	ESnormal },
 	{ ']', &VTerm::linux_specific, ESnormal },
 	{ '}', &VTerm::fbterm_specific, ESnormal },
-	{ '%', 0, ESkeep }, // this is a workaround for the wierd, undocumented code "\e[0%m" - otherwise the trailing 'm' gets printed
 	ENDSEQ,
 
 	// ESosc #3 "ESC ]"
@@ -153,27 +159,40 @@ const VTerm::Sequence VTerm::escape_sequences[] = {
 	{ '9', &VTerm::screen_clear, ESnormal },
 	ENDSEQ,
 
-	// ESgreater #8 "ESC [ >"
+	// ESgreater #7 "ESC [ >"
 	{ CSPAN('0', '9'), &VTerm::param_digit, ESkeep },
 	{ ';', &VTerm::next_param,	ESkeep },
 	{ 'c', &VTerm::get_device_attribute, ESnormal }, // Send Device Attributes (Secondary DA)
 	{ 'm', &VTerm::set_key_modifier, ESnormal }, // Set/reset key modifier options
 	ENDSEQ,
 
-	// ESdcs #9 "ESC P"
+	// ESdcs #8 "ESC P"
 	{ '+', nullptr, ESkeep },
 	{ 'q', nullptr, EStermcap },
 	ENDSEQ,
 
-	// EStermcap #10 "ESC P + q"
+	// EStermcap #9 "ESC P + q"
 	{ CSPAN('0', '9'), &VTerm::param_hex_digit, ESkeep },
 	{ CSPAN('a', 'f'), &VTerm::param_hex_digit, ESkeep },
 	{ CSPAN('A', 'F'), &VTerm::param_hex_digit, ESkeep },
 	{ 0x1B, &VTerm::request_termcap, ESst },
 	ENDSEQ,
 
-	// ESst #11
+	// ESst #10
 	{ '\\', nullptr, ESnormal },
+	ENDSEQ,
+
+	// EScsiInter #11 "CSI ... I" where I is an intermediate byte (0x20-0x2F)
+	// Sequences reaching this state are not implemented by fbterm. Consume the
+	// remaining intermediate bytes and the final byte so that nothing is printed.
+	{ CSPAN(' ', '/'), nullptr, ESkeep },
+	{ CSPAN('@', '~'), nullptr, ESnormal },
+	// Exception: the undocumented "\e[0%m" is emitted by some applications and
+	// was previously handled by keeping '%' in EScsi so that the trailing 'm'
+	// reached the SGR entry. ECMA-48 assigns no function to an intermediate
+	// byte followed by 06/13, so treating it as SGR here does not shadow a
+	// standard sequence.
+	{ 'm', &VTerm::set_display_attr, ESnormal },
 	ENDSEQ
 
 };
