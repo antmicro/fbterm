@@ -408,17 +408,29 @@ void DrmDev::cleanup()
 		drm_saved_crtc = 0;
 	}
 
-	if (drm_fb_id) {
-		drmModeRmFB(drm_fd, drm_fb_id);
-		drm_fb_id = 0;
+	for (int buf_idx = 0; buf_idx < 2; buf_idx++) {
+		if (drm_fb_ids[buf_idx]) {
+			drmModeRmFB(drm_fd, drm_fb_ids[buf_idx]);
+			drm_fb_ids[buf_idx] = 0;
+		}
+
+		if (drm_handles[buf_idx]) {
+			struct drm_mode_destroy_dumb dreq;
+			memset(&dreq, 0, sizeof(dreq));
+			dreq.handle = drm_handles[buf_idx];
+			ioctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
+			drm_handles[buf_idx] = 0;
+		}
+
+		if (drm_maps[buf_idx] && drm_maps[buf_idx] != MAP_FAILED) {
+			munmap(drm_maps[buf_idx], drm_sizes[buf_idx]);
+			drm_maps[buf_idx] = nullptr;
+		}
 	}
 
-	if (drm_handle) {
-		struct drm_mode_destroy_dumb dreq;
-		memset(&dreq, 0, sizeof(dreq));
-		dreq.handle = drm_handle;
-		ioctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
-		drm_handle = 0;
+	if (back_buffer) {
+		delete[] back_buffer;
+		back_buffer = nullptr;
 	}
 
 	if (drm_fd >= 0) {
@@ -426,19 +438,14 @@ void DrmDev::cleanup()
 		close(drm_fd);
 		drm_fd = -1;
 	}
-
-	if (drm_map && drm_map != MAP_FAILED) {
-		munmap(drm_map, drm_size);
-		drm_map = nullptr;
-	}
 }
 
 bool DrmDev::restoreScanout()
 {
-	if (drm_fd < 0 || drm_crtc_id == 0 || drm_fb_id == 0)
+	if (drm_fd < 0 || drm_crtc_id == 0 || drm_fb_ids[front_buffer_idx] == 0)
 		return false;
 
-	if (drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_id, 0, 0, &drm_connector_id, 1, &drm_mode) != 0) {
+	if (drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_ids[front_buffer_idx], 0, 0, &drm_connector_id, 1, &drm_mode) != 0) {
 		perror("drmModeSetCrtc");
 		return false;
 	}
@@ -496,58 +503,72 @@ bool DrmDev::setup() {
 		return false;
 	}
 
-	struct drm_mode_create_dumb creq = {0};
-	creq.width = drm_mode.hdisplay;
-	creq.height = drm_mode.vdisplay;
-	creq.bpp = 32; // ARGB
+	for (int buf_idx = 0; buf_idx < 2; buf_idx++) {
+		struct drm_mode_create_dumb creq = {0};
+		creq.width = drm_mode.hdisplay;
+		creq.height = drm_mode.vdisplay;
+		creq.bpp = 32; // ARGB
 
-	if (ioctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq) < 0) {
-		LOG("create dumb buffer: %s", strerror(errno));
-		drmModeFreeConnector(conn);
-		drmModeFreeResources(res);
-		cleanup();
+		if (ioctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq) < 0) {
+			LOG("create dumb buffer: %s", strerror(errno));
+			drmModeFreeConnector(conn);
+			drmModeFreeResources(res);
+			cleanup();
+			return false;
+		}
+		drm_handles[buf_idx] = creq.handle;
+
+		if(drmModeAddFB(drm_fd, drm_mode.hdisplay, drm_mode.vdisplay, 24, 32, creq.pitch, creq.handle, &drm_fb_ids[buf_idx])) {
+			LOG("drmModeAddFB: %s", strerror(errno));
+			drmModeFreeConnector(conn);
+			drmModeFreeResources(res);
+			cleanup();
+			return false;
+		}
+		LOG("created dumb buffer: handle=%u, pitch=%u, size=%llu", drm_handles[buf_idx], creq.pitch, (unsigned long long)creq.size);
+		drm_pitches[buf_idx] = creq.pitch;
+
+		// MEMORY MAPPING
+		// Mapping GPU-side
+		struct drm_mode_map_dumb mreq = {0};
+		mreq.handle = creq.handle;
+		if(ioctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq) < 0) {
+			LOG("map dumb buffer: %s", strerror(errno));
+			drmModeFreeConnector(conn);
+			drmModeFreeResources(res);
+			cleanup();
+			return false;
+		}
+
+		// Mapping fbterm-side
+		drm_sizes[buf_idx] = creq.size;
+		drm_maps[buf_idx] = (u8*)mmap(0, drm_sizes[buf_idx], PROT_READ | PROT_WRITE, MAP_SHARED, drm_fd, mreq.offset);
+		if (drm_maps[buf_idx] == MAP_FAILED) {
+			drm_maps[buf_idx] = nullptr;
+			LOG("mmap: %s", strerror(errno));
+			drmModeFreeConnector(conn);
+			drmModeFreeResources(res);
+			cleanup();
+			return false;
+		}
+		LOG("mapped dumb buffer to %p", drm_maps[buf_idx]);
+	}
+
+	if (drm_pitches[front_buffer_idx] != drm_pitches[flip_buffer_idx]) {
+		LOG("front buffer and flip buffer pitches do not match");
 		return false;
 	}
-	drm_handle = creq.handle;
 
-	if(drmModeAddFB(drm_fd, drm_mode.hdisplay, drm_mode.vdisplay, 24, 32, creq.pitch, creq.handle, &drm_fb_id)) {
-		LOG("drmModeAddFB: %s", strerror(errno));
-		drmModeFreeConnector(conn);
-		drmModeFreeResources(res);
-		cleanup();
+	if (drm_sizes[front_buffer_idx] != drm_sizes[flip_buffer_idx]) {
+		LOG("front buffer and flip buffer sizes do not match");
 		return false;
 	}
-	LOG("created dumb buffer: handle=%u, pitch=%u, size=%llu", drm_handle, creq.pitch, (unsigned long long)creq.size);
-	drm_pitch = creq.pitch;
-
-	// MEMORY MAPPING
-	// Mapping GPU-side
-	struct drm_mode_map_dumb mreq = {0};
-	mreq.handle = creq.handle;
-	if(ioctl(drm_fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq) < 0) {
-		LOG("map dumb buffer: %s", strerror(errno));
-		drmModeFreeConnector(conn);
-		drmModeFreeResources(res);
-		cleanup();
-		return false;
-	}
-
-	// Mapping fbterm-side
-	drm_size = creq.size;
-	drm_map = (u8*)mmap(0, drm_size, PROT_READ | PROT_WRITE, MAP_SHARED, drm_fd, mreq.offset);
-	if (drm_map == MAP_FAILED) {
-		drm_map = nullptr;
-		LOG("mmap: %s", strerror(errno));
-		drmModeFreeConnector(conn);
-		drmModeFreeResources(res);
-		cleanup();
-		return false;
-	}
-	LOG("mapped dumb buffer to %p", drm_map);
+	
+	back_buffer = new u8[drm_sizes[front_buffer_idx]];
 
 	drm_saved_crtc = drmModeGetCrtc(drm_fd, drm_crtc_id);
 
-	int result = drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_id, 0, 0, &drm_connector_id, 1, &drm_mode);
+	int result = drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_ids[front_buffer_idx], 0, 0, &drm_connector_id, 1, &drm_mode);
 
 	if(result) {
 		LOG("drmModeSetCrtc: %s", strerror(errno));
@@ -557,7 +578,7 @@ bool DrmDev::setup() {
 		return false;
 	}
 
-	LOG("set CRTC %u to use FB %u", drm_crtc_id, drm_fb_id);
+	LOG("set CRTC %u to use FB %u", drm_crtc_id, drm_fb_ids[front_buffer_idx]);
 
 	drmModeFreeConnector(conn);
 	drmModeFreeResources(res);
@@ -568,8 +589,8 @@ bool DrmDev::setup() {
 	mScreenWidth = drm_mode.hdisplay;
 	mWidth = drm_mode.hdisplay;
 	mHeight = drm_mode.vdisplay;
-	mBytesPerLine = drm_pitch;
-	mVMemBase = (u8*)drm_map;
+	mBytesPerLine = drm_pitches[front_buffer_idx];
+	mVMemBase = (u8*)back_buffer;
 
 	return true;
 }
@@ -620,7 +641,7 @@ void DrmDev::switchVc(bool enter) {
 	int status = 0;
 	if(enter) {
 		if( (status = drmSetMaster(drm_fd)) == 0) {
-			drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_id, 0, 0, &drm_connector_id, 1, &drm_mode);
+			drmModeSetCrtc(drm_fd, drm_crtc_id, drm_fb_ids[front_buffer_idx], 0, 0, &drm_connector_id, 1, &drm_mode);
 		} else {
 			fprintf(stderr, "Could not set DRM master, status: %d", status);
 		}
@@ -649,17 +670,22 @@ void DrmDev::present()
 	}
 
 	if (drm_page_flip_pending) {
+		pending_present = true;
 		return;
 	}
 
-	if (drmModePageFlip(drm_fd, drm_crtc_id, drm_fb_id, DRM_MODE_PAGE_FLIP_EVENT, this)) {
+	pending_present = false;
+	drm_page_flip_pending = true;
+
+	memcpy(drm_maps[flip_buffer_idx], back_buffer, drm_sizes[flip_buffer_idx]);
+
+	if (drmModePageFlip(drm_fd, drm_crtc_id, drm_fb_ids[flip_buffer_idx], DRM_MODE_PAGE_FLIP_EVENT, this)) {
 		if (errno != EBUSY) {
 			LOG("drmModePageFlip: %s", strerror(errno));
 		}
+		drm_page_flip_pending = false;
 		return;
 	}
-
-	drm_page_flip_pending = true;
 }
 
 void DrmDev::pageFlipHandler(
@@ -670,10 +696,21 @@ void DrmDev::pageFlipHandler(
 		void *user_data)
 {
 	auto *self = static_cast<DrmDev *>(user_data);
+
 	self->drm_page_flip_pending = false;
+
+	// Update the buffer used only after successful page flip
+	auto temp = self->flip_buffer_idx;
+	self->flip_buffer_idx = self->front_buffer_idx;
+	self->front_buffer_idx = temp;
 
 	if (self->mPageFlipCompletedCallback != NULL)
 		self->mPageFlipCompletedCallback(self->mPageFlipCompletedUserData);
+
+	if (self->pending_present) {
+		self->present();
+		return;
+	}
 }
 
 void DrmDev::handleDrmEvents()
